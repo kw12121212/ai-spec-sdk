@@ -1,0 +1,20 @@
+{
+  "name": "ai-spec-sdk",
+  "version": "0.1.0",
+  "description": "Polyglot JSON-RPC bridge for Claude Agent SDK and spec-driven workflows",
+  "type": "module",
+  "packageManager": "bun@latest",
+  "main": "src/index.js",
+  "bin": {
+    "ai-spec-bridge": "src/cli.js"
+  },
+  "scripts": {
+    "lint": "node --check src/*.js test/*.js",
+    "test": "node --test",
+    "start": "node src/cli.js"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "license": "Apache-2.0"
+}

@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Package manager artifacts
+bun.lockb
+
+# Build outputs
+dist/
+build/
+coverage/
+
+# Runtime logs
+*.log
+logs/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Test temp files
+tmp/
+.tmp/

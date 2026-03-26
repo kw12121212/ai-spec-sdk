@@ -1,0 +1,61 @@
+export const BRIDGE_VERSION = "0.1.0";
+
+export const SUPPORTED_WORKFLOWS = [
+  "init",
+  "propose",
+  "modify",
+  "apply",
+  "verify",
+  "archive",
+  "cancel",
+  "list",
+];
+
+export const BUILTIN_SPEC_SKILLS = [
+  "spec-driven-brainstorm",
+  "spec-driven-init",
+  "spec-driven-propose",
+  "spec-driven-modify",
+  "spec-driven-spec-content",
+  "spec-driven-apply",
+  "spec-driven-verify",
+  "spec-driven-review",
+  "spec-driven-archive",
+  "spec-driven-cancel",
+  "spec-driven-auto",
+];
+
+export const WORKFLOW_SKILL_MAP = {
+  init: "spec-driven-init",
+  propose: "spec-driven-propose",
+  modify: "spec-driven-modify",
+  apply: "spec-driven-apply",
+  verify: "spec-driven-verify",
+  archive: "spec-driven-archive",
+  cancel: "spec-driven-cancel",
+  list: "spec-driven-modify",
+};
+
+export function getCapabilities() {
+  return {
+    protocol: "jsonrpc-2.0",
+    transport: "stdio",
+    bridgeVersion: BRIDGE_VERSION,
+    notifications: {
+      progress: true,
+      sessionEvent: true,
+    },
+    workflows: SUPPORTED_WORKFLOWS,
+    skills: BUILTIN_SPEC_SKILLS,
+    workflowSkillMap: WORKFLOW_SKILL_MAP,
+    methods: [
+      "bridge.capabilities",
+      "workflow.run",
+      "skills.list",
+      "session.start",
+      "session.resume",
+      "session.stop",
+      "session.status",
+    ],
+  };
+}
