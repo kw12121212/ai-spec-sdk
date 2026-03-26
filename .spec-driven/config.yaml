@@ -1,7 +1,8 @@
 schema: spec-driven
 context: |
   ai-spec-sdk is an SDK project intended to package Claude Agent SDK workflows together with built-in spec-driven skills so other tools can integrate them through a simpler interface.
-  The repository is currently at a very early stage and only contains the license plus the spec-driven scaffold, so the initial specs should define intended external behavior before implementation grows.
+  The project is implemented in TypeScript (strict mode, NodeNext module resolution). Source files live in src/*.ts and test files in test/*.ts. The compiled output goes to dist/. bun is the package manager and test runner.
+  @anthropic-ai/claude-agent-sdk is a required dependency (not optional). It is imported statically in src/claude-agent-runner.ts. Tests inject a stub via globalThis.__AI_SPEC_SDK_QUERY__ to avoid real API calls.
   The project lives in a Git repository named `ai-spec-sdk` and is distributed under the Apache 2.0 license.
   Specs and changes should stay focused on observable SDK behavior, workflow integration boundaries, and clear contracts for downstream tool consumers.
 rules:
@@ -20,6 +21,7 @@ rules:
     - Mark tasks [x] immediately upon completion — never batch at the end
     - Every change must include test tasks (lint + unit tests at minimum)
   code:
+    - All source and test files must be TypeScript (.ts); do not add .js source files
     - Read existing code before modifying it
     - Implement only what the current task requires — no speculative features
     - No abstractions for hypothetical future needs (YAGNI)
@@ -28,6 +30,8 @@ rules:
       implementation details
     - Each test must be independent — no shared mutable state between tests
     - Prefer real dependencies over mocks for code the project owns
+    - Use globalThis.__AI_SPEC_SDK_QUERY__ to stub Claude Agent SDK calls in tests;
+      always delete the stub in a finally block or after-each equivalent
 # fileMatch:              # per-pattern rules applied in addition to global rules above
 #   - pattern: "**/*.test.*"
 #     rules:

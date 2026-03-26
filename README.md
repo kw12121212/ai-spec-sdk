@@ -14,13 +14,22 @@ Polyglot local SDK bridge for Claude Agent SDK and spec-driven workflows.
 
 ```bash
 bun install
+bun run build
 bun run start
 ```
 
-You can also run the bridge process directly:
+Or run the bridge directly from compiled output:
 
 ```bash
-bun src/cli.js
+node dist/src/cli.js
+```
+
+## Development
+
+```bash
+bun run lint    # tsc --noEmit (type-check)
+bun run test    # run test suite
+bun run build   # compile to dist/
 ```
 
 ## JSON-RPC methods

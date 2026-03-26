@@ -5,7 +5,13 @@ The bridge speaks JSON-RPC 2.0 over stdio. One JSON object per line.
 ## Start process
 
 ```bash
-bun src/cli.js
+node dist/src/cli.js
+```
+
+Or via the package bin after `bun run build`:
+
+```bash
+ai-spec-bridge
 ```
 
 ## Capabilities request
@@ -127,7 +133,7 @@ import json
 import subprocess
 
 proc = subprocess.Popen(
-    ["bun", "src/cli.js"],
+    ["node", "dist/src/cli.js"],
     stdin=subprocess.PIPE,
     stdout=subprocess.PIPE,
     text=True,
