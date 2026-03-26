@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { BridgeServer } from "../src/bridge.js";
 
 test("bridge.capabilities returns stdio JSON-RPC capabilities", async () => {
-  const notifications = [];
+  const notifications: unknown[] = [];
   const server = new BridgeServer({
     notify: (message) => notifications.push(message),
   });
@@ -16,9 +16,10 @@ test("bridge.capabilities returns stdio JSON-RPC capabilities", async () => {
 
   assert.equal(response.jsonrpc, "2.0");
   assert.equal(response.id, 1);
-  assert.equal(response.result.transport, "stdio");
-  assert.equal(response.result.protocol, "jsonrpc-2.0");
-  assert.ok(response.result.methods.includes("workflow.run"));
+  const result = response.result as Record<string, unknown>;
+  assert.equal(result["transport"], "stdio");
+  assert.equal(result["protocol"], "jsonrpc-2.0");
+  assert.ok((result["methods"] as string[]).includes("workflow.run"));
   assert.equal(notifications.length, 0);
 });
 
@@ -32,7 +33,7 @@ test("unknown method returns method-not-found error", async () => {
 
   assert.equal(response.jsonrpc, "2.0");
   assert.equal(response.id, 2);
-  assert.equal(response.error.code, -32601);
+  assert.equal(response.error!.code, -32601);
 });
 
 test("invalid JSON-RPC object returns invalid-request error", async () => {
@@ -44,5 +45,5 @@ test("invalid JSON-RPC object returns invalid-request error", async () => {
 
   assert.equal(response.jsonrpc, "2.0");
   assert.equal(response.id, 3);
-  assert.equal(response.error.code, -32600);
+  assert.equal(response.error!.code, -32600);
 });

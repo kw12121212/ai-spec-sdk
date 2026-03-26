@@ -8,9 +8,9 @@ import { SUPPORTED_WORKFLOWS } from "./capabilities.js";
 
 const execFileAsync = promisify(execFile);
 
-function resolveSpecDrivenScript() {
-  if (process.env.SPEC_DRIVEN_SCRIPT) {
-    return process.env.SPEC_DRIVEN_SCRIPT;
+function resolveSpecDrivenScript(): string {
+  if (process.env["SPEC_DRIVEN_SCRIPT"]) {
+    return process.env["SPEC_DRIVEN_SCRIPT"];
   }
 
   const home = os.homedir();
@@ -30,10 +30,10 @@ function resolveSpecDrivenScript() {
     }
   }
 
-  return candidates[0];
+  return candidates[0]!;
 }
 
-function ensureWorkspace(workspace) {
+function ensureWorkspace(workspace: unknown): string {
   if (!workspace || typeof workspace !== "string") {
     throw new BridgeError(-32602, "'workspace' must be a string path");
   }
@@ -46,12 +46,12 @@ function ensureWorkspace(workspace) {
   return resolved;
 }
 
-function ensureWorkflow(workflow) {
+function ensureWorkflow(workflow: unknown): void {
   if (!workflow || typeof workflow !== "string") {
     throw new BridgeError(-32602, "'workflow' must be a string");
   }
 
-  if (!SUPPORTED_WORKFLOWS.includes(workflow)) {
+  if (!(SUPPORTED_WORKFLOWS as readonly string[]).includes(workflow)) {
     throw new BridgeError(-32602, "Unsupported workflow", {
       workflow,
       supported: SUPPORTED_WORKFLOWS,
@@ -59,8 +59,27 @@ function ensureWorkflow(workflow) {
   }
 }
 
-export async function runWorkflow(params, emitNotification = () => {}) {
-  const { workspace, workflow, args = [] } = params || {};
+export interface WorkflowParams {
+  workspace: unknown;
+  workflow: unknown;
+  args?: unknown[];
+}
+
+export interface WorkflowResult {
+  workflow: string;
+  workspace: string;
+  stdout: string;
+  stderr: string;
+  parsed: unknown;
+}
+
+type NotifyFn = (event: string, payload: Record<string, unknown>) => void;
+
+export async function runWorkflow(
+  params: WorkflowParams | null | undefined,
+  emitNotification: NotifyFn = () => {},
+): Promise<WorkflowResult> {
+  const { workspace, workflow, args = [] } = params ?? {};
 
   const resolvedWorkspace = ensureWorkspace(workspace);
   ensureWorkflow(workflow);
@@ -76,24 +95,24 @@ export async function runWorkflow(params, emitNotification = () => {}) {
 
   emitNotification("bridge/progress", {
     phase: "workflow_started",
-    workflow,
+    workflow: workflow as string,
     workspace: resolvedWorkspace,
   });
 
   try {
-    const invocationArgs = [scriptPath, workflow, ...args.map((value) => String(value))];
+    const invocationArgs = [scriptPath, workflow as string, ...args.map((value) => String(value))];
     const { stdout, stderr } = await execFileAsync("node", invocationArgs, {
       cwd: resolvedWorkspace,
     });
 
     emitNotification("bridge/progress", {
       phase: "workflow_completed",
-      workflow,
+      workflow: workflow as string,
       workspace: resolvedWorkspace,
     });
 
     return {
-      workflow,
+      workflow: workflow as string,
       workspace: resolvedWorkspace,
       stdout: stdout.trim(),
       stderr: stderr.trim(),
@@ -102,29 +121,30 @@ export async function runWorkflow(params, emitNotification = () => {}) {
   } catch (error) {
     emitNotification("bridge/progress", {
       phase: "workflow_failed",
-      workflow,
+      workflow: workflow as string,
       workspace: resolvedWorkspace,
     });
 
+    const err = error as NodeJS.ErrnoException & { stdout?: string; stderr?: string };
     throw new BridgeError(-32003, "Workflow execution failed", {
       workflow,
       workspace: resolvedWorkspace,
-      message: error.message,
-      stdout: error.stdout ? String(error.stdout).trim() : "",
-      stderr: error.stderr ? String(error.stderr).trim() : "",
-      code: error.code,
+      message: err.message,
+      stdout: err.stdout ? String(err.stdout).trim() : "",
+      stderr: err.stderr ? String(err.stderr).trim() : "",
+      code: err.code,
     });
   }
 }
 
-function safelyParseJson(value) {
-  const raw = String(value || "").trim();
+function safelyParseJson(value: unknown): unknown {
+  const raw = String(value ?? "").trim();
   if (!raw) {
     return null;
   }
 
   try {
-    return JSON.parse(raw);
+    return JSON.parse(raw) as unknown;
   } catch {
     return null;
   }

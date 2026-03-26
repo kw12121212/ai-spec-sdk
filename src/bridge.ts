@@ -9,16 +9,39 @@ import { runClaudeQuery } from "./claude-agent-runner.js";
 const METHOD_NOT_FOUND = -32601;
 const INTERNAL_ERROR = -32603;
 
+export interface JsonRpcRequest {
+  jsonrpc: "2.0";
+  id: unknown;
+  method: string;
+  params?: Record<string, unknown>;
+}
+
+export interface JsonRpcResponse {
+  jsonrpc: "2.0";
+  id: unknown;
+  result?: unknown;
+  error?: { code: number; message: string; data?: unknown };
+}
+
+export interface BridgeServerOptions {
+  notify?: (message: unknown) => void;
+}
+
 export class BridgeServer {
-  constructor({ notify = () => {} } = {}) {
+  private notify: (message: unknown) => void;
+  private sessionStore: SessionStore;
+
+  constructor({ notify = () => {} }: BridgeServerOptions = {}) {
     this.notify = notify;
     this.sessionStore = new SessionStore();
   }
 
-  async handleMessage(payload) {
+  async handleMessage(payload: unknown): Promise<JsonRpcResponse> {
     const id =
-      payload && typeof payload === "object" && Object.prototype.hasOwnProperty.call(payload, "id")
-        ? payload.id
+      payload !== null &&
+      typeof payload === "object" &&
+      Object.prototype.hasOwnProperty.call(payload, "id")
+        ? (payload as Record<string, unknown>)["id"]
         : null;
 
     if (!isJsonRpcRequest(payload)) {
@@ -29,8 +52,10 @@ export class BridgeServer {
       };
     }
 
+    const request = payload as JsonRpcRequest;
+
     try {
-      const result = await this.dispatch(payload.method, payload.params || {}, id);
+      const result = await this.dispatch(request.method, request.params ?? {}, request.id);
       return {
         jsonrpc: "2.0",
         id,
@@ -41,7 +66,7 @@ export class BridgeServer {
         error instanceof BridgeError
           ? error
           : new BridgeError(INTERNAL_ERROR, "Internal bridge error", {
-              message: error.message,
+              message: (error as Error).message,
             });
 
       return {
@@ -52,18 +77,23 @@ export class BridgeServer {
     }
   }
 
-  async dispatch(method, params, requestId) {
+  private async dispatch(
+    method: string,
+    params: Record<string, unknown>,
+    requestId: unknown,
+  ): Promise<unknown> {
     switch (method) {
       case "bridge.capabilities":
         return getCapabilities();
       case "skills.list":
-        return {
-          skills: BUILTIN_SPEC_SKILLS,
-        };
+        return { skills: BUILTIN_SPEC_SKILLS };
       case "workflow.run":
-        return runWorkflow(params, (event, payload) => {
-          this.emit(event, payload, requestId);
-        });
+        return runWorkflow(
+          params as { workspace: unknown; workflow: unknown; args?: unknown[] },
+          (event, payload) => {
+            this.emit(event, payload, requestId);
+          },
+        );
       case "session.start":
         return this.startSession(params, requestId);
       case "session.resume":
@@ -77,7 +107,7 @@ export class BridgeServer {
     }
   }
 
-  emit(method, params, requestId = null) {
+  private emit(method: string, params: Record<string, unknown>, requestId: unknown = null): void {
     this.notify({
       jsonrpc: "2.0",
       method,
@@ -88,8 +118,11 @@ export class BridgeServer {
     });
   }
 
-  async startSession(params, requestId) {
-    const { workspace, prompt, options = {} } = params || {};
+  private async startSession(
+    params: Record<string, unknown>,
+    requestId: unknown,
+  ): Promise<unknown> {
+    const { workspace, prompt, options = {} } = params;
 
     if (!workspace || typeof workspace !== "string") {
       throw new BridgeError(-32602, "'workspace' must be provided");
@@ -110,83 +143,23 @@ export class BridgeServer {
 
     this.emit(
       "bridge/session_event",
-      {
-        sessionId: session.id,
-        type: "session_started",
-      },
+      { sessionId: session.id, type: "session_started" },
       requestId,
     );
 
-    const queryResult = await runClaudeQuery({
+    return this._runQuery(
+      session,
       prompt,
-      options,
-      shouldStop: () => {
-        const current = this.sessionStore.get(session.id);
-        return Boolean(current && current.stopRequested);
-      },
-      onEvent: (message) => {
-        const current = this.sessionStore.get(session.id);
-        if (current && current.stopRequested) {
-          return;
-        }
-
-        this.sessionStore.appendEvent(session.id, {
-          type: "agent_message",
-          message,
-        });
-
-        this.emit(
-          "bridge/session_event",
-          {
-            sessionId: session.id,
-            type: "agent_message",
-            message,
-          },
-          requestId,
-        );
-      },
-    });
-
-    if (queryResult.status === "stopped") {
-      const stopped = this.sessionStore.stop(session.id);
-      this.emit(
-        "bridge/session_event",
-        {
-          sessionId: session.id,
-          type: "session_stopped",
-          status: stopped ? stopped.status : "stopped",
-        },
-        requestId,
-      );
-
-      return {
-        sessionId: session.id,
-        status: "stopped",
-        result: null,
-      };
-    }
-
-    this.sessionStore.complete(session.id, queryResult.result);
-
-    this.emit(
-      "bridge/session_event",
-      {
-        sessionId: session.id,
-        type: "session_completed",
-        result: queryResult.result,
-      },
+      options as Record<string, unknown>,
       requestId,
     );
-
-    return {
-      sessionId: session.id,
-      status: "completed",
-      result: queryResult.result,
-    };
   }
 
-  async resumeSession(params, requestId) {
-    const { sessionId, prompt, options = {} } = params || {};
+  private async resumeSession(
+    params: Record<string, unknown>,
+    requestId: unknown,
+  ): Promise<unknown> {
+    const { sessionId, prompt, options = {} } = params;
 
     if (!sessionId || typeof sessionId !== "string") {
       throw new BridgeError(-32602, "'sessionId' must be provided");
@@ -201,33 +174,38 @@ export class BridgeServer {
       throw new BridgeError(-32602, "'prompt' must be provided");
     }
 
-    this.sessionStore.appendEvent(session.id, {
-      type: "resume_prompt",
-      prompt,
-    });
+    this.sessionStore.appendEvent(session.id, { type: "resume_prompt", prompt });
 
     this.emit(
       "bridge/session_event",
-      {
-        sessionId: session.id,
-        type: "session_resumed",
-      },
+      { sessionId: session.id, type: "session_resumed" },
       requestId,
     );
 
+    return this._runQuery(
+      session,
+      prompt,
+      { ...(options as Record<string, unknown>), resume: session.id },
+      requestId,
+    );
+  }
+
+  private async _runQuery(
+    session: { id: string },
+    prompt: string,
+    options: Record<string, unknown>,
+    requestId: unknown,
+  ): Promise<unknown> {
     const queryResult = await runClaudeQuery({
       prompt,
-      options: {
-        ...options,
-        resume: session.id,
-      },
+      options,
       shouldStop: () => {
         const current = this.sessionStore.get(session.id);
-        return Boolean(current && current.stopRequested);
+        return Boolean(current?.stopRequested);
       },
       onEvent: (message) => {
         const current = this.sessionStore.get(session.id);
-        if (current && current.stopRequested) {
+        if (current?.stopRequested) {
           return;
         }
 
@@ -238,11 +216,7 @@ export class BridgeServer {
 
         this.emit(
           "bridge/session_event",
-          {
-            sessionId: session.id,
-            type: "agent_message",
-            message,
-          },
+          { sessionId: session.id, type: "agent_message", message },
           requestId,
         );
       },
@@ -260,34 +234,22 @@ export class BridgeServer {
         requestId,
       );
 
-      return {
-        sessionId: session.id,
-        status: "stopped",
-        result: null,
-      };
+      return { sessionId: session.id, status: "stopped", result: null };
     }
 
     this.sessionStore.complete(session.id, queryResult.result);
 
     this.emit(
       "bridge/session_event",
-      {
-        sessionId: session.id,
-        type: "session_completed",
-        result: queryResult.result,
-      },
+      { sessionId: session.id, type: "session_completed", result: queryResult.result },
       requestId,
     );
 
-    return {
-      sessionId: session.id,
-      status: "completed",
-      result: queryResult.result,
-    };
+    return { sessionId: session.id, status: "completed", result: queryResult.result };
   }
 
-  stopSession(params) {
-    const { sessionId } = params || {};
+  private stopSession(params: Record<string, unknown>): unknown {
+    const { sessionId } = params;
     if (!sessionId || typeof sessionId !== "string") {
       throw new BridgeError(-32602, "'sessionId' must be provided");
     }
@@ -297,14 +259,11 @@ export class BridgeServer {
       throw new BridgeError(-32011, "Session not found", { sessionId });
     }
 
-    return {
-      sessionId,
-      status: session.status,
-    };
+    return { sessionId, status: session.status };
   }
 
-  getSessionStatus(params) {
-    const { sessionId } = params || {};
+  private getSessionStatus(params: Record<string, unknown>): unknown {
+    const { sessionId } = params;
     if (!sessionId || typeof sessionId !== "string") {
       throw new BridgeError(-32602, "'sessionId' must be provided");
     }

@@ -41,7 +41,7 @@ test("workflow.run returns parsed verify JSON output", async () => {
     "## ADDED Requirements\n\n### Requirement: Demo\nThe system MUST respond.\n",
   );
 
-  const notifications = [];
+  const notifications: Array<{ method: string; params: Record<string, unknown> }> = [];
   const result = await runWorkflow(
     {
       workspace: fixtureWorkspace,
@@ -54,15 +54,15 @@ test("workflow.run returns parsed verify JSON output", async () => {
   assert.equal(result.workflow, "verify");
   assert.equal(result.workspace, fixtureWorkspace);
   assert.ok(result.parsed);
-  assert.equal(typeof result.parsed.valid, "boolean");
-  assert.equal(notifications[0].method, "bridge/progress");
-  assert.equal(notifications[0].params.phase, "workflow_started");
+  assert.equal(typeof (result.parsed as Record<string, unknown>)["valid"], "boolean");
+  assert.equal(notifications[0]!.method, "bridge/progress");
+  assert.equal(notifications[0]!.params["phase"], "workflow_started");
 });
 
 test("workflow.run returns structured error when script path is invalid", async () => {
   const fixtureWorkspace = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-invalid-script-"));
-  const original = process.env.SPEC_DRIVEN_SCRIPT;
-  process.env.SPEC_DRIVEN_SCRIPT = path.join(fixtureWorkspace, "does-not-exist.js");
+  const original = process.env["SPEC_DRIVEN_SCRIPT"];
+  process.env["SPEC_DRIVEN_SCRIPT"] = path.join(fixtureWorkspace, "does-not-exist.js");
 
   try {
     await assert.rejects(
@@ -71,20 +71,23 @@ test("workflow.run returns structured error when script path is invalid", async 
         workflow: "verify",
         args: ["missing-change"],
       }),
-      (error) => error && error.code === -32002,
+      (error: unknown) =>
+        error !== null &&
+        typeof error === "object" &&
+        (error as { code?: number }).code === -32002,
     );
   } finally {
     if (original === undefined) {
-      delete process.env.SPEC_DRIVEN_SCRIPT;
+      delete process.env["SPEC_DRIVEN_SCRIPT"];
     } else {
-      process.env.SPEC_DRIVEN_SCRIPT = original;
+      process.env["SPEC_DRIVEN_SCRIPT"] = original;
     }
   }
 });
 
 test("workflow.run returns structured error when command execution fails", async () => {
   const fixtureWorkspace = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-workflow-fail-"));
-  const notifications = [];
+  const notifications: Array<{ method: string; params: Record<string, unknown> }> = [];
 
   await assert.rejects(
     runWorkflow(
@@ -95,12 +98,15 @@ test("workflow.run returns structured error when command execution fails", async
       },
       (method, params) => notifications.push({ method, params }),
     ),
-    (error) => error && error.code === -32003,
+    (error: unknown) =>
+      error !== null &&
+      typeof error === "object" &&
+      (error as { code?: number }).code === -32003,
   );
 
   const phases = notifications
     .filter((item) => item.method === "bridge/progress")
-    .map((item) => item.params.phase);
+    .map((item) => item.params["phase"]);
   assert.ok(phases.includes("workflow_started"));
   assert.ok(phases.includes("workflow_failed"));
 });

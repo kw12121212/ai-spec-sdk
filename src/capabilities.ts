@@ -1,6 +1,6 @@
 export const BRIDGE_VERSION = "0.1.0";
 
-export const SUPPORTED_WORKFLOWS = [
+export const SUPPORTED_WORKFLOWS: readonly string[] = [
   "init",
   "propose",
   "modify",
@@ -11,7 +11,7 @@ export const SUPPORTED_WORKFLOWS = [
   "list",
 ];
 
-export const BUILTIN_SPEC_SKILLS = [
+export const BUILTIN_SPEC_SKILLS: readonly string[] = [
   "spec-driven-brainstorm",
   "spec-driven-init",
   "spec-driven-propose",
@@ -25,7 +25,7 @@ export const BUILTIN_SPEC_SKILLS = [
   "spec-driven-auto",
 ];
 
-export const WORKFLOW_SKILL_MAP = {
+export const WORKFLOW_SKILL_MAP: Readonly<Record<string, string>> = {
   init: "spec-driven-init",
   propose: "spec-driven-propose",
   modify: "spec-driven-modify",
@@ -33,10 +33,22 @@ export const WORKFLOW_SKILL_MAP = {
   verify: "spec-driven-verify",
   archive: "spec-driven-archive",
   cancel: "spec-driven-cancel",
+  // "list" uses spec-driven-modify to enumerate active changes
   list: "spec-driven-modify",
 };
 
-export function getCapabilities() {
+export interface Capabilities {
+  protocol: string;
+  transport: string;
+  bridgeVersion: string;
+  notifications: { progress: boolean; sessionEvent: boolean };
+  workflows: readonly string[];
+  skills: readonly string[];
+  workflowSkillMap: Readonly<Record<string, string>>;
+  methods: string[];
+}
+
+export function getCapabilities(): Capabilities {
   return {
     protocol: "jsonrpc-2.0",
     transport: "stdio",

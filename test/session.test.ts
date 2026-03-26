@@ -7,10 +7,13 @@ import { BridgeServer } from "../src/bridge.js";
 
 test("session start and resume produce events and complete", async () => {
   const fixtureWorkspace = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-session-"));
-  const notifications = [];
+  const notifications: unknown[] = [];
 
-  globalThis.__AI_SPEC_SDK_QUERY__ = async function* queryStub({ prompt, options }) {
-    yield { type: "system", subtype: "init", session_id: options?.resume || "new" };
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* queryStub({ prompt, options }: {
+    prompt: string;
+    options: Record<string, unknown>;
+  }) {
+    yield { type: "system", subtype: "init", session_id: options?.["resume"] ?? "new" };
     yield { result: `done:${prompt}` };
   };
 
@@ -29,9 +32,10 @@ test("session start and resume produce events and complete", async () => {
     },
   });
 
-  assert.equal(start.result.status, "completed");
-  assert.equal(start.result.result, "done:hello");
-  const sessionId = start.result.sessionId;
+  const startResult = start.result as Record<string, unknown>;
+  assert.equal(startResult["status"], "completed");
+  assert.equal(startResult["result"], "done:hello");
+  const sessionId = startResult["sessionId"] as string;
   assert.ok(sessionId);
 
   const resume = await server.handleMessage({
@@ -45,8 +49,9 @@ test("session start and resume produce events and complete", async () => {
     },
   });
 
-  assert.equal(resume.result.status, "completed");
-  assert.equal(resume.result.result, "done:continue");
+  const resumeResult = resume.result as Record<string, unknown>;
+  assert.equal(resumeResult["status"], "completed");
+  assert.equal(resumeResult["result"], "done:continue");
 
   const status = await server.handleMessage({
     jsonrpc: "2.0",
@@ -55,22 +60,27 @@ test("session start and resume produce events and complete", async () => {
     params: { sessionId },
   });
 
-  assert.equal(status.result.sessionId, sessionId);
-  assert.ok(status.result.historyLength >= 2);
-  assert.ok(notifications.some((n) => n.method === "bridge/session_event"));
+  const statusResult = status.result as Record<string, unknown>;
+  assert.equal(statusResult["sessionId"], sessionId);
+  assert.ok((statusResult["historyLength"] as number) >= 2);
+  assert.ok(
+    (notifications as Array<Record<string, unknown>>).some(
+      (n) => n["method"] === "bridge/session_event",
+    ),
+  );
 
   delete globalThis.__AI_SPEC_SDK_QUERY__;
 });
 
 test("session.stop transitions active session to stopped", async () => {
   const fixtureWorkspace = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-session-stop-"));
-  const notifications = [];
+  const notifications: unknown[] = [];
 
   globalThis.__AI_SPEC_SDK_QUERY__ = async function* queryStub() {
     yield { type: "system", subtype: "init" };
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    await new Promise<void>((resolve) => setTimeout(resolve, 20));
     yield { type: "assistant", content: "still running" };
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    await new Promise<void>((resolve) => setTimeout(resolve, 20));
     yield { result: "should-not-complete-after-stop" };
   };
 
@@ -89,7 +99,7 @@ test("session.stop transitions active session to stopped", async () => {
     },
   });
 
-  const sessionId = await waitForSessionStarted(notifications);
+  const sessionId = await waitForSessionStarted(notifications as Array<Record<string, unknown>>);
 
   const stop = await server.handleMessage({
     jsonrpc: "2.0",
@@ -98,11 +108,12 @@ test("session.stop transitions active session to stopped", async () => {
     params: { sessionId },
   });
 
-  assert.equal(stop.result.status, "stopped");
+  assert.equal((stop.result as Record<string, unknown>)["status"], "stopped");
 
   const final = await startPromise;
-  assert.equal(final.result.status, "stopped");
-  assert.equal(final.result.result, null);
+  const finalResult = final.result as Record<string, unknown>;
+  assert.equal(finalResult["status"], "stopped");
+  assert.equal(finalResult["result"], null);
 
   const statusAfter = await server.handleMessage({
     jsonrpc: "2.0",
@@ -111,14 +122,22 @@ test("session.stop transitions active session to stopped", async () => {
     params: { sessionId },
   });
 
-  assert.equal(statusAfter.result.status, "stopped");
+  assert.equal(
+    (statusAfter.result as Record<string, unknown>)["status"],
+    "stopped",
+  );
+
   delete globalThis.__AI_SPEC_SDK_QUERY__;
 });
 
-async function waitForSessionStarted(notifications) {
+async function waitForSessionStarted(
+  notifications: Array<Record<string, unknown>>,
+): Promise<string> {
   const started = () =>
     notifications.find(
-      (item) => item.method === "bridge/session_event" && item.params?.type === "session_started",
+      (item) =>
+        item["method"] === "bridge/session_event" &&
+        (item["params"] as Record<string, unknown>)?.["type"] === "session_started",
     );
 
   const timeoutMs = 1000;
@@ -127,8 +146,8 @@ async function waitForSessionStarted(notifications) {
     if (Date.now() - start > timeoutMs) {
       throw new Error("Timed out waiting for session_started event");
     }
-    await new Promise((resolve) => setTimeout(resolve, 5));
+    await new Promise<void>((resolve) => setTimeout(resolve, 5));
   }
 
-  return started().params.sessionId;
+  return (started()!["params"] as Record<string, unknown>)["sessionId"] as string;
 }

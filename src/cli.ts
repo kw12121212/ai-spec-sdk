@@ -3,7 +3,7 @@ import readline from "node:readline";
 import { BridgeServer } from "./bridge.js";
 import { BridgeError } from "./errors.js";
 
-function writeMessage(message) {
+function writeMessage(message: unknown): void {
   process.stdout.write(`${JSON.stringify(message)}\n`);
 }
 
@@ -16,15 +16,15 @@ const rl = readline.createInterface({
   crlfDelay: Infinity,
 });
 
-rl.on("line", async (line) => {
+rl.on("line", async (line: string) => {
   const trimmed = line.trim();
   if (!trimmed) {
     return;
   }
 
-  let payload;
+  let payload: unknown;
   try {
-    payload = JSON.parse(trimmed);
+    payload = JSON.parse(trimmed) as unknown;
   } catch {
     writeMessage({
       jsonrpc: "2.0",
@@ -50,7 +50,12 @@ rl.on("line", async (line) => {
 
     writeMessage({
       jsonrpc: "2.0",
-      id: payload && Object.prototype.hasOwnProperty.call(payload, "id") ? payload.id : null,
+      id:
+        payload !== null &&
+        typeof payload === "object" &&
+        Object.prototype.hasOwnProperty.call(payload, "id")
+          ? (payload as Record<string, unknown>)["id"]
+          : null,
       error: bridgeError.toJsonRpcError(),
     });
   }

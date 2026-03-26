@@ -1,19 +1,39 @@
 import crypto from "node:crypto";
 
-function nowIso() {
+export interface SessionHistoryEntry {
+  type: string;
+  at: string;
+  prompt?: string;
+  message?: unknown;
+}
+
+export interface Session {
+  id: string;
+  workspace: string;
+  createdAt: string;
+  updatedAt: string;
+  status: "active" | "completed" | "stopped";
+  stopRequested: boolean;
+  history: SessionHistoryEntry[];
+  result: unknown;
+}
+
+function nowIso(): string {
   return new Date().toISOString();
 }
 
 export class SessionStore {
+  private sessions: Map<string, Session>;
+
   constructor() {
     this.sessions = new Map();
   }
 
-  create(workspace, prompt) {
+  create(workspace: string, prompt: string): Session {
     const sessionId = crypto.randomUUID();
     const createdAt = nowIso();
 
-    const session = {
+    const session: Session = {
       id: sessionId,
       workspace,
       createdAt,
@@ -34,22 +54,23 @@ export class SessionStore {
     return session;
   }
 
-  get(sessionId) {
-    return this.sessions.get(sessionId) || null;
+  get(sessionId: string): Session | null {
+    return this.sessions.get(sessionId) ?? null;
   }
 
-  appendEvent(sessionId, event) {
+  appendEvent(sessionId: string, event: Omit<SessionHistoryEntry, "at">): Session | null {
     const session = this.get(sessionId);
     if (!session) {
       return null;
     }
 
-    session.history.push({ ...event, at: nowIso() });
-    session.updatedAt = nowIso();
+    const now = nowIso();
+    session.history.push({ ...event, at: now });
+    session.updatedAt = now;
     return session;
   }
 
-  complete(sessionId, result) {
+  complete(sessionId: string, result: unknown): Session | null {
     const session = this.get(sessionId);
     if (!session) {
       return null;
@@ -65,19 +86,7 @@ export class SessionStore {
     return session;
   }
 
-  requestStop(sessionId) {
-    const session = this.get(sessionId);
-    if (!session) {
-      return null;
-    }
-
-    session.stopRequested = true;
-    session.status = "stopped";
-    session.updatedAt = nowIso();
-    return session;
-  }
-
-  stop(sessionId) {
+  stop(sessionId: string): Session | null {
     const session = this.get(sessionId);
     if (!session) {
       return null;
