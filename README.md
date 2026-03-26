@@ -42,4 +42,4 @@ bun run build   # compile to dist/
 - `session.stop`
 - `session.status`
 
-See `docs/bridge-contract.md` for request/response examples.
+See `docs/bridge-contract.yaml` for the full integration contract (all methods, params, result shapes, error codes, notifications, and environment variables).

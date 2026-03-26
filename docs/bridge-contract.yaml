@@ -1,0 +1,576 @@
+# Bridge Contract
+# ai-spec-sdk JSON-RPC 2.0 over stdio
+#
+# This file is the authoritative integration reference.
+# Every field, type, enum value, and error code is derived directly from source.
+#
+# Conventions used in this file:
+#   type: string | number | boolean | null | object | array
+#   required: true means the field MUST be present; false means it MAY be omitted
+#   nullable: true means the field MAY be null
+#   enum: exhaustive list of valid values
+
+# ---------------------------------------------------------------------------
+# Transport
+# ---------------------------------------------------------------------------
+transport:
+  protocol: jsonrpc-2.0
+  medium: stdio
+  framing: one JSON object per line (newline-delimited, no pretty-printing)
+  encoding: UTF-8
+  direction:
+    client_to_bridge: one request object per line on stdin
+    bridge_to_client: one response or notification object per line on stdout
+  notes:
+    - The bridge process is started as a subprocess by the host tool.
+    - The bridge never writes to stderr for protocol messages; stderr is reserved for
+      unexpected runtime errors only.
+    - Notifications are emitted on stdout interleaved with responses; the client MUST
+      distinguish them by the presence of "method" (notification) vs "result"/"error"
+      (response).
+
+# ---------------------------------------------------------------------------
+# Process startup
+# ---------------------------------------------------------------------------
+startup:
+  binary: node dist/src/cli.js
+  bin_alias: ai-spec-bridge   # available after "bun run build" and install
+  stdin: line-buffered JSON-RPC requests
+  stdout: line-buffered JSON-RPC responses and notifications
+  exit_code:
+    0: normal shutdown (stdin closed)
+    non-zero: unexpected runtime crash
+
+# ---------------------------------------------------------------------------
+# Envelope shapes
+# ---------------------------------------------------------------------------
+envelope:
+
+  request:
+    fields:
+      jsonrpc:
+        type: string
+        required: true
+        value: "2.0"
+      id:
+        type: string | number | null
+        required: true
+        notes: Echoed verbatim in the matching response. Use null for fire-and-forget
+               (no response will be sent).
+      method:
+        type: string
+        required: true
+      params:
+        type: object
+        required: false
+        notes: Omit or pass {} when a method takes no parameters.
+
+  response:
+    fields:
+      jsonrpc:
+        type: string
+        value: "2.0"
+      id:
+        type: string | number | null
+        notes: Matches the request id. null when the request id could not be parsed.
+      result:
+        type: object
+        notes: Present on success. Mutually exclusive with "error".
+      error:
+        type: object
+        notes: Present on failure. Mutually exclusive with "result".
+        fields:
+          code:
+            type: number
+          message:
+            type: string
+          data:
+            type: object
+            required: false
+            notes: Additional structured context. Present only when the error has
+                   extra diagnostic fields.
+
+  notification:
+    notes: Server-initiated message with no "id" field. The client MUST NOT send a
+           response to a notification.
+    fields:
+      jsonrpc:
+        type: string
+        value: "2.0"
+      method:
+        type: string
+        enum:
+          - bridge/progress
+          - bridge/session_event
+      params:
+        type: object
+        fields:
+          requestId:
+            type: string | number | null
+            notes: id of the originating request, or null if not applicable.
+          # Additional fields depend on the notification method — see below.
+
+# ---------------------------------------------------------------------------
+# Error codes
+# ---------------------------------------------------------------------------
+error_codes:
+  # Standard JSON-RPC codes
+  -32700:
+    name: ParseError
+    message: "Parse error"
+    cause: Request line was not valid JSON.
+    data: none
+  -32600:
+    name: InvalidRequest
+    message: "Invalid JSON-RPC request"
+    cause: Parsed object missing "jsonrpc":"2.0" or "method" string.
+    data: none
+  -32601:
+    name: MethodNotFound
+    message: "Method not found: <method>"
+    cause: method is not in the supported methods list.
+    data: none
+  -32602:
+    name: InvalidParams
+    message: varies (e.g. "'workspace' must be provided")
+    cause: A required param is missing, wrong type, or fails validation.
+    data: none
+  -32603:
+    name: InternalError
+    message: "Internal bridge error"
+    cause: Unhandled exception inside the bridge.
+    data:
+      message:
+        type: string
+        notes: Original exception message.
+
+  # Application-defined codes
+  -32001:
+    name: WorkspaceNotFound
+    message: "Workspace path does not exist"
+    cause: workspace param resolves to a path that does not exist or is not a directory.
+    data:
+      workspace:
+        type: string
+        notes: Resolved absolute path that was checked.
+  -32002:
+    name: ScriptNotFound
+    message: "spec-driven script not found"
+    cause: The spec-driven CLI script could not be located on this host.
+           Set SPEC_DRIVEN_SCRIPT env var to an explicit path to resolve this.
+    data:
+      scriptPath:
+        type: string
+        notes: Candidate path that was checked last.
+  -32003:
+    name: WorkflowFailed
+    message: "Workflow execution failed"
+    cause: The spec-driven script exited with a non-zero status.
+    data:
+      workflow:
+        type: string
+      workspace:
+        type: string
+      message:
+        type: string
+        notes: Node child_process error message.
+      stdout:
+        type: string
+      stderr:
+        type: string
+      code:
+        type: string | null
+        notes: Process exit code or signal name, if available.
+  -32011:
+    name: SessionNotFound
+    message: "Session not found"
+    cause: sessionId does not match any in-memory session. Sessions are lost on
+           bridge process restart.
+    data:
+      sessionId:
+        type: string
+  -32020:
+    name: SDKUnavailable
+    message: "Claude Agent SDK query function is unavailable"
+    cause: (Reserved — only reachable via test injection misuse. In production the
+            SDK is a required dependency and is always present.)
+    data:
+      hint:
+        type: string
+
+# ---------------------------------------------------------------------------
+# Methods
+# ---------------------------------------------------------------------------
+methods:
+
+  # -------------------------------------------------------------------------
+  bridge.capabilities:
+    description: Returns static metadata about this bridge process.
+    params: none
+    result:
+      protocol:
+        type: string
+        value: "jsonrpc-2.0"
+      transport:
+        type: string
+        value: "stdio"
+      bridgeVersion:
+        type: string
+        example: "0.1.0"
+      notifications:
+        type: object
+        fields:
+          progress:
+            type: boolean
+            value: true
+          sessionEvent:
+            type: boolean
+            value: true
+      workflows:
+        type: array
+        items: string
+        enum:
+          - init
+          - propose
+          - modify
+          - apply
+          - verify
+          - archive
+          - cancel
+          - list
+      skills:
+        type: array
+        items: string
+        enum:
+          - spec-driven-brainstorm
+          - spec-driven-init
+          - spec-driven-propose
+          - spec-driven-modify
+          - spec-driven-spec-content
+          - spec-driven-apply
+          - spec-driven-verify
+          - spec-driven-review
+          - spec-driven-archive
+          - spec-driven-cancel
+          - spec-driven-auto
+      workflowSkillMap:
+        type: object
+        description: Maps each workflow name to its backing built-in skill.
+        entries:
+          init: spec-driven-init
+          propose: spec-driven-propose
+          modify: spec-driven-modify
+          apply: spec-driven-apply
+          verify: spec-driven-verify
+          archive: spec-driven-archive
+          cancel: spec-driven-cancel
+          list: spec-driven-modify   # list reuses modify's script to enumerate changes
+      methods:
+        type: array
+        items: string
+        value:
+          - bridge.capabilities
+          - workflow.run
+          - skills.list
+          - session.start
+          - session.resume
+          - session.stop
+          - session.status
+    errors: none
+
+  # -------------------------------------------------------------------------
+  skills.list:
+    description: Returns the list of bundled spec-driven skills.
+    params: none
+    result:
+      skills:
+        type: array
+        items: string
+        notes: Same set as bridge.capabilities.skills.
+    errors: none
+
+  # -------------------------------------------------------------------------
+  workflow.run:
+    description: >
+      Executes a spec-driven workflow script in the given workspace.
+      Emits bridge/progress notifications before and after execution.
+    params:
+      workspace:
+        type: string
+        required: true
+        notes: Absolute or relative path to the target project directory.
+               Resolved to an absolute path before use.
+      workflow:
+        type: string
+        required: true
+        enum:
+          - init
+          - propose
+          - modify
+          - apply
+          - verify
+          - archive
+          - cancel
+          - list
+      args:
+        type: array
+        items: string
+        required: false
+        default: []
+        notes: Extra positional arguments forwarded to the spec-driven script
+               (e.g. change name for verify/apply/archive).
+    notifications:
+      - method: bridge/progress
+        params:
+          phase: workflow_started
+          workflow: string
+          workspace: string   # resolved absolute path
+          requestId: string | number | null
+      - method: bridge/progress
+        params:
+          phase: workflow_completed | workflow_failed
+          workflow: string
+          workspace: string
+          requestId: string | number | null
+    result:
+      workflow:
+        type: string
+        notes: Echoes the workflow that was run.
+      workspace:
+        type: string
+        notes: Resolved absolute path.
+      stdout:
+        type: string
+        notes: Trimmed stdout from the script.
+      stderr:
+        type: string
+        notes: Trimmed stderr from the script.
+      parsed:
+        type: object | null
+        notes: JSON.parse of stdout if stdout is valid JSON; otherwise null.
+    errors:
+      - -32602  # invalid or missing workspace / workflow / args
+      - -32001  # workspace directory not found
+      - -32002  # spec-driven script not found on this host
+      - -32003  # script exited non-zero
+
+  # -------------------------------------------------------------------------
+  session.start:
+    description: >
+      Starts a new Claude agent session for the given workspace and prompt.
+      The method is long-running: it resolves only after the agent finishes
+      or is stopped. Progress is streamed via bridge/session_event notifications.
+    params:
+      workspace:
+        type: string
+        required: true
+        notes: Absolute or relative path to the target project directory.
+      prompt:
+        type: string
+        required: true
+        notes: Initial user prompt sent to the Claude agent.
+      options:
+        type: object
+        required: false
+        default: {}
+        notes: Passed directly to the Claude Agent SDK query() call.
+               Supported keys are determined by the installed SDK version.
+               Common keys include allowedTools (string[]).
+    notifications:
+      - method: bridge/session_event
+        timing: emitted immediately after the session is created
+        params:
+          sessionId: string
+          type: session_started
+          requestId: string | number | null
+      - method: bridge/session_event
+        timing: emitted for each message yielded by the agent
+        params:
+          sessionId: string
+          type: agent_message
+          message: object   # raw SDK message object
+          requestId: string | number | null
+      - method: bridge/session_event
+        timing: emitted when the session ends (completed or stopped)
+        params:
+          sessionId: string
+          type: session_completed | session_stopped
+          result: any | null   # present on session_completed; null on session_stopped
+          status: string       # present on session_stopped
+          requestId: string | number | null
+    result:
+      sessionId:
+        type: string
+        format: UUID v4
+      status:
+        type: string
+        enum:
+          - completed
+          - stopped
+      result:
+        type: any
+        nullable: true
+        notes: Final result value from the agent. null when status is "stopped".
+    errors:
+      - -32602  # missing or invalid workspace / prompt
+      - -32001  # workspace directory not found
+
+  # -------------------------------------------------------------------------
+  session.resume:
+    description: >
+      Resumes an existing session identified by sessionId with a new prompt.
+      Behaves identically to session.start after validation; the session id
+      is forwarded to the SDK as options.resume.
+    params:
+      sessionId:
+        type: string
+        required: true
+        format: UUID v4
+        notes: Must match a session that is still held in the bridge's memory.
+               Sessions are lost on process restart.
+      prompt:
+        type: string
+        required: true
+        notes: Follow-up prompt for the resumed session.
+      options:
+        type: object
+        required: false
+        default: {}
+        notes: "Merged with {resume: sessionId} before being passed to the SDK."
+    notifications:
+      - method: bridge/session_event
+        timing: emitted immediately after resume is validated
+        params:
+          sessionId: string
+          type: session_resumed
+          requestId: string | number | null
+      - method: bridge/session_event
+        timing: emitted for each agent message (same as session.start)
+        params:
+          sessionId: string
+          type: agent_message
+          message: object
+          requestId: string | number | null
+      - method: bridge/session_event
+        timing: emitted on completion or stop (same as session.start)
+        params:
+          sessionId: string
+          type: session_completed | session_stopped
+          result: any | null
+          status: string
+          requestId: string | number | null
+    result:
+      sessionId:
+        type: string
+        format: UUID v4
+      status:
+        type: string
+        enum:
+          - completed
+          - stopped
+      result:
+        type: any
+        nullable: true
+    errors:
+      - -32602  # missing or invalid sessionId / prompt
+      - -32011  # session not found
+
+  # -------------------------------------------------------------------------
+  session.stop:
+    description: >
+      Requests cooperative cancellation of an active session.
+      Sets a stopRequested flag that is checked between agent message yields.
+      Returns immediately; the session.start / session.resume call resolves
+      shortly after with status "stopped".
+    params:
+      sessionId:
+        type: string
+        required: true
+        format: UUID v4
+    result:
+      sessionId:
+        type: string
+        format: UUID v4
+      status:
+        type: string
+        enum:
+          - stopped
+    errors:
+      - -32602  # missing or invalid sessionId
+      - -32011  # session not found
+
+  # -------------------------------------------------------------------------
+  session.status:
+    description: Returns the current state of a session without blocking.
+    params:
+      sessionId:
+        type: string
+        required: true
+        format: UUID v4
+    result:
+      sessionId:
+        type: string
+        format: UUID v4
+      status:
+        type: string
+        enum:
+          - active
+          - completed
+          - stopped
+      createdAt:
+        type: string
+        format: ISO 8601 UTC
+      updatedAt:
+        type: string
+        format: ISO 8601 UTC
+      historyLength:
+        type: number
+        notes: Number of entries in the session history, including the initial prompt.
+      result:
+        type: any
+        nullable: true
+        notes: Final result value if status is "completed"; null otherwise.
+    errors:
+      - -32602  # missing or invalid sessionId
+      - -32011  # session not found
+
+# ---------------------------------------------------------------------------
+# Environment variables
+# ---------------------------------------------------------------------------
+environment:
+  SPEC_DRIVEN_SCRIPT:
+    required: false
+    type: string
+    notes: >
+      Absolute path to the spec-driven CLI script. When set, overrides the
+      automatic candidate search. Useful in CI or non-standard installations.
+      If unset, the bridge searches these paths in order:
+        1. <cwd>/.config/opencode/skills/spec-driven-apply/scripts/spec-driven.js
+        2. <cwd>/.agents/skills/spec-driven-apply/scripts/spec-driven.js
+        3. <HOME>/.slim-spec-driven/skills/spec-driven-apply/scripts/spec-driven.js
+        4. <HOME>/.config/opencode/skills/spec-driven-apply/scripts/spec-driven.js
+        5. <HOME>/.agents/skills/spec-driven-apply/scripts/spec-driven.js
+        6. /home/code/.config/opencode/skills/spec-driven-apply/scripts/spec-driven.js
+        7. /home/code/.agents/skills/spec-driven-apply/scripts/spec-driven.js
+
+# ---------------------------------------------------------------------------
+# Session lifecycle notes
+# ---------------------------------------------------------------------------
+session_lifecycle:
+  storage: in-memory only; sessions are lost when the bridge process exits
+  id_format: UUID v4 (crypto.randomUUID)
+  status_transitions:
+    active -> completed: agent finishes normally
+    active -> stopped: session.stop is called and the stop flag is observed
+    completed -> (terminal): no further transitions
+    stopped -> (terminal): no further transitions
+  stop_semantics: >
+    session.stop sets stopRequested=true and status="stopped" immediately.
+    The running query loop checks shouldStop() between each yielded message.
+    The session.start / session.resume response is not sent until the loop
+    exits, so the caller observes status "stopped" in the final response.
+  history:
+    - Each session begins with one entry of type "user_prompt".
+    - Each resumed session appends one entry of type "resume_prompt".
+    - Each agent yield appends one entry of type "agent_message".
+    - historyLength in session.status reflects the total entry count.
