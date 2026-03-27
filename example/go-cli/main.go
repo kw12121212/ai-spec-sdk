@@ -548,6 +548,112 @@ func handleCommand(client *bridge.Client, sm *session.Manager, wr *workflow.Runn
 			fmt.Printf("Unknown hooks subcommand: %s\nUse: /hooks [add|remove] or /hooks to list\n", args[0])
 		}
 
+	case "/context":
+		// Context file management.
+		if len(args) == 0 {
+			// List context files.
+			result, err := client.Call("context.list", map[string]any{"workspace": absWorkspace})
+			if err != nil {
+				fmt.Printf("Error: %v\n", err)
+			} else {
+				pretty, _ := json.MarshalIndent(result, "", "  ")
+				fmt.Println(string(pretty))
+			}
+			return false
+		}
+		switch args[0] {
+		case "read":
+			if len(args) < 3 {
+				fmt.Println("Usage: /context read <project|user> <path>")
+				return false
+			}
+			params := map[string]any{
+				"scope": args[1],
+				"path":  args[2],
+			}
+			if args[1] == "project" {
+				params["workspace"] = absWorkspace
+			}
+			result, err := client.Call("context.read", params)
+			if err != nil {
+				fmt.Printf("Error: %v\n", err)
+			} else {
+				pretty, _ := json.MarshalIndent(result, "", "  ")
+				fmt.Println(string(pretty))
+			}
+		case "write":
+			if len(args) < 4 {
+				fmt.Println("Usage: /context write <project|user> <path> <content>")
+				return false
+			}
+			params := map[string]any{
+				"scope":   args[1],
+				"path":    args[2],
+				"content": strings.Join(args[3:], " "),
+			}
+			if args[1] == "project" {
+				params["workspace"] = absWorkspace
+			}
+			result, err := client.Call("context.write", params)
+			if err != nil {
+				fmt.Printf("Error: %v\n", err)
+			} else {
+				pretty, _ := json.MarshalIndent(result, "", "  ")
+				fmt.Println(string(pretty))
+			}
+		default:
+			fmt.Printf("Unknown context subcommand: %s\nUse: /context [read|write] or /context to list\n", args[0])
+		}
+
+	case "/branch":
+		// Branch a session.
+		sid := sm.CurrentSessionID
+		if len(args) > 0 {
+			sid = args[0]
+		}
+		if sid == "" {
+			fmt.Println("No session to branch from. Start a session or provide a session ID.")
+			return false
+		}
+		params := map[string]any{"sessionId": sid}
+		if len(args) > 1 {
+			// args[1] = fromIndex
+			if n, err := strconv.Atoi(args[1]); err == nil {
+				params["fromIndex"] = n
+			}
+		}
+		if len(args) > 2 {
+			params["prompt"] = strings.Join(args[2:], " ")
+		}
+		result, err := client.Call("session.branch", params)
+		if err != nil {
+			fmt.Printf("Error: %v\n", err)
+		} else {
+			pretty, _ := json.MarshalIndent(result, "", "  ")
+			fmt.Printf("Branched session:\n%s\n", string(pretty))
+		}
+
+	case "/search":
+		// Search across sessions.
+		if len(args) == 0 {
+			fmt.Println("Usage: /search <query> [workspace] [status]")
+			return false
+		}
+		params := map[string]any{"query": args[0]}
+		if len(args) > 1 {
+			params["workspace"] = args[1]
+		}
+		if len(args) > 2 {
+			params["status"] = args[2]
+		}
+		result, err := client.Call("session.search", params)
+		if err != nil {
+			fmt.Printf("Error: %v\n", err)
+		} else {
+			pretty, _ := json.MarshalIndent(result, "", "  ")
+			fmt.Println(string(pretty))
+		}
+
 	default:
 		fmt.Printf("Unknown command: %s\nType /help for available commands.\n", cmd)
 	}
@@ -590,6 +696,15 @@ func printHelp() {
   %s/mcp add%s <name> <cmd> [args]   Add and start an MCP server
   %s/mcp stop%s <name>              Stop an MCP server
 
+%sContext:%s
+  %s/context%s [read|write]           List/read/write context files
+  %s/context read%s <scope> <path>   Read a context file
+  %s/context write%s <scope> <path> <content>  Write a context file
+
+%sSession UX:%s
+  %s/branch%s [session-id] [from-idx] [prompt]  Branch a session
+  %s/search%s <query> [workspace] [status]  Search sessions
+
 %sWorkflow:%s
   %s/workflow%s [name] [args...]      Run a workflow (no name = list available)
 
@@ -599,20 +714,25 @@ func printHelp() {
 
 `
 	fmt.Printf(help,
-		colorBold, colorReset,
-		colorBold, colorReset,
-		colorCyan, colorReset, colorCyan, colorReset, colorCyan, colorReset,
-		colorBold, colorReset,
-		colorCyan, colorReset, colorCyan, colorReset, colorCyan, colorReset, colorCyan, colorReset, colorCyan, colorReset, colorCyan, colorReset, colorCyan, colorReset,
-		colorBold, colorReset,
-		colorCyan, colorReset, colorCyan, colorReset, colorCyan, colorReset,
-		colorBold, colorReset,
-		colorCyan, colorReset, colorCyan, colorReset, colorCyan, colorReset, colorCyan, colorReset, colorCyan, colorReset, colorCyan, colorReset, colorCyan, colorReset,
-		colorBold, colorReset,
-		colorCyan, colorReset, colorCyan, colorReset, colorCyan, colorReset,
-		colorBold, colorReset,
-		colorCyan, colorReset,
-		colorBold, colorReset,
-		colorBold, colorReset,
+		colorBold, colorReset, // title
+		colorBold, colorReset, // Commands:
+		colorCyan, colorReset, // /help
+		colorCyan, colorReset, colorCyan, colorReset, // /quit, /exit
+		colorBold, colorReset, // Session:
+		colorCyan, colorReset, colorCyan, colorReset, colorCyan, colorReset, colorCyan, colorReset, colorCyan, colorReset, colorCyan, colorReset, colorCyan, colorReset, // 7 session cmds
+		colorBold, colorReset, // Bridge:
+		colorCyan, colorReset, colorCyan, colorReset, colorCyan, colorReset, // 3 bridge cmds
+		colorBold, colorReset, // Configuration:
+		colorCyan, colorReset, colorCyan, colorReset, colorCyan, colorReset, colorCyan, colorReset, colorCyan, colorReset, colorCyan, colorReset, colorCyan, colorReset, // 7 config cmds
+		colorBold, colorReset, // MCP:
+		colorCyan, colorReset, colorCyan, colorReset, colorCyan, colorReset, // 3 mcp cmds
+		colorBold, colorReset, // Context:
+		colorCyan, colorReset, colorCyan, colorReset, colorCyan, colorReset, // 3 context cmds
+		colorBold, colorReset, // Session UX:
+		colorCyan, colorReset, colorCyan, colorReset, // 2 session ux cmds
+		colorBold, colorReset, // Workflow:
+		colorCyan, colorReset, // /workflow
+		colorBold, colorReset, // Input:
+		colorBold, colorReset, // \\
 	)
 }

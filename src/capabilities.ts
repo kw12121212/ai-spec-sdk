@@ -131,6 +131,11 @@ export function getCapabilities(): Capabilities {
       "hooks.add",
       "hooks.remove",
       "hooks.list",
+      "context.read",
+      "context.write",
+      "context.list",
+      "session.branch",
+      "session.search",
     ],
     agentControlParams: [
       "model",

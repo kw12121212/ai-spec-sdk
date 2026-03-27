@@ -14,3 +14,4 @@ export type { QueryResult, RunClaudeQueryOptions } from "./claude-agent-runner.j
 export type { McpServerConfig, McpServerEntry } from "./mcp-store.js";
 export type { ConfigEntry } from "./config-store.js";
 export type { HookEntry, HookEvent } from "./hooks-store.js";
+export type { ContextFile } from "./context-store.js";

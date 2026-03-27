@@ -217,3 +217,399 @@ test("workspace.list returns empty array when no workspaces registered", async (
   const workspaces = (response.result as Record<string, unknown>)["workspaces"] as unknown[];
   assert.deepEqual(workspaces, []);
 });
+
+// --- Context management tests ---
+
+test("context.read reads a project CLAUDE.md", async () => {
+  const wsDir = fs.mkdtempSync(path.join(os.tmpdir(), "ctx-bridge-"));
+  try {
+    fs.writeFileSync(path.join(wsDir, "CLAUDE.md"), "# Test", "utf8");
+    const server = new BridgeServer();
+
+    const response = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 100,
+      method: "context.read",
+      params: { scope: "project", workspace: wsDir, path: "CLAUDE.md" },
+    });
+
+    assert.ok(!response.error, `unexpected error: ${JSON.stringify(response.error)}`);
+    const result = response.result as Record<string, unknown>;
+    assert.equal(result["content"], "# Test");
+    assert.equal(result["scope"], "project");
+  } finally {
+    fs.rmSync(wsDir, { recursive: true, force: true });
+  }
+});
+
+test("context.write creates a file and context.read reads it back", async () => {
+  const wsDir = fs.mkdtempSync(path.join(os.tmpdir(), "ctx-bridge-"));
+  try {
+    const server = new BridgeServer();
+
+    const writeResp = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 101,
+      method: "context.write",
+      params: { scope: "project", workspace: wsDir, path: "CLAUDE.md", content: "# Written" },
+    });
+    assert.ok(!writeResp.error);
+    assert.equal((writeResp.result as Record<string, unknown>)["written"], true);
+
+    const readResp = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 102,
+      method: "context.read",
+      params: { scope: "project", workspace: wsDir, path: "CLAUDE.md" },
+    });
+    assert.equal((readResp.result as Record<string, unknown>)["content"], "# Written");
+  } finally {
+    fs.rmSync(wsDir, { recursive: true, force: true });
+  }
+});
+
+test("context.write rejects path traversal", async () => {
+  const wsDir = fs.mkdtempSync(path.join(os.tmpdir(), "ctx-bridge-"));
+  try {
+    const server = new BridgeServer();
+
+    const response = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 103,
+      method: "context.write",
+      params: { scope: "project", workspace: wsDir, path: "../../etc/bad", content: "hacked" },
+    });
+    assert.ok(response.error);
+    assert.equal(response.error!.code, -32602);
+  } finally {
+    fs.rmSync(wsDir, { recursive: true, force: true });
+  }
+});
+
+test("context.list returns project and user files", async () => {
+  const wsDir = fs.mkdtempSync(path.join(os.tmpdir(), "ctx-bridge-"));
+  try {
+    fs.writeFileSync(path.join(wsDir, "CLAUDE.md"), "# P", "utf8");
+    fs.mkdirSync(path.join(wsDir, ".claude"), { recursive: true });
+    fs.writeFileSync(path.join(wsDir, ".claude", "settings.json"), "{}", "utf8");
+
+    const server = new BridgeServer();
+    const response = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 104,
+      method: "context.list",
+      params: { workspace: wsDir },
+    });
+
+    assert.ok(!response.error);
+    const files = (response.result as Record<string, unknown>)["files"] as Array<Record<string, unknown>>;
+    const projectFiles = files.filter((f) => f["scope"] === "project");
+    assert.ok(projectFiles.length >= 2, "should have CLAUDE.md and .claude/settings.json");
+  } finally {
+    fs.rmSync(wsDir, { recursive: true, force: true });
+  }
+});
+
+test("context.read returns -32001 for non-existent file", async () => {
+  const wsDir = fs.mkdtempSync(path.join(os.tmpdir(), "ctx-bridge-"));
+  try {
+    const server = new BridgeServer();
+    const response = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 105,
+      method: "context.read",
+      params: { scope: "project", workspace: wsDir, path: ".claude/nonexistent.md" },
+    });
+    assert.ok(response.error);
+    assert.equal(response.error!.code, -32001);
+  } finally {
+    fs.rmSync(wsDir, { recursive: true, force: true });
+  }
+});
+
+// --- File change tracking tests ---
+
+test("bridge/file_changed emitted for Write tool_use", async () => {
+  const wsDir = fs.mkdtempSync(path.join(os.tmpdir(), "file-track-"));
+  try {
+    const notifications: unknown[] = [];
+    const server = new BridgeServer({
+      notify: (msg) => notifications.push(msg),
+    });
+
+    globalThis.__AI_SPEC_SDK_QUERY__ = async function* () {
+      yield { type: "assistant", message: { content: [{ type: "tool_use", name: "Write", id: "tu-1", input: { file_path: path.join(wsDir, "new-file.ts"), content: "export {}" } }] } };
+      yield { type: "result", subtype: "success", result: "done" };
+    };
+
+    await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 200,
+      method: "session.start",
+      params: { workspace: wsDir, prompt: "test" },
+    });
+
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+
+    const fileChanged = notifications.find(
+      (n) => (n as Record<string, unknown>)["method"] === "bridge/file_changed",
+    );
+    assert.ok(fileChanged, "should emit bridge/file_changed for Write tool");
+    const params = (fileChanged as Record<string, unknown>)["params"] as Record<string, unknown>;
+    assert.equal(params["action"], "created");
+    assert.ok(params["path"], "should include relative path");
+  } finally {
+    fs.rmSync(wsDir, { recursive: true, force: true });
+  }
+});
+
+test("bridge/file_changed emitted for Edit tool_use with diff", async () => {
+  const wsDir = fs.mkdtempSync(path.join(os.tmpdir(), "file-track-"));
+  try {
+    const targetFile = path.join(wsDir, "existing.ts");
+    fs.writeFileSync(targetFile, "old code", "utf8");
+
+    const notifications: unknown[] = [];
+    const server = new BridgeServer({
+      notify: (msg) => notifications.push(msg),
+    });
+
+    globalThis.__AI_SPEC_SDK_QUERY__ = async function* () {
+      yield { type: "assistant", message: { content: [{ type: "tool_use", name: "Edit", id: "tu-2", input: { file_path: targetFile, old_string: "old code", new_string: "new code" } }] } };
+      yield { type: "result", subtype: "success", result: "done" };
+    };
+
+    await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 201,
+      method: "session.start",
+      params: { workspace: wsDir, prompt: "test" },
+    });
+
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+
+    const fileChanged = notifications.find(
+      (n) => (n as Record<string, unknown>)["method"] === "bridge/file_changed",
+    );
+    assert.ok(fileChanged, "should emit bridge/file_changed for Edit tool");
+    const params = (fileChanged as Record<string, unknown>)["params"] as Record<string, unknown>;
+    assert.equal(params["action"], "modified");
+    assert.ok(params["path"], "should include relative path");
+  } finally {
+    fs.rmSync(wsDir, { recursive: true, force: true });
+  }
+});
+
+// --- Session branch tests ---
+
+test("session.branch creates new session with copied history", async () => {
+  const wsDir = fs.mkdtempSync(path.join(os.tmpdir(), "branch-"));
+  try {
+    const server = new BridgeServer();
+
+    globalThis.__AI_SPEC_SDK_QUERY__ = async function* () {
+      yield { type: "system", subtype: "init", session_id: "sdk-src-1" };
+      yield { type: "result", subtype: "success", result: "done" };
+    };
+
+    const startResp = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 300,
+      method: "session.start",
+      params: { workspace: wsDir, prompt: "original prompt" },
+    });
+
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+
+    const srcSessionId = (startResp.result as Record<string, unknown>)["sessionId"] as string;
+    assert.ok(srcSessionId, "source session should have an ID");
+
+    const branchResp = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 301,
+      method: "session.branch",
+      params: { sessionId: srcSessionId },
+    });
+
+    assert.ok(!branchResp.error, `unexpected error: ${JSON.stringify(branchResp.error)}`);
+    const result = branchResp.result as Record<string, unknown>;
+    assert.ok(result["sessionId"], "should return a new session ID");
+    assert.notEqual(result["sessionId"], srcSessionId, "branched session ID must differ");
+    assert.equal(result["branchedFrom"], srcSessionId);
+  } finally {
+    fs.rmSync(wsDir, { recursive: true, force: true });
+  }
+});
+
+test("session.branch returns -32011 for unknown session", async () => {
+  const server = new BridgeServer();
+  const response = await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 302,
+    method: "session.branch",
+    params: { sessionId: "nonexistent" },
+  });
+  assert.ok(response.error);
+  assert.equal(response.error!.code, -32011);
+});
+
+test("session.branch with fromIndex limits copied history", async () => {
+  const wsDir = fs.mkdtempSync(path.join(os.tmpdir(), "branch-"));
+  try {
+    const server = new BridgeServer();
+
+    globalThis.__AI_SPEC_SDK_QUERY__ = async function* () {
+      yield { type: "system", subtype: "init", session_id: "sdk-src-2" };
+      yield { type: "assistant", message: { content: [{ type: "text", text: "hello" }] } };
+      yield { type: "assistant", message: { content: [{ type: "text", text: "world" }] } };
+      yield { type: "result", subtype: "success", result: "done" };
+    };
+
+    const startResp = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 303,
+      method: "session.start",
+      params: { workspace: wsDir, prompt: "test" },
+    });
+
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+
+    const srcId = (startResp.result as Record<string, unknown>)["sessionId"] as string;
+
+    const branchResp = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 304,
+      method: "session.branch",
+      params: { sessionId: srcId, fromIndex: 2 },
+    });
+
+    assert.ok(!branchResp.error);
+    const result = branchResp.result as Record<string, unknown>;
+    assert.equal(result["historyCopied"], 2);
+  } finally {
+    fs.rmSync(wsDir, { recursive: true, force: true });
+  }
+});
+
+// --- Session search tests ---
+
+test("session.search finds matching sessions", async () => {
+  const wsDir = fs.mkdtempSync(path.join(os.tmpdir(), "search-"));
+  try {
+    const server = new BridgeServer();
+
+    globalThis.__AI_SPEC_SDK_QUERY__ = async function* () {
+      yield { type: "system", subtype: "init", session_id: "sdk-search-1" };
+      yield { type: "result", subtype: "success", result: "done" };
+    };
+
+    await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 400,
+      method: "session.start",
+      params: { workspace: wsDir, prompt: "fix authentication bug" },
+    });
+
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+
+    const searchResp = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 401,
+      method: "session.search",
+      params: { query: "authentication" },
+    });
+
+    assert.ok(!searchResp.error);
+    const results = (searchResp.result as Record<string, unknown>)["results"] as Array<Record<string, unknown>>;
+    assert.ok(results.length >= 1, "should find at least one matching session");
+    const first = results[0];
+    assert.ok(first["matches"].length > 0, "should have match details");
+    assert.ok(first["sessionId"], "result should have sessionId");
+  } finally {
+    fs.rmSync(wsDir, { recursive: true, force: true });
+  }
+});
+
+test("session.search with workspace filter", async () => {
+  const wsDir = fs.mkdtempSync(path.join(os.tmpdir(), "search-"));
+  const otherWs = fs.mkdtempSync(path.join(os.tmpdir(), "search-other-"));
+  try {
+    const server = new BridgeServer();
+
+    globalThis.__AI_SPEC_SDK_QUERY__ = async function* () {
+      yield { type: "system", subtype: "init", session_id: "sdk-search-2" };
+      yield { type: "result", subtype: "success", result: "done" };
+    };
+
+    await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 402,
+      method: "session.start",
+      params: { workspace: wsDir, prompt: "unique search test query" },
+    });
+
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+
+    // Filter to other workspace — should find nothing
+    const resp1 = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 403,
+      method: "session.search",
+      params: { query: "unique search test", workspace: otherWs },
+    });
+    const results1 = (resp1.result as Record<string, unknown>)["results"] as unknown[];
+    assert.equal(results1.length, 0);
+
+    // Filter to correct workspace — should find it
+    const resp2 = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 404,
+      method: "session.search",
+      params: { query: "unique search test", workspace: wsDir },
+    });
+    const results2 = (resp2.result as Record<string, unknown>)["results"] as unknown[];
+    assert.ok(results2.length >= 1);
+  } finally {
+    fs.rmSync(wsDir, { recursive: true, force: true });
+    fs.rmSync(otherWs, { recursive: true, force: true });
+  }
+});
+
+test("session.search rejects empty query", async () => {
+  const server = new BridgeServer();
+  const response = await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 405,
+    method: "session.search",
+    params: { query: "" },
+  });
+  assert.ok(response.error);
+  assert.equal(response.error!.code, -32602);
+});
+
+test("session.search caps limit at 100", async () => {
+  const server = new BridgeServer();
+  const response = await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 406,
+    method: "session.search",
+    params: { query: "test", limit: 500 },
+  });
+  assert.ok(!response.error);
+});
+
+test("bridge.capabilities advertises context.*, session.branch, session.search", async () => {
+  const server = new BridgeServer();
+  const response = await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 500,
+    method: "bridge.capabilities",
+  });
+
+  const methods = (response.result as Record<string, unknown>)["methods"] as string[];
+  assert.ok(methods.includes("context.read"), "must advertise context.read");
+  assert.ok(methods.includes("context.write"), "must advertise context.write");
+  assert.ok(methods.includes("context.list"), "must advertise context.list");
+  assert.ok(methods.includes("session.branch"), "must advertise session.branch");
+  assert.ok(methods.includes("session.search"), "must advertise session.search");
+});

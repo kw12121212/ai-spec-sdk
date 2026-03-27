@@ -11,6 +11,7 @@ import type { McpServerConfig } from "./mcp-store.js";
 import { ConfigStore } from "./config-store.js";
 import { HooksStore } from "./hooks-store.js";
 import type { HookEvent } from "./hooks-store.js";
+import { ContextStore } from "./context-store.js";
 import { runClaudeQuery } from "./claude-agent-runner.js";
 
 const METHOD_NOT_FOUND = -32601;
@@ -224,6 +225,7 @@ export class BridgeServer {
   private mcpStore: McpStore;
   private configStore: ConfigStore;
   private hooksStore: HooksStore;
+  private contextStore: ContextStore;
   private eventLog: Map<string, BufferedEvent[]>;
   private eventSeq: Map<string, number>;
   private pendingApprovals: Map<string, PendingApproval>;
@@ -237,6 +239,7 @@ export class BridgeServer {
     });
     this.configStore = new ConfigStore();
     this.hooksStore = new HooksStore();
+    this.contextStore = new ContextStore();
     this.eventLog = new Map();
     this.eventSeq = new Map();
     this.pendingApprovals = new Map();
@@ -388,6 +391,16 @@ export class BridgeServer {
         return this.hooksRemove(params);
       case "hooks.list":
         return this.hooksList(params);
+      case "context.read":
+        return this.contextRead(params);
+      case "context.write":
+        return this.contextWrite(params);
+      case "context.list":
+        return this.contextList(params);
+      case "session.branch":
+        return this.branchSession(params, requestId);
+      case "session.search":
+        return this.searchSessions(params);
       default:
         throw new BridgeError(METHOD_NOT_FOUND, `Method not found: ${method}`);
     }
@@ -587,6 +600,9 @@ export class BridgeServer {
         if (msgType === "tool_use") {
           const toolName = this._extractToolName(message);
           this._fireHooks("pre_tool_use", session.id, context.cwd, toolName);
+
+          // File change tracking for Write/Edit tools
+          this._emitFileChange(session.id, toolName, message, context.cwd);
         } else if (msgType === "tool_result") {
           this._fireHooks("post_tool_use", session.id, context.cwd);
         }
@@ -827,6 +843,57 @@ export class BridgeServer {
     }
   }
 
+  private _emitFileChange(
+    sessionId: string,
+    toolName: string | undefined,
+    message: unknown,
+    workspace: string,
+  ): void {
+    if (toolName !== "Write" && toolName !== "Edit") return;
+
+    const msg = message as Record<string, unknown> | null;
+    if (!msg || typeof msg !== "object") return;
+
+    const innerMsg = msg["message"] as Record<string, unknown> | undefined;
+    const content = innerMsg?.["content"] ?? msg["content"];
+    if (!Array.isArray(content)) return;
+
+    for (const block of content as Array<Record<string, unknown>>) {
+      if (block["type"] !== "tool_use") continue;
+      if (block["name"] !== "Write" && block["name"] !== "Edit") continue;
+
+      const input = block["input"] as Record<string, unknown> | undefined;
+      if (!input || typeof input["file_path"] !== "string") continue;
+
+      const filePath = input["file_path"] as string;
+      const relativePath = path.isAbsolute(filePath) ? path.relative(workspace, filePath) : filePath;
+
+      if (block["name"] === "Write") {
+        const existed = fs.existsSync(filePath);
+        this.notify({
+          jsonrpc: "2.0",
+          method: "bridge/file_changed",
+          params: {
+            sessionId,
+            path: relativePath,
+            action: existed ? "modified" : "created",
+          },
+        });
+      } else {
+        // Edit
+        this.notify({
+          jsonrpc: "2.0",
+          method: "bridge/file_changed",
+          params: {
+            sessionId,
+            path: relativePath,
+            action: "modified",
+          },
+        });
+      }
+    }
+  }
+
   // --- MCP methods ---
 
   private mcpAdd(params: Record<string, unknown>): unknown {
@@ -1038,5 +1105,209 @@ export class BridgeServer {
     const resolvedWorkspace = typeof workspace === "string" ? path.resolve(workspace) : undefined;
     const hooks = this.hooksStore.list(resolvedWorkspace);
     return { hooks };
+  }
+
+  // --- Context methods ---
+
+  private contextRead(params: Record<string, unknown>): unknown {
+    const { scope, path: relPath, workspace } = params;
+
+    if (scope !== "project" && scope !== "user") {
+      throw new BridgeError(-32602, "'scope' must be 'project' or 'user'");
+    }
+    if (!relPath || typeof relPath !== "string") {
+      throw new BridgeError(-32602, "'path' must be provided");
+    }
+
+    const resolvedWorkspace = typeof workspace === "string" ? path.resolve(workspace) : undefined;
+
+    if (resolvedWorkspace) {
+      if (!fs.existsSync(resolvedWorkspace) || !fs.statSync(resolvedWorkspace).isDirectory()) {
+        throw new BridgeError(-32001, "Workspace path does not exist", { workspace: resolvedWorkspace });
+      }
+    }
+
+    try {
+      return this.contextStore.read(scope as "project" | "user", relPath, resolvedWorkspace);
+    } catch (err: unknown) {
+      if (err && typeof err === "object" && (err as { code?: number }).code === -32001) {
+        throw new BridgeError(-32001, "File not found", { path: relPath });
+      }
+      throw new BridgeError(-32602, (err as Error).message);
+    }
+  }
+
+  private contextWrite(params: Record<string, unknown>): unknown {
+    const { scope, path: relPath, content, workspace } = params;
+
+    if (scope !== "project" && scope !== "user") {
+      throw new BridgeError(-32602, "'scope' must be 'project' or 'user'");
+    }
+    if (!relPath || typeof relPath !== "string") {
+      throw new BridgeError(-32602, "'path' must be provided");
+    }
+    if (typeof content !== "string") {
+      throw new BridgeError(-32602, "'content' must be a string");
+    }
+
+    const resolvedWorkspace = typeof workspace === "string" ? path.resolve(workspace) : undefined;
+
+    if (resolvedWorkspace) {
+      if (!fs.existsSync(resolvedWorkspace) || !fs.statSync(resolvedWorkspace).isDirectory()) {
+        throw new BridgeError(-32001, "Workspace path does not exist", { workspace: resolvedWorkspace });
+      }
+    }
+
+    try {
+      return this.contextStore.write(scope as "project" | "user", relPath, content, resolvedWorkspace);
+    } catch (err) {
+      throw new BridgeError(-32602, (err as Error).message);
+    }
+  }
+
+  private contextList(params: Record<string, unknown>): unknown {
+    const { workspace } = params;
+    const resolvedWorkspace = typeof workspace === "string" ? workspace : undefined;
+    const files = this.contextStore.list(resolvedWorkspace);
+    return { files };
+  }
+
+  // --- Session branch ---
+
+  private async branchSession(
+    params: Record<string, unknown>,
+    requestId: unknown,
+  ): Promise<unknown> {
+    const { sessionId, fromIndex, prompt } = params;
+
+    if (!sessionId || typeof sessionId !== "string") {
+      throw new BridgeError(-32602, "'sessionId' must be provided");
+    }
+
+    const source = this.sessionStore.get(sessionId);
+    if (!source) {
+      throw new BridgeError(-32011, "Session not found", { sessionId });
+    }
+
+    let branchIndex = source.history.length;
+    if (fromIndex !== undefined) {
+      if (typeof fromIndex !== "number" || !Number.isInteger(fromIndex) || fromIndex < 0) {
+        throw new BridgeError(-32602, "'fromIndex' must be a non-negative integer");
+      }
+      if (fromIndex > source.history.length) {
+        throw new BridgeError(-32602, `'fromIndex' ${fromIndex} exceeds history length ${source.history.length}`);
+      }
+      branchIndex = fromIndex;
+    }
+
+    // Create new session in the same workspace
+    const branchPrompt = typeof prompt === "string" ? prompt : "(branched session)";
+    const newSession = this.sessionStore.create(source.workspace, branchPrompt);
+
+    // Copy history from source up to branchIndex
+    const copiedHistory = source.history.slice(0, branchIndex);
+    for (const entry of copiedHistory) {
+      this.sessionStore.appendEvent(newSession.id, {
+        type: "branch_from",
+        message: entry,
+      });
+    }
+
+    this.emit(
+      "bridge/session_event",
+      { sessionId: newSession.id, type: "session_started" },
+      requestId,
+    );
+
+    // If prompt is provided, start the branched session
+    if (typeof prompt === "string") {
+      const options: Record<string, unknown> = {};
+      // Only try SDK resume when branching from the full history end.
+      // If fromIndex is set, the SDK has no concept of a mid-point branch,
+      // so a fresh session is more appropriate.
+      if (source.sdkSessionId && branchIndex === source.history.length) {
+        options["resume"] = source.sdkSessionId;
+      }
+
+      return this._runQuery(
+        newSession,
+        prompt,
+        options,
+        { cwd: source.workspace, env: undefined },
+        requestId,
+      );
+    }
+
+    return {
+      sessionId: newSession.id,
+      workspace: newSession.workspace,
+      branchedFrom: sessionId,
+      historyCopied: branchIndex,
+    };
+  }
+
+  // --- Session search ---
+
+  private searchSessions(params: Record<string, unknown>): unknown {
+    const { query, workspace, status, limit } = params;
+
+    if (!query || typeof query !== "string") {
+      throw new BridgeError(-32602, "'query' must be a non-empty string");
+    }
+
+    if (limit !== undefined && (typeof limit !== "number" || !Number.isInteger(limit) || limit < 1)) {
+      throw new BridgeError(-32602, "'limit' must be a positive integer");
+    }
+
+    const resolvedLimit = Math.min(typeof limit === "number" ? limit : 20, 100);
+    const resolvedWorkspace = typeof workspace === "string" ? path.resolve(workspace) : undefined;
+
+    const allSessions = this.sessionStore.list("all" as "active" | "all" | undefined);
+
+    const results: Array<{
+      sessionId: string;
+      workspace: string;
+      status: string;
+      matches: Array<{ historyIndex: number; snippet: string }>;
+    }> = [];
+
+    for (const session of allSessions) {
+      // Filter by workspace
+      if (resolvedWorkspace && session.workspace !== resolvedWorkspace) continue;
+
+      // Filter by status
+      if (typeof status === "string" && session.status !== status) continue;
+
+      const matches: Array<{ historyIndex: number; snippet: string }> = [];
+
+      for (let i = 0; i < session.history.length; i++) {
+        const entry = session.history[i];
+        const text = entry.prompt ?? JSON.stringify(entry.message ?? "");
+        const lowerText = text.toLowerCase();
+        const lowerQuery = query.toLowerCase();
+        const idx = lowerText.indexOf(lowerQuery);
+
+        if (idx !== -1) {
+          // Build snippet with context around match
+          const start = Math.max(0, idx - 40);
+          const end = Math.min(text.length, idx + query.length + 40);
+          const snippet = (start > 0 ? "..." : "") + text.slice(start, end) + (end < text.length ? "..." : "");
+          matches.push({ historyIndex: i, snippet });
+        }
+      }
+
+      if (matches.length > 0) {
+        results.push({
+          sessionId: session.id,
+          workspace: session.workspace,
+          status: session.status,
+          matches,
+        });
+      }
+
+      if (results.length >= resolvedLimit) break;
+    }
+
+    return { results };
   }
 }
