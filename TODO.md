@@ -59,7 +59,7 @@ GUI 进程崩溃重连后，中间的 `bridge/session_event` 通知已丢失，
 ### [x] 9. 工具 Schema 列表
 GUI 没有途径获知哪些工具可用、参数是什么。
 
-### [ ] 10. 工具审批流（Tool Approval）
+### [x] 10. 工具审批流（Tool Approval）
 当前 `permissionMode` 默认 `bypassPermissions`，Bridge 没有任何机制让 GUI 弹出
 "Claude 要执行此命令，是否批准？"对话框。GUI 无法：
 - 收到"待审批"事件

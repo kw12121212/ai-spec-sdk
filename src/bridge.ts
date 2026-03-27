@@ -1,5 +1,6 @@
 import path from "node:path";
 import fs from "node:fs";
+import type { PermissionResult } from "@anthropic-ai/claude-agent-sdk";
 import { BridgeError, isJsonRpcRequest } from "./errors.js";
 import { getCapabilities, BUILTIN_SPEC_SKILLS, SUPPORTED_MODELS, BUILTIN_TOOLS } from "./capabilities.js";
 import { runWorkflow } from "./workflow.js";
@@ -18,7 +19,8 @@ interface BufferedEvent {
   payload: Record<string, unknown>;
 }
 
-const PERMISSION_MODES = new Set(["default", "acceptEdits", "bypassPermissions"]);
+const PERMISSION_MODES = new Set(["default", "acceptEdits", "bypassPermissions", "approve"]);
+const APPROVAL_NOT_FOUND = -32020;
 const DEFAULT_PERMISSION_MODE = "bypassPermissions";
 
 interface AgentControlParams {
@@ -205,12 +207,18 @@ interface AgentQueryContext {
   env: Record<string, string | undefined> | undefined;
 }
 
+interface PendingApproval {
+  resolve: (result: PermissionResult) => void;
+  sessionId: string;
+}
+
 export class BridgeServer {
   private notify: (message: unknown) => void;
   private sessionStore: SessionStore;
   private workspaceStore: WorkspaceStore;
   private eventLog: Map<string, BufferedEvent[]>;
   private eventSeq: Map<string, number>;
+  private pendingApprovals: Map<string, PendingApproval>;
 
   constructor({ notify = () => {}, sessionsDir, workspacesDir }: BridgeServerOptions = {}) {
     this.notify = notify;
@@ -218,6 +226,42 @@ export class BridgeServer {
     this.workspaceStore = new WorkspaceStore(workspacesDir);
     this.eventLog = new Map();
     this.eventSeq = new Map();
+    this.pendingApprovals = new Map();
+  }
+
+  private _buildApprovalCallback(sessionId: string): (
+    toolName: string,
+    input: Record<string, unknown>,
+    opts: { signal: AbortSignal; title?: string; displayName?: string; description?: string; toolUseID: string }
+  ) => Promise<PermissionResult> {
+    return (toolName, input, opts) => {
+      const requestId = crypto.randomUUID();
+      return new Promise<PermissionResult>((resolve) => {
+        this.pendingApprovals.set(requestId, { resolve, sessionId });
+
+        opts.signal.addEventListener("abort", () => {
+          if (this.pendingApprovals.delete(requestId)) {
+            resolve({ behavior: "deny", message: "Tool call aborted" });
+          }
+        }, { once: true });
+
+        // Call notify directly — using this.emit would overwrite our requestId
+        // with the RPC context requestId (a different concept).
+        this.notify({
+          jsonrpc: "2.0",
+          method: "bridge/tool_approval_requested",
+          params: {
+            sessionId,
+            requestId,
+            toolName,
+            input,
+            ...(opts.title !== undefined && { title: opts.title }),
+            ...(opts.displayName !== undefined && { displayName: opts.displayName }),
+            ...(opts.description !== undefined && { description: opts.description }),
+          },
+        });
+      });
+    };
   }
 
   async handleMessage(payload: unknown): Promise<JsonRpcResponse> {
@@ -302,6 +346,13 @@ export class BridgeServer {
         return this.registerWorkspace(params);
       case "workspace.list":
         return { workspaces: this.workspaceStore.list() };
+      case "session.approveTool":
+        return this.resolveApproval(params, { behavior: "allow" });
+      case "session.rejectTool":
+        return this.resolveApproval(params, {
+          behavior: "deny",
+          message: typeof params["message"] === "string" ? params["message"] : "Tool use rejected by user",
+        });
       default:
         throw new BridgeError(METHOD_NOT_FOUND, `Method not found: ${method}`);
     }
@@ -448,9 +499,18 @@ export class BridgeServer {
     context: AgentQueryContext,
     requestId: unknown,
   ): Promise<unknown> {
+    let resolvedOptions = options;
+    if (options["permissionMode"] === "approve") {
+      resolvedOptions = {
+        ...options,
+        permissionMode: "default",
+        canUseTool: this._buildApprovalCallback(session.id),
+      };
+    }
+
     const queryResult = await runClaudeQuery({
       prompt,
-      options,
+      options: resolvedOptions,
       cwd: context.cwd,
       env: context.env,
       shouldStop: () => {
@@ -529,6 +589,13 @@ export class BridgeServer {
     const session = this.sessionStore.stop(sessionId);
     if (!session) {
       throw new BridgeError(-32011, "Session not found", { sessionId });
+    }
+
+    for (const [reqId, pending] of this.pendingApprovals) {
+      if (pending.sessionId === sessionId) {
+        this.pendingApprovals.delete(reqId);
+        pending.resolve({ behavior: "deny", message: "Session stopped" });
+      }
     }
 
     return { sessionId, status: session.status };
@@ -611,6 +678,30 @@ export class BridgeServer {
     const filtered = buf.filter((e) => e.seq >= sinceSeq).slice(0, resolvedLimit);
 
     return { sessionId, events: filtered, total: buf.length };
+  }
+
+  private resolveApproval(params: Record<string, unknown>, result: PermissionResult): unknown {
+    const { sessionId, requestId } = params;
+
+    if (!sessionId || typeof sessionId !== "string") {
+      throw new BridgeError(-32602, "'sessionId' must be provided");
+    }
+    if (!requestId || typeof requestId !== "string") {
+      throw new BridgeError(-32602, "'requestId' must be provided");
+    }
+
+    if (!this.sessionStore.get(sessionId)) {
+      throw new BridgeError(-32011, "Session not found", { sessionId });
+    }
+
+    const pending = this.pendingApprovals.get(requestId);
+    if (!pending || pending.sessionId !== sessionId) {
+      throw new BridgeError(APPROVAL_NOT_FOUND, "Approval request not found", { requestId });
+    }
+
+    this.pendingApprovals.delete(requestId);
+    pending.resolve(result);
+    return { requestId, behavior: result.behavior };
   }
 
   private registerWorkspace(params: Record<string, unknown>): unknown {

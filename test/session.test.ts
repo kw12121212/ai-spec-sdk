@@ -1315,3 +1315,282 @@ test("session.start response has usage: null when SDK omits usage", async () => 
     delete globalThis.__AI_SPEC_SDK_QUERY__;
   }
 });
+
+// ────────────────────────────────────────────────────────
+// Tool approval flow tests
+// ────────────────────────────────────────────────────────
+
+/** Wait for a bridge/tool_approval_requested notification, resolving with its params. */
+function makeApprovalWaiter(server: BridgeServer): {
+  server: BridgeServer;
+  waitForApproval: () => Promise<Record<string, unknown>>;
+} {
+  let resolveApproval!: (params: Record<string, unknown>) => void;
+  const approvalPromise = new Promise<Record<string, unknown>>((res) => { resolveApproval = res; });
+
+  const wrapped = new BridgeServer({
+    notify: (m) => {
+      const msg = m as Record<string, unknown>;
+      const params = msg["params"] as Record<string, unknown> | undefined;
+      if (msg["method"] === "bridge/tool_approval_requested" && params) {
+        resolveApproval(params);
+      }
+    },
+  });
+
+  // Replace the wrapped server's notify by reconstructing — instead, we expose
+  // a factory that builds the BridgeServer with the intercepting notify directly.
+  void server; // unused — see factory function below
+  return { server: wrapped, waitForApproval: () => approvalPromise };
+}
+
+function makeApprovalServer(): {
+  server: BridgeServer;
+  waitForApproval: () => Promise<Record<string, unknown>>;
+} {
+  let resolveApproval!: (params: Record<string, unknown>) => void;
+  const approvalPromise = new Promise<Record<string, unknown>>((res) => { resolveApproval = res; });
+
+  const server = new BridgeServer({
+    notify: (m) => {
+      const msg = m as Record<string, unknown>;
+      const params = msg["params"] as Record<string, unknown> | undefined;
+      if (msg["method"] === "bridge/tool_approval_requested" && params) {
+        resolveApproval(params);
+      }
+    },
+  });
+
+  return { server, waitForApproval: () => approvalPromise };
+}
+
+test("session.approveTool allows a pending canUseTool call and session completes", async () => {
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-approve-"));
+  type CanUseTool = (tool: string, input: Record<string, unknown>, opts: { signal: AbortSignal; toolUseID: string }) => Promise<{ behavior: string }>;
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* ({ prompt, options }: { prompt: string; options: Record<string, unknown> }) {
+    yield { type: "system", subtype: "init", session_id: "s1" };
+    const canUseTool = options["canUseTool"] as CanUseTool | undefined;
+    if (canUseTool) {
+      const ac = new AbortController();
+      const perm = await canUseTool("Bash", { command: "ls" }, { signal: ac.signal, toolUseID: "tu-1" });
+      yield { type: "tool_use_result", behavior: perm.behavior };
+    }
+    yield { result: `done:${prompt}` };
+  };
+
+  try {
+    const { server, waitForApproval } = makeApprovalServer();
+
+    // Kick off the session — do NOT await yet (it will block on canUseTool)
+    const startPromise = server.handleMessage({
+      jsonrpc: "2.0", id: 1,
+      method: "session.start",
+      params: { workspace: ws, prompt: "hello", permissionMode: "approve" },
+    });
+
+    // Wait for the approval notification (emitted synchronously inside canUseTool)
+    const approvalParams = await waitForApproval();
+    const sessionId = approvalParams["sessionId"] as string;
+    const requestId = approvalParams["requestId"] as string;
+    assert.ok(typeof sessionId === "string", "approval notification must carry sessionId");
+    assert.equal(approvalParams["toolName"], "Bash");
+
+    // Approve the tool — this resolves the pending canUseTool Promise
+    const approveResp = await server.handleMessage({
+      jsonrpc: "2.0", id: 2,
+      method: "session.approveTool",
+      params: { sessionId, requestId },
+    });
+    assert.ok(!approveResp.error, "session.approveTool must not error");
+    assert.equal((approveResp.result as Record<string, unknown>)["behavior"], "allow");
+
+    // Now the session should complete
+    const startResult = await startPromise;
+    assert.ok(!startResult.error, "session should complete without error");
+    assert.equal((startResult.result as Record<string, unknown>)["status"], "completed");
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    fs.rmSync(ws, { recursive: true, force: true });
+  }
+});
+
+test("session.rejectTool denies a pending canUseTool call", async () => {
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-reject-"));
+  type CanUseTool = (tool: string, input: Record<string, unknown>, opts: { signal: AbortSignal; toolUseID: string }) => Promise<{ behavior: string }>;
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* ({ prompt, options }: { prompt: string; options: Record<string, unknown> }) {
+    yield { type: "system", subtype: "init", session_id: "s2" };
+    const canUseTool = options["canUseTool"] as CanUseTool | undefined;
+    if (canUseTool) {
+      const ac = new AbortController();
+      const perm = await canUseTool("Bash", { command: "rm -rf /" }, { signal: ac.signal, toolUseID: "tu-2" });
+      yield { type: "tool_use_result", behavior: perm.behavior };
+    }
+    yield { result: `done:${prompt}` };
+  };
+
+  try {
+    const { server, waitForApproval } = makeApprovalServer();
+
+    const startPromise = server.handleMessage({
+      jsonrpc: "2.0", id: 3,
+      method: "session.start",
+      params: { workspace: ws, prompt: "dangerous", permissionMode: "approve" },
+    });
+
+    const approvalParams = await waitForApproval();
+    const sessionId = approvalParams["sessionId"] as string;
+    const requestId = approvalParams["requestId"] as string;
+
+    const rejectResp = await server.handleMessage({
+      jsonrpc: "2.0", id: 4,
+      method: "session.rejectTool",
+      params: { sessionId, requestId, message: "Not allowed" },
+    });
+    assert.ok(!rejectResp.error, "session.rejectTool must not error");
+    assert.equal((rejectResp.result as Record<string, unknown>)["behavior"], "deny");
+
+    const startResult = await startPromise;
+    assert.ok(!startResult.error, "session should complete (with denied tool)");
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    fs.rmSync(ws, { recursive: true, force: true });
+  }
+});
+
+test("session.approveTool returns -32020 for an unknown requestId", async () => {
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-approve-unk-"));
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* () {
+    yield { type: "system", subtype: "init", session_id: "s3" };
+    yield { result: "done" };
+  };
+
+  try {
+    const server = new BridgeServer();
+
+    const start = await server.handleMessage({
+      jsonrpc: "2.0", id: 5,
+      method: "session.start",
+      params: { workspace: ws, prompt: "hi", permissionMode: "bypassPermissions" },
+    });
+    const sessionId = (start.result as Record<string, unknown>)["sessionId"] as string;
+
+    const resp = await server.handleMessage({
+      jsonrpc: "2.0", id: 6,
+      method: "session.approveTool",
+      params: { sessionId, requestId: "nonexistent-request-id" },
+    });
+    assert.ok(resp.error, "must return an error for unknown requestId");
+    assert.equal(resp.error!.code, -32020);
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    fs.rmSync(ws, { recursive: true, force: true });
+  }
+});
+
+test("session.rejectTool returns -32020 for sessionId mismatch", async () => {
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-reject-mismatch-"));
+  type CanUseTool = (tool: string, input: Record<string, unknown>, opts: { signal: AbortSignal; toolUseID: string }) => Promise<{ behavior: string }>;
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* ({ options }: { options: Record<string, unknown> }) {
+    yield { type: "system", subtype: "init", session_id: "s4" };
+    const canUseTool = options["canUseTool"] as CanUseTool | undefined;
+    if (canUseTool) {
+      const ac = new AbortController();
+      await canUseTool("Read", { file: "x" }, { signal: ac.signal, toolUseID: "tu-3" });
+    }
+    yield { result: "done" };
+  };
+
+  try {
+    const { server, waitForApproval } = makeApprovalServer();
+
+    const startPromise = server.handleMessage({
+      jsonrpc: "2.0", id: 7,
+      method: "session.start",
+      params: { workspace: ws, prompt: "test", permissionMode: "approve" },
+    });
+
+    const approvalParams = await waitForApproval();
+    const requestId = approvalParams["requestId"] as string;
+
+    // Use the wrong sessionId
+    const resp = await server.handleMessage({
+      jsonrpc: "2.0", id: 8,
+      method: "session.rejectTool",
+      params: { sessionId: "wrong-session-id", requestId },
+    });
+    assert.ok(resp.error, "must return an error for session not found");
+    // -32011 session not found or -32020 approval not found
+    assert.ok(resp.error!.code === -32011 || resp.error!.code === -32020);
+
+    // Clean up: approve with correct sessionId so session can finish
+    const correctSessionId = approvalParams["sessionId"] as string;
+    await server.handleMessage({
+      jsonrpc: "2.0", id: 9,
+      method: "session.approveTool",
+      params: { sessionId: correctSessionId, requestId },
+    });
+    await startPromise;
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    fs.rmSync(ws, { recursive: true, force: true });
+  }
+});
+
+test("session.stop auto-denies pending tool approvals", async () => {
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-stop-approve-"));
+  type CanUseTool = (tool: string, input: Record<string, unknown>, opts: { signal: AbortSignal; toolUseID: string }) => Promise<{ behavior: string }>;
+
+  let permissionBehavior: string | undefined;
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* ({ options }: { options: Record<string, unknown> }) {
+    yield { type: "system", subtype: "init", session_id: "s5" };
+    const canUseTool = options["canUseTool"] as CanUseTool | undefined;
+    if (canUseTool) {
+      const ac = new AbortController();
+      const perm = await canUseTool("Bash", { command: "sleep 999" }, { signal: ac.signal, toolUseID: "tu-4" });
+      permissionBehavior = perm.behavior;
+    }
+    yield { result: "done" };
+  };
+
+  try {
+    const { server, waitForApproval } = makeApprovalServer();
+
+    const startPromise = server.handleMessage({
+      jsonrpc: "2.0", id: 10,
+      method: "session.start",
+      params: { workspace: ws, prompt: "slow", permissionMode: "approve" },
+    });
+
+    const approvalParams = await waitForApproval();
+    const sessionId = approvalParams["sessionId"] as string;
+    const requestId = approvalParams["requestId"] as string;
+
+    // Stop the session while the tool approval is pending
+    const stopResp = await server.handleMessage({
+      jsonrpc: "2.0", id: 11,
+      method: "session.stop",
+      params: { sessionId },
+    });
+    assert.ok(!stopResp.error, "session.stop must succeed");
+
+    // The pending approval should have been auto-denied; session finishes
+    await startPromise;
+    assert.equal(permissionBehavior, "deny", "auto-denied approval must produce deny behavior");
+
+    // The requestId is no longer in pendingApprovals — a second call should error
+    const lateApprove = await server.handleMessage({
+      jsonrpc: "2.0", id: 12,
+      method: "session.approveTool",
+      params: { sessionId, requestId },
+    });
+    assert.ok(lateApprove.error, "late approval after stop must return an error");
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    fs.rmSync(ws, { recursive: true, force: true });
+  }
+});

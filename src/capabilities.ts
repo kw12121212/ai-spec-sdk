@@ -117,6 +117,8 @@ export function getCapabilities(): Capabilities {
       "workspace.register",
       "workspace.list",
       "tools.list",
+      "session.approveTool",
+      "session.rejectTool",
     ],
     agentControlParams: [
       "model",
