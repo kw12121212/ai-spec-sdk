@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 import readline from "node:readline";
+import fs from "node:fs";
+import path from "node:path";
+import os from "node:os";
 import { BridgeServer } from "./bridge.js";
 import { BridgeError } from "./errors.js";
 
@@ -7,8 +10,12 @@ function writeMessage(message: unknown): void {
   process.stdout.write(`${JSON.stringify(message)}\n`);
 }
 
+const sessionsDir = path.join(os.homedir(), ".ai-spec-sdk", "sessions");
+fs.mkdirSync(sessionsDir, { recursive: true });
+
 const server = new BridgeServer({
   notify: (message) => writeMessage(message),
+  sessionsDir,
 });
 
 const rl = readline.createInterface({

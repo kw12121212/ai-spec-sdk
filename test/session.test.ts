@@ -666,6 +666,190 @@ test("session.list returns sessions ordered by createdAt descending", async () =
   }
 });
 
+// ── session.history ───────────────────────────────────────────────────────────
+
+test("session.history returns total and entries for a completed session", async () => {
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-history-"));
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* () {
+    yield { type: "system", subtype: "init", session_id: "hist-sdk" };
+    yield { type: "assistant", message: { content: [{ type: "text", text: "thinking" }] } };
+    yield { type: "result", subtype: "success", result: "done" };
+  };
+
+  try {
+    const server = new BridgeServer();
+    const start = await server.handleMessage({
+      jsonrpc: "2.0", id: 200,
+      method: "session.start",
+      params: { workspace: ws, prompt: "history test" },
+    });
+    const sessionId = (start.result as Record<string, unknown>)["sessionId"] as string;
+
+    const response = await server.handleMessage({
+      jsonrpc: "2.0", id: 201,
+      method: "session.history",
+      params: { sessionId },
+    });
+
+    const result = response.result as Record<string, unknown>;
+    assert.equal(result["sessionId"], sessionId);
+    assert.ok(typeof result["total"] === "number" && result["total"] > 0);
+    const entries = result["entries"] as unknown[];
+    assert.ok(Array.isArray(entries));
+    assert.ok(entries.length > 0);
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+  }
+});
+
+test("session.history with offset and limit returns correct window", async () => {
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-history-page-"));
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* () {
+    yield { type: "system", subtype: "init", session_id: "page-sdk" };
+    for (let i = 0; i < 5; i++) {
+      yield { type: "assistant", message: { content: [{ type: "text", text: `msg-${i}` }] } };
+    }
+    yield { type: "result", subtype: "success", result: "done" };
+  };
+
+  try {
+    const server = new BridgeServer();
+    const start = await server.handleMessage({
+      jsonrpc: "2.0", id: 210,
+      method: "session.start",
+      params: { workspace: ws, prompt: "paging test" },
+    });
+    const sessionId = (start.result as Record<string, unknown>)["sessionId"] as string;
+
+    // Get total first
+    const allResponse = await server.handleMessage({
+      jsonrpc: "2.0", id: 211,
+      method: "session.history",
+      params: { sessionId },
+    });
+    const total = (allResponse.result as Record<string, unknown>)["total"] as number;
+
+    // Paginate: offset=1, limit=2
+    const pageResponse = await server.handleMessage({
+      jsonrpc: "2.0", id: 212,
+      method: "session.history",
+      params: { sessionId, offset: 1, limit: 2 },
+    });
+    const pageResult = pageResponse.result as Record<string, unknown>;
+    assert.equal(pageResult["total"], total);
+    const entries = pageResult["entries"] as unknown[];
+    assert.equal(entries.length, 2);
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+  }
+});
+
+test("session.history with limit > 200 is capped at 200", async () => {
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-history-cap-"));
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* () {
+    yield { type: "system", subtype: "init", session_id: "cap-sdk-h" };
+    yield { type: "result", subtype: "success", result: "done" };
+  };
+
+  try {
+    const server = new BridgeServer();
+    const start = await server.handleMessage({
+      jsonrpc: "2.0", id: 220,
+      method: "session.start",
+      params: { workspace: ws, prompt: "cap test" },
+    });
+    const sessionId = (start.result as Record<string, unknown>)["sessionId"] as string;
+
+    const response = await server.handleMessage({
+      jsonrpc: "2.0", id: 221,
+      method: "session.history",
+      params: { sessionId, limit: 9999 },
+    });
+
+    const entries = (response.result as Record<string, unknown>)["entries"] as unknown[];
+    assert.ok(entries.length <= 200, "entries must not exceed 200");
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+  }
+});
+
+test("session.history with unknown sessionId returns -32011", async () => {
+  const server = new BridgeServer();
+  const response = await server.handleMessage({
+    jsonrpc: "2.0", id: 230,
+    method: "session.history",
+    params: { sessionId: "does-not-exist" },
+  });
+
+  assert.ok(response.error, "should return an error");
+  assert.equal(response.error?.code, -32011);
+});
+
+test("session.list entries include prompt field with initial prompt", async () => {
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-list-prompt-"));
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* () {
+    yield { type: "system", subtype: "init", session_id: "prompt-sdk" };
+    yield { result: "done" };
+  };
+
+  try {
+    const server = new BridgeServer();
+    await server.handleMessage({
+      jsonrpc: "2.0", id: 240,
+      method: "session.start",
+      params: { workspace: ws, prompt: "my initial prompt" },
+    });
+
+    const response = await server.handleMessage({
+      jsonrpc: "2.0", id: 241,
+      method: "session.list",
+    });
+    const sessions = (response.result as Record<string, unknown>)["sessions"] as Array<Record<string, unknown>>;
+
+    assert.ok(sessions.length > 0);
+    const entry = sessions.find((s) => s["prompt"] === "my initial prompt");
+    assert.ok(entry, "session entry should include the initial prompt");
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+  }
+});
+
+test("session.list prompt is truncated to 200 chars for long prompts", async () => {
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-list-prompt-trunc-"));
+  const longPrompt = "x".repeat(300);
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* () {
+    yield { type: "system", subtype: "init", session_id: "trunc-sdk" };
+    yield { result: "done" };
+  };
+
+  try {
+    const server = new BridgeServer();
+    const start = await server.handleMessage({
+      jsonrpc: "2.0", id: 250,
+      method: "session.start",
+      params: { workspace: ws, prompt: longPrompt },
+    });
+    const sessionId = (start.result as Record<string, unknown>)["sessionId"] as string;
+
+    const response = await server.handleMessage({
+      jsonrpc: "2.0", id: 251,
+      method: "session.list",
+    });
+    const sessions = (response.result as Record<string, unknown>)["sessions"] as Array<Record<string, unknown>>;
+    const entry = sessions.find((s) => s["sessionId"] === sessionId);
+
+    assert.ok(entry, "session entry should be present");
+    assert.equal((entry!["prompt"] as string).length, 200, "prompt should be truncated to 200 chars");
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+  }
+});
+
 // ── agent control parameters ──────────────────────────────────────────────────
 
 test("session.start with model passes it to the agent query", async () => {

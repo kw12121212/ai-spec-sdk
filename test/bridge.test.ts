@@ -36,6 +36,21 @@ test("unknown method returns method-not-found error", async () => {
   assert.equal(response.error!.code, -32601);
 });
 
+test("bridge.capabilities includes session.history in methods list", async () => {
+  const server = new BridgeServer();
+  const response = await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 4,
+    method: "bridge.capabilities",
+  });
+
+  const result = response.result as Record<string, unknown>;
+  assert.ok(
+    (result["methods"] as string[]).includes("session.history"),
+    "capabilities must advertise session.history",
+  );
+});
+
 test("invalid JSON-RPC object returns invalid-request error", async () => {
   const server = new BridgeServer();
   const response = await server.handleMessage({

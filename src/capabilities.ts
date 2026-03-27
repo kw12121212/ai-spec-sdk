@@ -70,6 +70,7 @@ export function getCapabilities(): Capabilities {
       "session.stop",
       "session.status",
       "session.list",
+      "session.history",
     ],
     agentControlParams: [
       "model",

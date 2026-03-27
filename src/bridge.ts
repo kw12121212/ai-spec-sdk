@@ -188,6 +188,7 @@ export interface JsonRpcResponse {
 
 export interface BridgeServerOptions {
   notify?: (message: unknown) => void;
+  sessionsDir?: string;
 }
 
 interface AgentQueryContext {
@@ -199,9 +200,9 @@ export class BridgeServer {
   private notify: (message: unknown) => void;
   private sessionStore: SessionStore;
 
-  constructor({ notify = () => {} }: BridgeServerOptions = {}) {
+  constructor({ notify = () => {}, sessionsDir }: BridgeServerOptions = {}) {
     this.notify = notify;
-    this.sessionStore = new SessionStore();
+    this.sessionStore = new SessionStore(sessionsDir);
   }
 
   async handleMessage(payload: unknown): Promise<JsonRpcResponse> {
@@ -272,6 +273,8 @@ export class BridgeServer {
         return this.getSessionStatus(params);
       case "session.list":
         return this.listSessions(params);
+      case "session.history":
+        return this.getSessionHistory(params);
       default:
         throw new BridgeError(METHOD_NOT_FOUND, `Method not found: ${method}`);
     }
@@ -515,6 +518,37 @@ export class BridgeServer {
     };
   }
 
+  private getSessionHistory(params: Record<string, unknown>): unknown {
+    const { sessionId, offset, limit } = params;
+
+    if (!sessionId || typeof sessionId !== "string") {
+      throw new BridgeError(-32602, "'sessionId' must be provided");
+    }
+
+    if (offset !== undefined && (typeof offset !== "number" || !Number.isInteger(offset) || offset < 0)) {
+      throw new BridgeError(-32602, "'offset' must be a non-negative integer");
+    }
+
+    if (limit !== undefined && (typeof limit !== "number" || !Number.isInteger(limit) || limit < 1)) {
+      throw new BridgeError(-32602, "'limit' must be a positive integer");
+    }
+
+    const session = this.sessionStore.get(sessionId);
+    if (!session) {
+      throw new BridgeError(-32011, "Session not found", { sessionId });
+    }
+
+    const resolvedOffset = typeof offset === "number" ? offset : 0;
+    const resolvedLimit = Math.min(typeof limit === "number" ? limit : 50, 200);
+    const entries = session.history.slice(resolvedOffset, resolvedOffset + resolvedLimit);
+
+    return {
+      sessionId,
+      total: session.history.length,
+      entries,
+    };
+  }
+
   private listSessions(params: Record<string, unknown>): unknown {
     const { status } = params;
 
@@ -525,13 +559,20 @@ export class BridgeServer {
     const sessions = this.sessionStore.list(status as "active" | "all" | undefined);
 
     return {
-      sessions: sessions.map((s) => ({
-        sessionId: s.id,
-        status: s.status,
-        workspace: s.workspace,
-        createdAt: s.createdAt,
-        updatedAt: s.updatedAt,
-      })),
+      sessions: sessions.map((s) => {
+        const firstPromptEntry = s.history.find((e) => e.type === "user_prompt");
+        const prompt = firstPromptEntry?.prompt
+          ? firstPromptEntry.prompt.slice(0, 200)
+          : null;
+        return {
+          sessionId: s.id,
+          status: s.status,
+          workspace: s.workspace,
+          createdAt: s.createdAt,
+          updatedAt: s.updatedAt,
+          prompt,
+        };
+      }),
     };
   }
 }

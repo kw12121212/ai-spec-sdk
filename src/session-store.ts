@@ -1,4 +1,6 @@
 import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
 
 export interface SessionHistoryEntry {
   type: string;
@@ -25,9 +27,44 @@ function nowIso(): string {
 
 export class SessionStore {
   private sessions: Map<string, Session>;
+  private sessionsDir: string | undefined;
 
-  constructor() {
+  constructor(sessionsDir?: string) {
     this.sessions = new Map();
+    this.sessionsDir = sessionsDir;
+
+    if (sessionsDir) {
+      this._loadFromDisk(sessionsDir);
+    }
+  }
+
+  private _loadFromDisk(dir: string): void {
+    let files: string[];
+    try {
+      files = fs.readdirSync(dir);
+    } catch {
+      return;
+    }
+    for (const file of files) {
+      if (!file.endsWith(".json")) continue;
+      try {
+        const raw = fs.readFileSync(path.join(dir, file), "utf8");
+        const session = JSON.parse(raw) as Session;
+        if (session && typeof session.id === "string") {
+          this.sessions.set(session.id, session);
+        }
+      } catch {
+        // skip corrupt files
+      }
+    }
+  }
+
+  private _persist(session: Session): void {
+    if (!this.sessionsDir) return;
+    const tmpPath = path.join(this.sessionsDir, `${session.id}.json.tmp`);
+    const finalPath = path.join(this.sessionsDir, `${session.id}.json`);
+    fs.writeFileSync(tmpPath, JSON.stringify(session), "utf8");
+    fs.renameSync(tmpPath, finalPath);
   }
 
   create(workspace: string, prompt: string): Session {
@@ -53,6 +90,7 @@ export class SessionStore {
     };
 
     this.sessions.set(sessionId, session);
+    this._persist(session);
     return session;
   }
 
@@ -68,6 +106,7 @@ export class SessionStore {
 
     session.sdkSessionId = sdkSessionId;
     session.updatedAt = nowIso();
+    this._persist(session);
     return session;
   }
 
@@ -80,6 +119,7 @@ export class SessionStore {
     const now = nowIso();
     session.history.push({ ...event, at: now });
     session.updatedAt = now;
+    this._persist(session);
     return session;
   }
 
@@ -96,6 +136,7 @@ export class SessionStore {
     session.status = "completed";
     session.result = result;
     session.updatedAt = nowIso();
+    this._persist(session);
     return session;
   }
 
@@ -108,6 +149,7 @@ export class SessionStore {
     session.stopRequested = true;
     session.status = "stopped";
     session.updatedAt = nowIso();
+    this._persist(session);
     return session;
   }
 
