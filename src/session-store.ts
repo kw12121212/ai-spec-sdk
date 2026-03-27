@@ -34,23 +34,18 @@ export class SessionStore {
     this.sessionsDir = sessionsDir;
 
     if (sessionsDir) {
+      fs.mkdirSync(sessionsDir, { recursive: true });
       this._loadFromDisk(sessionsDir);
     }
   }
 
   private _loadFromDisk(dir: string): void {
-    let files: string[];
-    try {
-      files = fs.readdirSync(dir);
-    } catch {
-      return;
-    }
-    for (const file of files) {
+    for (const file of fs.readdirSync(dir)) {
       if (!file.endsWith(".json")) continue;
       try {
         const raw = fs.readFileSync(path.join(dir, file), "utf8");
         const session = JSON.parse(raw) as Session;
-        if (session && typeof session.id === "string") {
+        if (session && typeof session.id === "string" && Array.isArray(session.history)) {
           this.sessions.set(session.id, session);
         }
       } catch {

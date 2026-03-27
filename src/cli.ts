@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 import readline from "node:readline";
-import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { BridgeServer } from "./bridge.js";
@@ -11,7 +10,6 @@ function writeMessage(message: unknown): void {
 }
 
 const sessionsDir = path.join(os.homedir(), ".ai-spec-sdk", "sessions");
-fs.mkdirSync(sessionsDir, { recursive: true });
 
 const server = new BridgeServer({
   notify: (message) => writeMessage(message),

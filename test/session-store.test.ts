@@ -48,13 +48,31 @@ test("SessionStore with sessionsDir reloads sessions from disk on construction",
   }
 });
 
-test("SessionStore without sessionsDir does not write files", () => {
-  const store = new SessionStore();
-  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-ws3-"));
-  const session = store.create(ws, "no persistence");
+test("SessionStore creates sessionsDir if it does not exist", () => {
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-mkdir-"));
+  const sessionsDir = path.join(parent, "sessions", "nested");
 
-  // Should not throw and session should be in memory
-  assert.ok(store.get(session.id));
+  try {
+    assert.ok(!fs.existsSync(sessionsDir), "directory should not exist before construction");
+    new SessionStore(sessionsDir);
+    assert.ok(fs.existsSync(sessionsDir), "SessionStore must create the directory on construction");
+  } finally {
+    fs.rmSync(parent, { recursive: true, force: true });
+  }
+});
+
+test("SessionStore without sessionsDir does not write files", () => {
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-ws3-"));
+
+  try {
+    const store = new SessionStore();
+    const session = store.create(ws, "no persistence");
+
+    // Should not throw and session should be in memory
+    assert.ok(store.get(session.id));
+  } finally {
+    fs.rmSync(ws, { recursive: true, force: true });
+  }
 });
 
 test("SessionStore atomic write leaves no temp file after create", () => {

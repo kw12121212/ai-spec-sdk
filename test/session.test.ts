@@ -818,6 +818,40 @@ test("session.list entries include prompt field with initial prompt", async () =
   }
 });
 
+test("session.list prompt is null when session has no user_prompt history entry", async () => {
+  const sessionsDir = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-null-prompt-"));
+
+  try {
+    // Write a session file with an empty history (no user_prompt entry)
+    const sessionId = "null-prompt-test-session";
+    const session = {
+      id: sessionId,
+      workspace: "/tmp/some-ws",
+      sdkSessionId: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      status: "completed",
+      stopRequested: false,
+      history: [],
+      result: "done",
+    };
+    fs.writeFileSync(path.join(sessionsDir, `${sessionId}.json`), JSON.stringify(session));
+
+    const server = new BridgeServer({ sessionsDir });
+    const response = await server.handleMessage({
+      jsonrpc: "2.0", id: 260,
+      method: "session.list",
+    });
+    const sessions = (response.result as Record<string, unknown>)["sessions"] as Array<Record<string, unknown>>;
+    const entry = sessions.find((s) => s["sessionId"] === sessionId);
+
+    assert.ok(entry, "session loaded from disk should appear in list");
+    assert.equal(entry!["prompt"], null, "prompt should be null when no user_prompt entry exists");
+  } finally {
+    fs.rmSync(sessionsDir, { recursive: true, force: true });
+  }
+});
+
 test("session.list prompt is truncated to 200 chars for long prompts", async () => {
   const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-list-prompt-trunc-"));
   const longPrompt = "x".repeat(300);

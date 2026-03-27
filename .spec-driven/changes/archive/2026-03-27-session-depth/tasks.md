@@ -22,6 +22,12 @@
 - [x] Lint passes (`bun run lint` or equivalent)
 - [x] All existing unit tests pass unchanged
 
+## Post-verify Fixes
+
+- [x] Move `fs.mkdirSync` into `SessionStore` constructor so programmatic `BridgeServer` use is self-protecting; remove duplicate from `cli.ts`
+- [x] Add test: `SessionStore` creates `sessionsDir` if it does not exist
+- [x] Add test: `session.list` prompt is `null` when session has no `user_prompt` history entry
+
 ## Verification
 
 - [x] Verify `session.history` spec scenarios are covered by tests

@@ -108,3 +108,11 @@ The bridge MUST expose a `session.list` method that returns summaries of session
 - GIVEN a client calls `session.list` with an unrecognized `status` value
 - WHEN the bridge validates the request
 - THEN the bridge returns a `-32602` error
+
+### Requirement: Session History Method in Capabilities
+The bridge capability response MUST advertise `session.history` as a supported method so clients can discover it without trial and error.
+
+#### Scenario: Capabilities include session.history
+- GIVEN a client calls `bridge.capabilities`
+- WHEN the bridge returns its capability metadata
+- THEN the response identifies `session.history` as a supported method
