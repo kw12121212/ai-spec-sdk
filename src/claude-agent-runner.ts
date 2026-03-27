@@ -22,9 +22,15 @@ export interface RunClaudeQueryOptions {
   shouldStop?: () => boolean;
 }
 
+export interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+}
+
 export interface QueryResult {
   status: "completed" | "stopped";
   result: unknown;
+  usage: TokenUsage | null;
 }
 
 export async function runClaudeQuery({
@@ -37,6 +43,7 @@ export async function runClaudeQuery({
 }: RunClaudeQueryOptions): Promise<QueryResult> {
   const queryFn = getQueryFunction();
   let terminalResult: unknown = null;
+  let terminalUsage: TokenUsage | null = null;
 
   const sdkOptions: Record<string, unknown> = { ...options };
   if (cwd !== undefined) sdkOptions["cwd"] = cwd;
@@ -47,6 +54,7 @@ export async function runClaudeQuery({
       return {
         status: "stopped",
         result: null,
+        usage: null,
       };
     }
 
@@ -58,11 +66,20 @@ export async function runClaudeQuery({
       Object.prototype.hasOwnProperty.call(message, "result")
     ) {
       terminalResult = (message as Record<string, unknown>)["result"];
+
+      const rawUsage = (message as Record<string, unknown>)["usage"];
+      if (rawUsage !== null && typeof rawUsage === "object") {
+        const u = rawUsage as Record<string, unknown>;
+        if (typeof u["input_tokens"] === "number" && typeof u["output_tokens"] === "number") {
+          terminalUsage = { inputTokens: u["input_tokens"], outputTokens: u["output_tokens"] };
+        }
+      }
     }
   }
 
   return {
     status: "completed",
     result: terminalResult,
+    usage: terminalUsage,
   };
 }

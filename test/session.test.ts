@@ -1147,3 +1147,171 @@ async function waitForSessionStarted(
 
   return (started()!["params"] as Record<string, unknown>)["sessionId"] as string;
 }
+
+// ─── session.events tests ────────────────────────────────────────────────────
+
+test("session.events returns buffered events after session.start", async () => {
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-events-"));
+  const notifications: unknown[] = [];
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* () {
+    yield { type: "system", subtype: "init", session_id: "s1" };
+    yield { result: "done" };
+  };
+
+  try {
+    const server = new BridgeServer({ notify: (m) => notifications.push(m) });
+
+    const resp = await server.handleMessage({
+      jsonrpc: "2.0", id: 1, method: "session.start",
+      params: { workspace: ws, prompt: "hi" },
+    });
+    const sessionId = (resp.result as Record<string, unknown>)["sessionId"] as string;
+
+    const evResp = await server.handleMessage({
+      jsonrpc: "2.0", id: 2, method: "session.events",
+      params: { sessionId },
+    });
+
+    assert.ok(!evResp.error, "session.events should succeed");
+    const r = evResp.result as Record<string, unknown>;
+    assert.equal(r["sessionId"], sessionId);
+    const events = r["events"] as Array<Record<string, unknown>>;
+    assert.ok(events.length >= 2, "should have at least session_started and session_completed events");
+    assert.ok(events.every((e) => typeof e["seq"] === "number"), "each event must have a seq");
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+  }
+});
+
+test("session.events since filter returns only events from that seq onward", async () => {
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-events-since-"));
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* () {
+    yield { type: "system", subtype: "init", session_id: "s2" };
+    yield { result: "done" };
+  };
+
+  try {
+    const server = new BridgeServer();
+    const resp = await server.handleMessage({
+      jsonrpc: "2.0", id: 1, method: "session.start",
+      params: { workspace: ws, prompt: "hi" },
+    });
+    const sessionId = (resp.result as Record<string, unknown>)["sessionId"] as string;
+
+    const allResp = await server.handleMessage({
+      jsonrpc: "2.0", id: 2, method: "session.events",
+      params: { sessionId },
+    });
+    const allEvents = (allResp.result as Record<string, unknown>)["events"] as Array<Record<string, unknown>>;
+
+    if (allEvents.length >= 2) {
+      const since = (allEvents[1]!["seq"] as number);
+      const sinceResp = await server.handleMessage({
+        jsonrpc: "2.0", id: 3, method: "session.events",
+        params: { sessionId, since },
+      });
+      const sinceEvents = (sinceResp.result as Record<string, unknown>)["events"] as Array<Record<string, unknown>>;
+      assert.ok(sinceEvents.every((e) => (e["seq"] as number) >= since), "all returned events must have seq >= since");
+      assert.ok(sinceEvents.length < allEvents.length, "since filter should reduce event count");
+    }
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+  }
+});
+
+test("session.events returns error -32011 for unknown session", async () => {
+  const server = new BridgeServer();
+  const resp = await server.handleMessage({
+    jsonrpc: "2.0", id: 1, method: "session.events",
+    params: { sessionId: "no-such-session" },
+  });
+
+  assert.equal(resp.error?.code, -32011);
+});
+
+test("session.events respects limit parameter", async () => {
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-events-limit-"));
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* () {
+    yield { type: "system", subtype: "init", session_id: "s3" };
+    yield { result: "done" };
+  };
+
+  try {
+    const server = new BridgeServer();
+    const resp = await server.handleMessage({
+      jsonrpc: "2.0", id: 1, method: "session.start",
+      params: { workspace: ws, prompt: "hi" },
+    });
+    const sessionId = (resp.result as Record<string, unknown>)["sessionId"] as string;
+
+    const limitResp = await server.handleMessage({
+      jsonrpc: "2.0", id: 2, method: "session.events",
+      params: { sessionId, limit: 1 },
+    });
+    const events = (limitResp.result as Record<string, unknown>)["events"] as unknown[];
+    assert.ok(events.length <= 1, "limit:1 must return at most 1 event");
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+  }
+});
+
+// ─── token usage tests ───────────────────────────────────────────────────────
+
+test("session.start response includes usage when SDK provides it", async () => {
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-usage-"));
+  const notifications: unknown[] = [];
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* () {
+    yield { type: "system", subtype: "init", session_id: "su1" };
+    yield { result: "done", usage: { input_tokens: 10, output_tokens: 20 } };
+  };
+
+  try {
+    const server = new BridgeServer({ notify: (m) => notifications.push(m) });
+    const resp = await server.handleMessage({
+      jsonrpc: "2.0", id: 1, method: "session.start",
+      params: { workspace: ws, prompt: "hi" },
+    });
+
+    const r = resp.result as Record<string, unknown>;
+    const usage = r["usage"] as Record<string, unknown>;
+    assert.ok(usage !== null && typeof usage === "object", "usage must be present");
+    assert.equal(usage["inputTokens"], 10);
+    assert.equal(usage["outputTokens"], 20);
+
+    const completedNotif = (notifications as Array<Record<string, unknown>>).find(
+      (n) => (n["params"] as Record<string, unknown>)?.["type"] === "session_completed",
+    );
+    assert.ok(completedNotif, "session_completed notification must be emitted");
+    const notifUsage = (completedNotif!["params"] as Record<string, unknown>)["usage"] as Record<string, unknown>;
+    assert.equal(notifUsage["inputTokens"], 10);
+    assert.equal(notifUsage["outputTokens"], 20);
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+  }
+});
+
+test("session.start response has usage: null when SDK omits usage", async () => {
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-usage-null-"));
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* () {
+    yield { type: "system", subtype: "init", session_id: "su2" };
+    yield { result: "done" };
+  };
+
+  try {
+    const server = new BridgeServer();
+    const resp = await server.handleMessage({
+      jsonrpc: "2.0", id: 1, method: "session.start",
+      params: { workspace: ws, prompt: "hi" },
+    });
+
+    const r = resp.result as Record<string, unknown>;
+    assert.equal(r["usage"], null, "usage must be null when SDK does not provide it");
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+  }
+});

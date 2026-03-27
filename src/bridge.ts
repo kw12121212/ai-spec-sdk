@@ -10,6 +10,13 @@ const METHOD_NOT_FOUND = -32601;
 const INTERNAL_ERROR = -32603;
 const SDK_SESSION_ID_UNAVAILABLE = -32012;
 
+const EVENT_BUFFER_CAP = 500;
+
+interface BufferedEvent {
+  seq: number;
+  payload: Record<string, unknown>;
+}
+
 const PERMISSION_MODES = new Set(["default", "acceptEdits", "bypassPermissions"]);
 const DEFAULT_PERMISSION_MODE = "bypassPermissions";
 
@@ -199,10 +206,14 @@ interface AgentQueryContext {
 export class BridgeServer {
   private notify: (message: unknown) => void;
   private sessionStore: SessionStore;
+  private eventLog: Map<string, BufferedEvent[]>;
+  private eventSeq: Map<string, number>;
 
   constructor({ notify = () => {}, sessionsDir }: BridgeServerOptions = {}) {
     this.notify = notify;
     this.sessionStore = new SessionStore(sessionsDir);
+    this.eventLog = new Map();
+    this.eventSeq = new Map();
   }
 
   async handleMessage(payload: unknown): Promise<JsonRpcResponse> {
@@ -254,6 +265,8 @@ export class BridgeServer {
     switch (method) {
       case "bridge.capabilities":
         return getCapabilities();
+      case "bridge.ping":
+        return { pong: true, ts: new Date().toISOString() };
       case "skills.list":
         return { skills: BUILTIN_SPEC_SKILLS };
       case "workflow.run":
@@ -275,20 +288,27 @@ export class BridgeServer {
         return this.listSessions(params);
       case "session.history":
         return this.getSessionHistory(params);
+      case "session.events":
+        return this.getSessionEvents(params);
       default:
         throw new BridgeError(METHOD_NOT_FOUND, `Method not found: ${method}`);
     }
   }
 
   private emit(method: string, params: Record<string, unknown>, requestId: unknown = null): void {
-    this.notify({
-      jsonrpc: "2.0",
-      method,
-      params: {
-        ...params,
-        requestId,
-      },
-    });
+    const payload = { ...params, requestId };
+    this.notify({ jsonrpc: "2.0", method, params: payload });
+
+    if (method === "bridge/session_event" && typeof params["sessionId"] === "string") {
+      const sid = params["sessionId"] as string;
+      const seq = this.eventSeq.get(sid) ?? 0;
+      this.eventSeq.set(sid, seq + 1);
+
+      const buf = this.eventLog.get(sid) ?? [];
+      buf.push({ seq, payload });
+      if (buf.length > EVENT_BUFFER_CAP) buf.shift();
+      this.eventLog.set(sid, buf);
+    }
   }
 
   private async startSession(
@@ -469,18 +489,23 @@ export class BridgeServer {
         requestId,
       );
 
-      return { sessionId: session.id, status: "stopped", result: null };
+      return { sessionId: session.id, status: "stopped", result: null, usage: null };
     }
 
     this.sessionStore.complete(session.id, queryResult.result);
 
     this.emit(
       "bridge/session_event",
-      { sessionId: session.id, type: "session_completed", result: queryResult.result },
+      {
+        sessionId: session.id,
+        type: "session_completed",
+        result: queryResult.result,
+        usage: queryResult.usage,
+      },
       requestId,
     );
 
-    return { sessionId: session.id, status: "completed", result: queryResult.result };
+    return { sessionId: session.id, status: "completed", result: queryResult.result, usage: queryResult.usage };
   }
 
   private stopSession(params: Record<string, unknown>): unknown {
@@ -547,6 +572,33 @@ export class BridgeServer {
       total: session.history.length,
       entries,
     };
+  }
+
+  private getSessionEvents(params: Record<string, unknown>): unknown {
+    const { sessionId, since, limit } = params;
+
+    if (!sessionId || typeof sessionId !== "string") {
+      throw new BridgeError(-32602, "'sessionId' must be provided");
+    }
+
+    if (since !== undefined && (typeof since !== "number" || !Number.isInteger(since) || since < 0)) {
+      throw new BridgeError(-32602, "'since' must be a non-negative integer");
+    }
+
+    if (limit !== undefined && (typeof limit !== "number" || !Number.isInteger(limit) || limit < 1)) {
+      throw new BridgeError(-32602, "'limit' must be a positive integer");
+    }
+
+    if (!this.sessionStore.get(sessionId)) {
+      throw new BridgeError(-32011, "Session not found", { sessionId });
+    }
+
+    const buf = this.eventLog.get(sessionId) ?? [];
+    const sinceSeq = typeof since === "number" ? since : 0;
+    const resolvedLimit = Math.min(typeof limit === "number" ? limit : 50, 500);
+    const filtered = buf.filter((e) => e.seq >= sinceSeq).slice(0, resolvedLimit);
+
+    return { sessionId, events: filtered, total: buf.length };
   }
 
   private listSessions(params: Record<string, unknown>): unknown {

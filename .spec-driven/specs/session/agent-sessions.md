@@ -177,3 +177,21 @@ The `session.list` response MUST include a `prompt` field for each session entry
 - GIVEN one or more sessions exist with an initial prompt
 - WHEN a client calls `session.list`
 - THEN each entry in the response includes a `prompt` field with up to 200 characters of the initial prompt
+
+### Requirement: token usage in session completion
+When a session completes, the `session_completed` notification MUST include a `usage` field:
+`{inputTokens: number, outputTokens: number}` if usage data was available from the SDK,
+or `null` if not.
+The `session.start` and `session.resume` response MUST include the same `usage` field on
+completion.
+Usage data is NOT persisted to disk as part of the session file.
+
+#### Scenario: Usage is included in session completed response
+- GIVEN the SDK returns usage data in its result message
+- WHEN a session completes
+- THEN the `session.start`/`session.resume` response and `session_completed` notification both contain `usage: {inputTokens, outputTokens}`
+
+#### Scenario: Usage is null when SDK omits it
+- GIVEN the SDK does not return usage data
+- WHEN a session completes
+- THEN the `usage` field is `null` in both the response and the notification

@@ -116,3 +116,39 @@ The bridge capability response MUST advertise `session.history` as a supported m
 - GIVEN a client calls `bridge.capabilities`
 - WHEN the bridge returns its capability metadata
 - THEN the response identifies `session.history` as a supported method
+
+### Requirement: bridge.ping health-check method
+The Bridge MUST respond to `bridge.ping` with `{pong: true, ts: <ISO-8601 string>}`.
+`bridge.capabilities` methods list MUST include `"bridge.ping"` and `"session.events"`.
+
+#### Scenario: Ping returns pong with timestamp
+- GIVEN a client calls `bridge.ping`
+- WHEN the bridge processes the request
+- THEN the response contains `pong: true` and a `ts` field containing an ISO-8601 timestamp
+
+### Requirement: session.events missed-event replay
+The Bridge MUST expose a `session.events` method that returns buffered `bridge/session_event`
+notifications for a given session.
+Request parameters: `{sessionId: string, since?: number, limit?: number}`.
+`since` is a non-negative integer; only events with `seq >= since` are returned (default 0).
+`limit` is a positive integer; max events returned (default 50, cap 500).
+Response: `{sessionId: string, events: Event[], total: number}` where each event includes
+a `seq` field (0-based per-session counter).
+If the session is unknown, the Bridge MUST return error code `-32011`.
+The event buffer is in-memory only; it is not persisted to disk and is cleared on Bridge restart.
+The buffer holds at most 500 events per session; oldest events are dropped when the cap is reached.
+
+#### Scenario: Retrieve buffered events after session start
+- GIVEN a session has been started and events have been emitted
+- WHEN a client calls `session.events` with the session ID
+- THEN the response contains the buffered events each with a `seq` field
+
+#### Scenario: since filter returns only later events
+- GIVEN a client knows the seq of the last event it received
+- WHEN the client calls `session.events` with `since` set to that seq
+- THEN only events with seq >= since are returned
+
+#### Scenario: Unknown session returns error
+- GIVEN a client calls `session.events` with an unknown sessionId
+- WHEN the bridge processes the request
+- THEN the bridge returns a `-32011` error

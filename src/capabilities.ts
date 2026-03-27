@@ -63,6 +63,7 @@ export function getCapabilities(): Capabilities {
     workflowSkillMap: WORKFLOW_SKILL_MAP,
     methods: [
       "bridge.capabilities",
+      "bridge.ping",
       "workflow.run",
       "skills.list",
       "session.start",
@@ -71,6 +72,7 @@ export function getCapabilities(): Capabilities {
       "session.status",
       "session.list",
       "session.history",
+      "session.events",
     ],
     agentControlParams: [
       "model",

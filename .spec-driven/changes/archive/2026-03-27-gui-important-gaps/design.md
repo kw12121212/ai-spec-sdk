@@ -1,0 +1,51 @@
+# Design: gui-important-gaps
+
+## Approach
+
+### bridge.ping
+Add a `bridge.ping` case to `BridgeServer.dispatch`. Returns `{pong: true, ts: new Date().toISOString()}`.
+No state, no side effects.
+
+### session.events (missed-event replay)
+Maintain a separate in-memory ring buffer `eventLog: Map<sessionId, BufferedEvent[]>` inside
+`BridgeServer`. Each call to `this.emit("bridge/session_event", ...)` appends to the buffer
+(capped at 500 per session). The buffer stores the full notification payload plus a sequential
+`seq` number (per-session counter starting at 0).
+
+`session.events` method accepts `{sessionId, since?, limit?}`:
+- `since`: inclusive lower bound on `seq` (default 0).
+- `limit`: max events to return (default 50, cap 500).
+- Returns `{sessionId, events: [...], total}` where each event includes `seq`.
+
+This is intentionally in-memory only (no disk persistence) to keep the implementation simple.
+A Bridge process restart naturally clears the buffer.
+
+### Token usage propagation
+The Claude Agent SDK emits a `result` message of shape
+`{type: "result", result: string, usage: {input_tokens: number, output_tokens: number}}`.
+`runClaudeQuery` already extracts `terminalResult` (the `.result` field).
+
+Change `QueryResult` to also carry `usage: {inputTokens: number, outputTokens: number} | null`.
+In `runClaudeQuery`, when a message has `type === "result"`, extract `usage` from it.
+Map SDK `input_tokens`/`output_tokens` → `inputTokens`/`outputTokens` for consistent camelCase.
+
+`BridgeServer._runQuery` threads usage through:
+- `session_completed` notification gains `usage` field.
+- Method response gains `usage` field.
+
+## Key Decisions
+
+- **Event buffer in BridgeServer, not SessionStore**: events are transient GUI concerns, not
+  part of the persistent session record. Keeping them separate avoids bloating disk writes.
+- **Per-session sequential `seq`**: simpler cursor than timestamps (no clock skew).
+- **camelCase usage keys** (`inputTokens` / `outputTokens`): consistent with the rest of the
+  Bridge API (which uses camelCase for all fields).
+- **`usage: null` when unavailable**: SDK may not always return usage (e.g., stopped sessions).
+  Explicit null is more informative than omitting the field.
+
+## Alternatives Considered
+
+- **Store events in SessionStore / disk**: rejected — event replay is a transient concern;
+  restarting the Bridge is an acceptable reset boundary.
+- **Timestamp-based `since` cursor**: more natural for humans but fragile with fast events;
+  sequential integers are unambiguous.

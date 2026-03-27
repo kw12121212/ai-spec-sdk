@@ -18,13 +18,13 @@
 
 ## 🔴 关键缺口（直接阻塞 GUI 核心功能）
 
-### [ ] 1. 会话历史读取
+### [x] 1. 会话历史读取
 `session.status` 只返回 `historyLength`，不返回实际内容。GUI 无法：
 - 展示完整对话记录
 - 重新加载已有会话的消息流
 - 缺少 `session.history` 方法
 
-### [ ] 2. 会话持久化
+### [x] 2. 会话持久化
 所有会话存储在内存的 `SessionStore` 中，Bridge 进程重启后全部丢失。GUI 通常需要：
 - 重启后恢复会话列表
 - 跨进程生命周期的会话状态
@@ -33,17 +33,17 @@
 
 ## 🟡 重要缺口（影响 GUI 体验质量）
 
-### [ ] 3. Heartbeat / Ping
+### [x] 3. Heartbeat / Ping
 GUI 不知道 Bridge 进程是否还存活，没有健康检查机制。
 
-### [ ] 4. 错过事件的回放
+### [x] 4. 错过事件的回放
 GUI 进程崩溃重连后，中间的 `bridge/session_event` 通知已丢失，
 没有事件历史回放接口。
 
-### [ ] 5. `session.list` 缺少初始 Prompt
+### [x] 5. `session.list` 缺少初始 Prompt
 会话列表只有 workspace + 状态，没有初始 prompt，GUI 的会话列表无法显示有意义的标题。
 
-### [ ] 6. 使用量 / Token 费用
+### [x] 6. 使用量 / Token 费用
 会话结果中没有 token 用量数据，GUI 无法展示费用统计。
 
 ---
