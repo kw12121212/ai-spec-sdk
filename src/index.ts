@@ -1,4 +1,5 @@
 export { BridgeServer } from "./bridge.js";
+export type { ProxyParams } from "./bridge.js";
 export {
   getCapabilities,
   BUILTIN_SPEC_SKILLS,

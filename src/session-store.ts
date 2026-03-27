@@ -10,6 +10,7 @@ export interface SessionHistoryEntry {
 export interface Session {
   id: string;
   workspace: string;
+  sdkSessionId: string | null;
   createdAt: string;
   updatedAt: string;
   status: "active" | "completed" | "stopped";
@@ -36,6 +37,7 @@ export class SessionStore {
     const session: Session = {
       id: sessionId,
       workspace,
+      sdkSessionId: null,
       createdAt,
       updatedAt: createdAt,
       status: "active",
@@ -56,6 +58,17 @@ export class SessionStore {
 
   get(sessionId: string): Session | null {
     return this.sessions.get(sessionId) ?? null;
+  }
+
+  setSdkSessionId(sessionId: string, sdkSessionId: string): Session | null {
+    const session = this.get(sessionId);
+    if (!session) {
+      return null;
+    }
+
+    session.sdkSessionId = sdkSessionId;
+    session.updatedAt = nowIso();
+    return session;
   }
 
   appendEvent(sessionId: string, event: Omit<SessionHistoryEntry, "at">): Session | null {

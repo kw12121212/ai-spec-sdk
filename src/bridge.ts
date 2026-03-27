@@ -8,6 +8,60 @@ import { runClaudeQuery } from "./claude-agent-runner.js";
 
 const METHOD_NOT_FOUND = -32601;
 const INTERNAL_ERROR = -32603;
+const SDK_SESSION_ID_UNAVAILABLE = -32012;
+
+export interface ProxyParams {
+  http?: string;
+  https?: string;
+  noProxy?: string;
+}
+
+const PROXY_KNOWN_KEYS = new Set(["http", "https", "noProxy"]);
+
+function validateProxy(proxy: unknown): ProxyParams {
+  if (proxy === null || proxy === undefined) {
+    return {};
+  }
+  if (typeof proxy !== "object" || Array.isArray(proxy)) {
+    throw new BridgeError(-32602, "'proxy' must be an object");
+  }
+  const p = proxy as Record<string, unknown>;
+  for (const key of Object.keys(p)) {
+    if (!PROXY_KNOWN_KEYS.has(key)) {
+      throw new BridgeError(-32602, `Unknown proxy field: '${key}'. Allowed fields: http, https, noProxy`);
+    }
+  }
+  const result: ProxyParams = {};
+  if (p["http"] !== undefined) {
+    if (typeof p["http"] !== "string") throw new BridgeError(-32602, "'proxy.http' must be a string");
+    result.http = p["http"];
+  }
+  if (p["https"] !== undefined) {
+    if (typeof p["https"] !== "string") throw new BridgeError(-32602, "'proxy.https' must be a string");
+    result.https = p["https"];
+  }
+  if (p["noProxy"] !== undefined) {
+    if (typeof p["noProxy"] !== "string") throw new BridgeError(-32602, "'proxy.noProxy' must be a string");
+    result.noProxy = p["noProxy"];
+  }
+  return result;
+}
+
+function buildProxyEnv(proxy: ProxyParams): Record<string, string> {
+  const env: Record<string, string> = {};
+  if (proxy.http !== undefined) env["HTTP_PROXY"] = proxy.http;
+  if (proxy.https !== undefined) env["HTTPS_PROXY"] = proxy.https;
+  if (proxy.noProxy !== undefined) env["NO_PROXY"] = proxy.noProxy;
+  return env;
+}
+
+function mergeEnv(
+  callerEnv: Record<string, string | undefined> | undefined,
+  proxyEnv: Record<string, string>,
+): Record<string, string | undefined> | undefined {
+  const merged = { ...(callerEnv ?? {}), ...proxyEnv };
+  return Object.keys(merged).length > 0 ? merged : undefined;
+}
 
 export interface JsonRpcRequest {
   jsonrpc: "2.0";
@@ -25,6 +79,11 @@ export interface JsonRpcResponse {
 
 export interface BridgeServerOptions {
   notify?: (message: unknown) => void;
+}
+
+interface AgentQueryContext {
+  cwd: string;
+  env: Record<string, string | undefined> | undefined;
 }
 
 export class BridgeServer {
@@ -122,7 +181,7 @@ export class BridgeServer {
     params: Record<string, unknown>,
     requestId: unknown,
   ): Promise<unknown> {
-    const { workspace, prompt, options = {} } = params;
+    const { workspace, prompt, options = {}, proxy } = params;
 
     if (!workspace || typeof workspace !== "string") {
       throw new BridgeError(-32602, "'workspace' must be provided");
@@ -132,12 +191,28 @@ export class BridgeServer {
       throw new BridgeError(-32602, "'prompt' must be provided");
     }
 
+    const typedOptions = options as Record<string, unknown>;
+    if (Object.prototype.hasOwnProperty.call(typedOptions, "cwd")) {
+      throw new BridgeError(
+        -32602,
+        "'cwd' must not be set in options; it is bridge-managed via 'workspace'",
+      );
+    }
+
     const resolvedWorkspace = path.resolve(workspace);
     if (!fs.existsSync(resolvedWorkspace) || !fs.statSync(resolvedWorkspace).isDirectory()) {
       throw new BridgeError(-32001, "Workspace path does not exist", {
         workspace: resolvedWorkspace,
       });
     }
+
+    const proxyParams = validateProxy(proxy);
+    const proxyEnv = buildProxyEnv(proxyParams);
+    const { env: callerEnv, ...passthroughOptions } = typedOptions;
+    const resolvedEnv = mergeEnv(
+      callerEnv as Record<string, string | undefined> | undefined,
+      proxyEnv,
+    );
 
     const session = this.sessionStore.create(resolvedWorkspace, prompt);
 
@@ -147,19 +222,14 @@ export class BridgeServer {
       requestId,
     );
 
-    return this._runQuery(
-      session,
-      prompt,
-      options as Record<string, unknown>,
-      requestId,
-    );
+    return this._runQuery(session, prompt, passthroughOptions, { cwd: resolvedWorkspace, env: resolvedEnv }, requestId);
   }
 
   private async resumeSession(
     params: Record<string, unknown>,
     requestId: unknown,
   ): Promise<unknown> {
-    const { sessionId, prompt, options = {} } = params;
+    const { sessionId, prompt, options = {}, proxy } = params;
 
     if (!sessionId || typeof sessionId !== "string") {
       throw new BridgeError(-32602, "'sessionId' must be provided");
@@ -174,6 +244,28 @@ export class BridgeServer {
       throw new BridgeError(-32602, "'prompt' must be provided");
     }
 
+    const typedOptions = options as Record<string, unknown>;
+    if (Object.prototype.hasOwnProperty.call(typedOptions, "cwd")) {
+      throw new BridgeError(
+        -32602,
+        "'cwd' must not be set in options; it is bridge-managed via 'workspace'",
+      );
+    }
+
+    if (!session.sdkSessionId) {
+      throw new BridgeError(SDK_SESSION_ID_UNAVAILABLE, "Session SDK ID not available", {
+        sessionId,
+      });
+    }
+
+    const proxyParams = validateProxy(proxy);
+    const proxyEnv = buildProxyEnv(proxyParams);
+    const { env: callerEnv, ...passthroughOptions } = typedOptions;
+    const resolvedEnv = mergeEnv(
+      callerEnv as Record<string, string | undefined> | undefined,
+      proxyEnv,
+    );
+
     this.sessionStore.appendEvent(session.id, { type: "resume_prompt", prompt });
 
     this.emit(
@@ -185,7 +277,8 @@ export class BridgeServer {
     return this._runQuery(
       session,
       prompt,
-      { ...(options as Record<string, unknown>), resume: session.id },
+      { ...passthroughOptions, resume: session.sdkSessionId },
+      { cwd: session.workspace, env: resolvedEnv },
       requestId,
     );
   }
@@ -194,11 +287,14 @@ export class BridgeServer {
     session: { id: string },
     prompt: string,
     options: Record<string, unknown>,
+    context: AgentQueryContext,
     requestId: unknown,
   ): Promise<unknown> {
     const queryResult = await runClaudeQuery({
       prompt,
       options,
+      cwd: context.cwd,
+      env: context.env,
       shouldStop: () => {
         const current = this.sessionStore.get(session.id);
         return Boolean(current?.stopRequested);
@@ -207,6 +303,19 @@ export class BridgeServer {
         const current = this.sessionStore.get(session.id);
         if (current?.stopRequested) {
           return;
+        }
+
+        if (
+          message !== null &&
+          typeof message === "object" &&
+          (message as Record<string, unknown>)["type"] === "system" &&
+          (message as Record<string, unknown>)["subtype"] === "init" &&
+          typeof (message as Record<string, unknown>)["session_id"] === "string"
+        ) {
+          this.sessionStore.setSdkSessionId(
+            session.id,
+            (message as Record<string, unknown>)["session_id"] as string,
+          );
         }
 
         this.sessionStore.appendEvent(session.id, {

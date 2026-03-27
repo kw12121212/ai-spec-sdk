@@ -16,6 +16,8 @@ function getQueryFunction(): QueryFunction {
 export interface RunClaudeQueryOptions {
   prompt: string;
   options: Record<string, unknown>;
+  cwd?: string;
+  env?: Record<string, string | undefined>;
   onEvent: (message: unknown) => void;
   shouldStop?: () => boolean;
 }
@@ -28,13 +30,19 @@ export interface QueryResult {
 export async function runClaudeQuery({
   prompt,
   options,
+  cwd,
+  env,
   onEvent,
   shouldStop = () => false,
 }: RunClaudeQueryOptions): Promise<QueryResult> {
   const queryFn = getQueryFunction();
   let terminalResult: unknown = null;
 
-  for await (const message of queryFn({ prompt, options } as Parameters<QueryFunction>[0])) {
+  const sdkOptions: Record<string, unknown> = { ...options };
+  if (cwd !== undefined) sdkOptions["cwd"] = cwd;
+  if (env !== undefined) sdkOptions["env"] = env;
+
+  for await (const message of queryFn({ prompt, options: sdkOptions } as Parameters<QueryFunction>[0])) {
     if (shouldStop()) {
       return {
         status: "stopped",
