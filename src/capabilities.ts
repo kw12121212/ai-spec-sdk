@@ -1,5 +1,43 @@
 export const BRIDGE_VERSION = "0.1.0";
 
+export interface ModelInfo {
+  id: string;
+  displayName: string;
+}
+
+export const SUPPORTED_MODELS: readonly ModelInfo[] = [
+  { id: "claude-opus-4-6", displayName: "Claude Opus 4.6" },
+  { id: "claude-sonnet-4-6", displayName: "Claude Sonnet 4.6" },
+  { id: "claude-haiku-4-5-20251001", displayName: "Claude Haiku 4.5" },
+  { id: "claude-opus-4-5", displayName: "Claude Opus 4.5" },
+  { id: "claude-sonnet-4-5", displayName: "Claude Sonnet 4.5" },
+  { id: "claude-opus-3-7-20250219", displayName: "Claude Opus 3.7" },
+  { id: "claude-sonnet-3-7-20250219", displayName: "Claude Sonnet 3.7" },
+  { id: "claude-haiku-3-5-20241022", displayName: "Claude Haiku 3.5" },
+];
+
+export interface ToolInfo {
+  name: string;
+  description: string;
+}
+
+export const BUILTIN_TOOLS: readonly ToolInfo[] = [
+  { name: "Bash", description: "Execute shell commands" },
+  { name: "Read", description: "Read file contents" },
+  { name: "Write", description: "Write or create files" },
+  { name: "Edit", description: "Make targeted edits to existing files" },
+  { name: "MultiEdit", description: "Make multiple edits to a file in one operation" },
+  { name: "Glob", description: "Find files by glob pattern" },
+  { name: "Grep", description: "Search file contents with regex" },
+  { name: "LS", description: "List directory contents" },
+  { name: "WebFetch", description: "Fetch content from a URL" },
+  { name: "WebSearch", description: "Search the web" },
+  { name: "TodoRead", description: "Read the current task list" },
+  { name: "TodoWrite", description: "Write or update the task list" },
+  { name: "NotebookRead", description: "Read a Jupyter notebook" },
+  { name: "NotebookEdit", description: "Edit a Jupyter notebook cell" },
+];
+
 export const SUPPORTED_WORKFLOWS: readonly string[] = [
   "init",
   "propose",
@@ -47,6 +85,8 @@ export interface Capabilities {
   workflowSkillMap: Readonly<Record<string, string>>;
   methods: string[];
   agentControlParams: readonly string[];
+  models: readonly ModelInfo[];
+  tools: readonly ToolInfo[];
 }
 
 export function getCapabilities(): Capabilities {
@@ -73,6 +113,10 @@ export function getCapabilities(): Capabilities {
       "session.list",
       "session.history",
       "session.events",
+      "models.list",
+      "workspace.register",
+      "workspace.list",
+      "tools.list",
     ],
     agentControlParams: [
       "model",
@@ -82,5 +126,7 @@ export function getCapabilities(): Capabilities {
       "maxTurns",
       "systemPrompt",
     ],
+    models: SUPPORTED_MODELS,
+    tools: BUILTIN_TOOLS,
   };
 }

@@ -152,3 +152,38 @@ The buffer holds at most 500 events per session; oldest events are dropped when 
 - GIVEN a client calls `session.events` with an unknown sessionId
 - WHEN the bridge processes the request
 - THEN the bridge returns a `-32011` error
+
+### Requirement: Model List
+The bridge MUST expose a `models.list` method that returns the set of supported Claude model IDs and display names so GUI clients can populate a model selector without hard-coding model identifiers.
+
+#### Scenario: List available models
+- GIVEN a GUI client needs to present a model selection UI
+- WHEN the client calls `models.list` with no parameters
+- THEN the bridge returns a `models` array where each entry has an `id` string and a `displayName` string
+
+### Requirement: Workspace Registry
+The bridge MUST expose `workspace.register` and `workspace.list` methods so GUI clients can track recently used workspaces across sessions.
+
+`workspace.register` MUST accept a `workspace` parameter (path string), resolve it to an absolute path, and return an error (code -32001) if the path does not exist as a directory. Registering the same path a second time MUST update its `lastUsedAt` timestamp without creating a duplicate entry.
+
+`workspace.list` MUST return workspaces sorted by `lastUsedAt` descending, capped at 50 entries.
+
+When `BridgeServer` is constructed with a `workspacesDir` option the registry MUST be persisted to disk and survive process restarts. When `workspacesDir` is omitted the registry MAY be in-memory only.
+
+#### Scenario: Register and retrieve a workspace
+- GIVEN a user opens a project directory in the GUI
+- WHEN the GUI calls `workspace.register` with the project path
+- THEN the bridge records the workspace and `workspace.list` includes it sorted by most-recently-used
+
+#### Scenario: Re-registering a workspace updates lastUsedAt
+- GIVEN a workspace has already been registered
+- WHEN `workspace.register` is called again with the same path
+- THEN the entry count does not increase and `lastUsedAt` is updated to the current time
+
+### Requirement: Tool List
+The bridge MUST expose a `tools.list` method that returns the names and descriptions of the Claude Code built-in tools so GUI clients can display available tools without embedding this knowledge themselves.
+
+#### Scenario: List available tools
+- GIVEN a GUI client wants to display or filter available tools
+- WHEN the client calls `tools.list` with no parameters
+- THEN the bridge returns a `tools` array where each entry has a `name` string and a `description` string

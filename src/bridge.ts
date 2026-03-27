@@ -1,9 +1,10 @@
 import path from "node:path";
 import fs from "node:fs";
 import { BridgeError, isJsonRpcRequest } from "./errors.js";
-import { getCapabilities, BUILTIN_SPEC_SKILLS } from "./capabilities.js";
+import { getCapabilities, BUILTIN_SPEC_SKILLS, SUPPORTED_MODELS, BUILTIN_TOOLS } from "./capabilities.js";
 import { runWorkflow } from "./workflow.js";
 import { SessionStore } from "./session-store.js";
+import { WorkspaceStore } from "./workspace-store.js";
 import { runClaudeQuery } from "./claude-agent-runner.js";
 
 const METHOD_NOT_FOUND = -32601;
@@ -196,6 +197,7 @@ export interface JsonRpcResponse {
 export interface BridgeServerOptions {
   notify?: (message: unknown) => void;
   sessionsDir?: string;
+  workspacesDir?: string;
 }
 
 interface AgentQueryContext {
@@ -206,12 +208,14 @@ interface AgentQueryContext {
 export class BridgeServer {
   private notify: (message: unknown) => void;
   private sessionStore: SessionStore;
+  private workspaceStore: WorkspaceStore;
   private eventLog: Map<string, BufferedEvent[]>;
   private eventSeq: Map<string, number>;
 
-  constructor({ notify = () => {}, sessionsDir }: BridgeServerOptions = {}) {
+  constructor({ notify = () => {}, sessionsDir, workspacesDir }: BridgeServerOptions = {}) {
     this.notify = notify;
     this.sessionStore = new SessionStore(sessionsDir);
+    this.workspaceStore = new WorkspaceStore(workspacesDir);
     this.eventLog = new Map();
     this.eventSeq = new Map();
   }
@@ -290,6 +294,14 @@ export class BridgeServer {
         return this.getSessionHistory(params);
       case "session.events":
         return this.getSessionEvents(params);
+      case "models.list":
+        return { models: SUPPORTED_MODELS };
+      case "tools.list":
+        return { tools: BUILTIN_TOOLS };
+      case "workspace.register":
+        return this.registerWorkspace(params);
+      case "workspace.list":
+        return { workspaces: this.workspaceStore.list() };
       default:
         throw new BridgeError(METHOD_NOT_FOUND, `Method not found: ${method}`);
     }
@@ -599,6 +611,21 @@ export class BridgeServer {
     const filtered = buf.filter((e) => e.seq >= sinceSeq).slice(0, resolvedLimit);
 
     return { sessionId, events: filtered, total: buf.length };
+  }
+
+  private registerWorkspace(params: Record<string, unknown>): unknown {
+    const { workspace } = params;
+    if (!workspace || typeof workspace !== "string") {
+      throw new BridgeError(-32602, "'workspace' must be provided");
+    }
+
+    const resolved = path.resolve(workspace);
+    if (!fs.existsSync(resolved) || !fs.statSync(resolved).isDirectory()) {
+      throw new BridgeError(-32001, "Workspace path does not exist", { workspace: resolved });
+    }
+
+    const entry = this.workspaceStore.register(resolved);
+    return { workspace: entry };
   }
 
   private listSessions(params: Record<string, unknown>): unknown {

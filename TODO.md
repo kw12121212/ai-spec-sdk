@@ -50,13 +50,13 @@ GUI 进程崩溃重连后，中间的 `bridge/session_event` 通知已丢失，
 
 ## 🟢 加分项（完整体验）
 
-### [ ] 7. 模型列表
+### [x] 7. 模型列表
 没有 `models.list` 接口，GUI 不能动态展示可选 Claude 模型。
 
-### [ ] 8. Workspace 注册表
+### [x] 8. Workspace 注册表
 没有 workspace 管理，GUI 不能追踪"最近使用的项目"。
 
-### [ ] 9. 工具 Schema 列表
+### [x] 9. 工具 Schema 列表
 GUI 没有途径获知哪些工具可用、参数是什么。
 
 ### [ ] 10. 工具审批流（Tool Approval）
