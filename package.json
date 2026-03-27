@@ -14,7 +14,8 @@
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "lint": "tsc --project tsconfig.json --noEmit",
     "test": "bun test",
-    "start": "node dist/src/cli.js"
+    "start": "node dist/src/cli.js",
+    "build:native": "bun build --compile src/cli.ts --outfile dist/ai-spec-bridge-native"
   },
   "engines": {
     "node": ">=20.0.0"
