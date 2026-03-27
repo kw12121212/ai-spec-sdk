@@ -30,3 +30,11 @@ The SDK MUST scope workflow execution to the workspace provided by the caller an
 - GIVEN a client invokes a workflow that requires `.spec-driven/` initialization
 - WHEN the target workspace does not contain the required prerequisite state
 - THEN the bridge returns a structured error that explains the missing prerequisite
+
+### Requirement: Workflow Execution in Go CLI Example
+The Go CLI example MUST demonstrate how to invoke workflows via `workflow.run` and display progress notifications.
+
+#### Scenario: Example runs a workflow
+- GIVEN the Go CLI is running
+- WHEN a user executes the `/workflow <name>` command
+- THEN the CLI calls `workflow.run` with the specified workflow name and workspace, and displays `bridge/progress` notifications
