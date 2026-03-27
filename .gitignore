@@ -5,10 +5,9 @@ node_modules/
 bun.lockb
 
 # Build outputs
-dist/
-build/
+/dist/
+/build/
 coverage/
-!.spec-driven/specs/build/
 
 # Runtime logs
 *.log
