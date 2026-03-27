@@ -110,4 +110,10 @@ export class SessionStore {
     session.updatedAt = nowIso();
     return session;
   }
+
+  list(filter?: "active" | "all"): Session[] {
+    const all = Array.from(this.sessions.values());
+    const filtered = filter === "active" ? all.filter((s) => s.status === "active") : all;
+    return filtered.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)).slice(0, 100);
+  }
 }

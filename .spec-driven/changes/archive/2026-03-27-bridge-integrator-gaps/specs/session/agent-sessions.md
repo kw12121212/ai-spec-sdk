@@ -1,0 +1,69 @@
+## ADDED Requirements
+
+### Requirement: Agent Control Parameters
+The bridge MUST accept the following optional first-class parameters on `session.start` and `session.resume`, validate their types, and pass them to the agent query when present:
+
+| Parameter | Type | Description |
+|---|---|---|
+| `model` | string | The Claude model identifier to use for this session |
+| `allowedTools` | string[] | Whitelist of tool names the agent may invoke |
+| `disallowedTools` | string[] | Blacklist of tool names the agent must not invoke |
+| `permissionMode` | string | One of `"default"`, `"acceptEdits"`, `"bypassPermissions"` |
+| `maxTurns` | number (integer ≥ 1) | Maximum number of agentic turns before the session stops |
+| `systemPrompt` | string | Custom system-level instructions prepended to the session |
+
+The bridge MUST return a `-32602` error if any of these parameters is present with the wrong type.
+
+The bridge MUST NOT require any of these parameters. When absent, the bridge MUST use the following defaults:
+- `permissionMode`: `"bypassPermissions"`
+- All others: not set (agent SDK default applies)
+
+#### Scenario: model is passed to the agent
+- GIVEN a client starts a session with `{ "model": "claude-opus-4-6" }`
+- WHEN the bridge launches the agent query
+- THEN the agent is invoked with the specified model
+
+#### Scenario: allowedTools restricts available tools
+- GIVEN a client starts a session with `{ "allowedTools": ["Read", "Glob"] }`
+- WHEN the bridge launches the agent query
+- THEN the agent is invoked with only the specified tools permitted
+
+#### Scenario: disallowedTools blocks specified tools
+- GIVEN a client starts a session with `{ "disallowedTools": ["Bash"] }`
+- WHEN the bridge launches the agent query
+- THEN the agent is invoked with the specified tools forbidden
+
+#### Scenario: permissionMode controls approval behavior
+- GIVEN a client starts a session with `{ "permissionMode": "acceptEdits" }`
+- WHEN the bridge launches the agent query
+- THEN the agent runs with the `acceptEdits` permission mode
+
+#### Scenario: default permissionMode is bypassPermissions
+- GIVEN a client starts a session without a `permissionMode` parameter
+- WHEN the bridge launches the agent query
+- THEN the agent runs with `bypassPermissions` permission mode
+
+#### Scenario: maxTurns caps session length
+- GIVEN a client starts a session with `{ "maxTurns": 5 }`
+- WHEN the bridge launches the agent query
+- THEN the agent is configured to stop after at most 5 turns
+
+#### Scenario: systemPrompt is injected into the session
+- GIVEN a client starts a session with `{ "systemPrompt": "You are a strict code reviewer." }`
+- WHEN the bridge launches the agent query
+- THEN the agent receives the custom system prompt
+
+#### Scenario: invalid permissionMode value is rejected
+- GIVEN a client starts a session with `{ "permissionMode": "superuser" }`
+- WHEN the bridge validates the request
+- THEN the bridge returns a `-32602` error identifying `permissionMode` as invalid
+
+#### Scenario: wrong type for agent control parameter is rejected
+- GIVEN a client starts a session with `{ "maxTurns": "five" }`
+- WHEN the bridge validates the request
+- THEN the bridge returns a `-32602` error
+
+#### Scenario: control parameters apply on resume
+- GIVEN a client resumes a session and provides `model`, `allowedTools`, or any other control parameter
+- WHEN the bridge builds the agent query for the resumed session
+- THEN the provided control parameters are applied to that query turn

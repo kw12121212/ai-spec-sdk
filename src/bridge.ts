@@ -10,6 +10,115 @@ const METHOD_NOT_FOUND = -32601;
 const INTERNAL_ERROR = -32603;
 const SDK_SESSION_ID_UNAVAILABLE = -32012;
 
+const PERMISSION_MODES = new Set(["default", "acceptEdits", "bypassPermissions"]);
+const DEFAULT_PERMISSION_MODE = "bypassPermissions";
+
+interface AgentControlParams {
+  model?: string;
+  allowedTools?: string[];
+  disallowedTools?: string[];
+  permissionMode: string;
+  maxTurns?: number;
+  systemPrompt?: string;
+}
+
+function validateAgentControlParams(raw: Record<string, unknown>): AgentControlParams {
+  const result: AgentControlParams = { permissionMode: DEFAULT_PERMISSION_MODE };
+
+  if (raw["model"] !== undefined) {
+    if (typeof raw["model"] !== "string") throw new BridgeError(-32602, "'model' must be a string");
+    result.model = raw["model"];
+  }
+
+  if (raw["allowedTools"] !== undefined) {
+    if (
+      !Array.isArray(raw["allowedTools"]) ||
+      !(raw["allowedTools"] as unknown[]).every((t) => typeof t === "string")
+    ) {
+      throw new BridgeError(-32602, "'allowedTools' must be an array of strings");
+    }
+    result.allowedTools = raw["allowedTools"] as string[];
+  }
+
+  if (raw["disallowedTools"] !== undefined) {
+    if (
+      !Array.isArray(raw["disallowedTools"]) ||
+      !(raw["disallowedTools"] as unknown[]).every((t) => typeof t === "string")
+    ) {
+      throw new BridgeError(-32602, "'disallowedTools' must be an array of strings");
+    }
+    result.disallowedTools = raw["disallowedTools"] as string[];
+  }
+
+  if (raw["permissionMode"] !== undefined) {
+    if (typeof raw["permissionMode"] !== "string" || !PERMISSION_MODES.has(raw["permissionMode"])) {
+      throw new BridgeError(
+        -32602,
+        `'permissionMode' must be one of: ${[...PERMISSION_MODES].join(", ")}`,
+      );
+    }
+    result.permissionMode = raw["permissionMode"];
+  }
+
+  if (raw["maxTurns"] !== undefined) {
+    if (
+      typeof raw["maxTurns"] !== "number" ||
+      !Number.isInteger(raw["maxTurns"]) ||
+      raw["maxTurns"] < 1
+    ) {
+      throw new BridgeError(-32602, "'maxTurns' must be an integer >= 1");
+    }
+    result.maxTurns = raw["maxTurns"];
+  }
+
+  if (raw["systemPrompt"] !== undefined) {
+    if (typeof raw["systemPrompt"] !== "string")
+      throw new BridgeError(-32602, "'systemPrompt' must be a string");
+    result.systemPrompt = raw["systemPrompt"];
+  }
+
+  return result;
+}
+
+function buildControlOptions(control: AgentControlParams): Record<string, unknown> {
+  const opts: Record<string, unknown> = { permissionMode: control.permissionMode };
+  if (control.model !== undefined) opts["model"] = control.model;
+  if (control.allowedTools !== undefined) opts["allowedTools"] = control.allowedTools;
+  if (control.disallowedTools !== undefined) opts["disallowedTools"] = control.disallowedTools;
+  if (control.maxTurns !== undefined) opts["maxTurns"] = control.maxTurns;
+  if (control.systemPrompt !== undefined) opts["systemPrompt"] = control.systemPrompt;
+  return opts;
+}
+
+function classifyMessageType(message: unknown): string {
+  if (message === null || typeof message !== "object") return "other";
+  const msg = message as Record<string, unknown>;
+
+  if (msg["type"] === "system" && msg["subtype"] === "init") return "system_init";
+  if (msg["type"] === "result") return "result";
+
+  if (msg["type"] === "assistant") {
+    const innerMsg = msg["message"] as Record<string, unknown> | undefined;
+    const content = innerMsg?.["content"] ?? msg["content"];
+    if (Array.isArray(content)) {
+      const blocks = content as Array<Record<string, unknown>>;
+      if (blocks.some((b) => b["type"] === "tool_use")) return "tool_use";
+      if (blocks.some((b) => b["type"] === "text")) return "assistant_text";
+    }
+  }
+
+  if (msg["type"] === "user") {
+    const innerMsg = msg["message"] as Record<string, unknown> | undefined;
+    const content = innerMsg?.["content"] ?? msg["content"];
+    if (Array.isArray(content)) {
+      const blocks = content as Array<Record<string, unknown>>;
+      if (blocks.some((b) => b["type"] === "tool_result")) return "tool_result";
+    }
+  }
+
+  return "other";
+}
+
 export interface ProxyParams {
   http?: string;
   https?: string;
@@ -161,6 +270,8 @@ export class BridgeServer {
         return this.stopSession(params);
       case "session.status":
         return this.getSessionStatus(params);
+      case "session.list":
+        return this.listSessions(params);
       default:
         throw new BridgeError(METHOD_NOT_FOUND, `Method not found: ${method}`);
     }
@@ -182,6 +293,7 @@ export class BridgeServer {
     requestId: unknown,
   ): Promise<unknown> {
     const { workspace, prompt, options = {}, proxy } = params;
+    const { model, allowedTools, disallowedTools, permissionMode, maxTurns, systemPrompt } = params;
 
     if (!workspace || typeof workspace !== "string") {
       throw new BridgeError(-32602, "'workspace' must be provided");
@@ -198,6 +310,8 @@ export class BridgeServer {
         "'cwd' must not be set in options; it is bridge-managed via 'workspace'",
       );
     }
+
+    const controlParams = validateAgentControlParams({ model, allowedTools, disallowedTools, permissionMode, maxTurns, systemPrompt });
 
     const resolvedWorkspace = path.resolve(workspace);
     if (!fs.existsSync(resolvedWorkspace) || !fs.statSync(resolvedWorkspace).isDirectory()) {
@@ -222,7 +336,13 @@ export class BridgeServer {
       requestId,
     );
 
-    return this._runQuery(session, prompt, passthroughOptions, { cwd: resolvedWorkspace, env: resolvedEnv }, requestId);
+    return this._runQuery(
+      session,
+      prompt,
+      { ...passthroughOptions, ...buildControlOptions(controlParams) },
+      { cwd: resolvedWorkspace, env: resolvedEnv },
+      requestId,
+    );
   }
 
   private async resumeSession(
@@ -230,6 +350,7 @@ export class BridgeServer {
     requestId: unknown,
   ): Promise<unknown> {
     const { sessionId, prompt, options = {}, proxy } = params;
+    const { model, allowedTools, disallowedTools, permissionMode, maxTurns, systemPrompt } = params;
 
     if (!sessionId || typeof sessionId !== "string") {
       throw new BridgeError(-32602, "'sessionId' must be provided");
@@ -251,6 +372,8 @@ export class BridgeServer {
         "'cwd' must not be set in options; it is bridge-managed via 'workspace'",
       );
     }
+
+    const controlParams = validateAgentControlParams({ model, allowedTools, disallowedTools, permissionMode, maxTurns, systemPrompt });
 
     if (!session.sdkSessionId) {
       throw new BridgeError(SDK_SESSION_ID_UNAVAILABLE, "Session SDK ID not available", {
@@ -277,7 +400,7 @@ export class BridgeServer {
     return this._runQuery(
       session,
       prompt,
-      { ...passthroughOptions, resume: session.sdkSessionId },
+      { ...passthroughOptions, resume: session.sdkSessionId, ...buildControlOptions(controlParams) },
       { cwd: session.workspace, env: resolvedEnv },
       requestId,
     );
@@ -325,7 +448,7 @@ export class BridgeServer {
 
         this.emit(
           "bridge/session_event",
-          { sessionId: session.id, type: "agent_message", message },
+          { sessionId: session.id, type: "agent_message", messageType: classifyMessageType(message), message },
           requestId,
         );
       },
@@ -389,6 +512,26 @@ export class BridgeServer {
       updatedAt: session.updatedAt,
       historyLength: session.history.length,
       result: session.result,
+    };
+  }
+
+  private listSessions(params: Record<string, unknown>): unknown {
+    const { status } = params;
+
+    if (status !== undefined && status !== "active" && status !== "all") {
+      throw new BridgeError(-32602, "'status' must be 'active' or 'all'");
+    }
+
+    const sessions = this.sessionStore.list(status as "active" | "all" | undefined);
+
+    return {
+      sessions: sessions.map((s) => ({
+        sessionId: s.id,
+        status: s.status,
+        workspace: s.workspace,
+        createdAt: s.createdAt,
+        updatedAt: s.updatedAt,
+      })),
     };
   }
 }

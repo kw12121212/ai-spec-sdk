@@ -46,6 +46,7 @@ export interface Capabilities {
   skills: readonly string[];
   workflowSkillMap: Readonly<Record<string, string>>;
   methods: string[];
+  agentControlParams: readonly string[];
 }
 
 export function getCapabilities(): Capabilities {
@@ -68,6 +69,15 @@ export function getCapabilities(): Capabilities {
       "session.resume",
       "session.stop",
       "session.status",
+      "session.list",
+    ],
+    agentControlParams: [
+      "model",
+      "allowedTools",
+      "disallowedTools",
+      "permissionMode",
+      "maxTurns",
+      "systemPrompt",
     ],
   };
 }

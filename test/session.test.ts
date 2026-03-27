@@ -383,6 +383,531 @@ test("session.start proxy entries overwrite matching keys in options.env, preser
   }
 });
 
+// ── messageType classification ────────────────────────────────────────────────
+
+test("agent_message notifications carry correct messageType for each defined shape", async () => {
+  const fixtureWorkspace = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-msgtype-"));
+  const notifications: unknown[] = [];
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* () {
+    yield { type: "system", subtype: "init", session_id: "mt-test" };
+    yield { type: "assistant", message: { content: [{ type: "text", text: "hello" }] } };
+    yield { type: "assistant", message: { content: [{ type: "tool_use", name: "Read", input: {} }] } };
+    yield { type: "user", message: { content: [{ type: "tool_result", tool_use_id: "x", content: "ok" }] } };
+    yield { type: "result", subtype: "success", result: "done" };
+  };
+
+  try {
+    const server = new BridgeServer({ notify: (m) => notifications.push(m) });
+    await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 90,
+      method: "session.start",
+      params: { workspace: fixtureWorkspace, prompt: "go" },
+    });
+
+    const agentEvents = (notifications as Array<Record<string, unknown>>)
+      .filter((n) => n["method"] === "bridge/session_event")
+      .map((n) => n["params"] as Record<string, unknown>)
+      .filter((p) => p["type"] === "agent_message");
+
+    const messageTypes = agentEvents.map((p) => p["messageType"]);
+
+    assert.ok(messageTypes.includes("system_init"), "expected system_init");
+    assert.ok(messageTypes.includes("assistant_text"), "expected assistant_text");
+    assert.ok(messageTypes.includes("tool_use"), "expected tool_use");
+    assert.ok(messageTypes.includes("tool_result"), "expected tool_result");
+    assert.ok(messageTypes.includes("result"), "expected result");
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+  }
+});
+
+test("tool_use takes precedence over text in mixed assistant content", async () => {
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-mixed-"));
+  const notifications: unknown[] = [];
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* () {
+    yield { type: "system", subtype: "init", session_id: "mixed-test" };
+    // message with both tool_use and text blocks
+    yield {
+      type: "assistant",
+      message: {
+        content: [
+          { type: "text", text: "I will read the file" },
+          { type: "tool_use", name: "Read", input: { file_path: "/foo" } },
+        ],
+      },
+    };
+    yield { type: "result", subtype: "success", result: "done" };
+  };
+
+  try {
+    const server = new BridgeServer({ notify: (m) => notifications.push(m) });
+    await server.handleMessage({
+      jsonrpc: "2.0", id: 92,
+      method: "session.start",
+      params: { workspace: ws, prompt: "go" },
+    });
+
+    const mixed = (notifications as Array<Record<string, unknown>>)
+      .filter((n) => n["method"] === "bridge/session_event")
+      .map((n) => n["params"] as Record<string, unknown>)
+      .find((p) => p["type"] === "agent_message" && p["messageType"] === "tool_use");
+
+    assert.ok(mixed, "expected tool_use messageType for mixed content");
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+  }
+});
+
+test("agent_message with unrecognized shape gets messageType other", async () => {
+  const fixtureWorkspace = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-msgother-"));
+  const notifications: unknown[] = [];
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* () {
+    yield { type: "system", subtype: "init", session_id: "other-test" };
+    yield { type: "unknown_type", data: "something" };
+    yield { type: "result", subtype: "success", result: "done" };
+  };
+
+  try {
+    const server = new BridgeServer({ notify: (m) => notifications.push(m) });
+    await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 91,
+      method: "session.start",
+      params: { workspace: fixtureWorkspace, prompt: "go" },
+    });
+
+    const agentEvents = (notifications as Array<Record<string, unknown>>)
+      .filter((n) => n["method"] === "bridge/session_event")
+      .map((n) => n["params"] as Record<string, unknown>)
+      .filter((p) => p["type"] === "agent_message");
+
+    assert.ok(
+      agentEvents.some((p) => p["messageType"] === "other"),
+      "expected at least one other messageType",
+    );
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+  }
+});
+
+// ── session.list ──────────────────────────────────────────────────────────────
+
+test("session.list with no filter returns all sessions", async () => {
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-list-"));
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* () {
+    yield { type: "system", subtype: "init", session_id: "list-sdk" };
+    yield { result: "done" };
+  };
+
+  try {
+    const server = new BridgeServer();
+    await server.handleMessage({ jsonrpc: "2.0", id: 100, method: "session.start", params: { workspace: ws, prompt: "a" } });
+    await server.handleMessage({ jsonrpc: "2.0", id: 101, method: "session.start", params: { workspace: ws, prompt: "b" } });
+
+    const response = await server.handleMessage({ jsonrpc: "2.0", id: 102, method: "session.list" });
+    const sessions = (response.result as Record<string, unknown>)["sessions"] as unknown[];
+
+    assert.ok(sessions.length >= 2);
+    const entry = sessions[0] as Record<string, unknown>;
+    assert.ok(entry["sessionId"]);
+    assert.ok(entry["status"]);
+    assert.ok(entry["workspace"]);
+    assert.ok(entry["createdAt"]);
+    assert.ok(entry["updatedAt"]);
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+  }
+});
+
+test("session.list with status active returns only active sessions", async () => {
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-list-active-"));
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* () {
+    yield { type: "system", subtype: "init", session_id: "list-active-sdk" };
+    yield { result: "done" };
+  };
+
+  try {
+    const server = new BridgeServer();
+    const start = await server.handleMessage({
+      jsonrpc: "2.0", id: 110,
+      method: "session.start",
+      params: { workspace: ws, prompt: "first" },
+    });
+    const sessionId = (start.result as Record<string, unknown>)["sessionId"] as string;
+
+    // Stop the session so it is no longer active
+    await server.handleMessage({ jsonrpc: "2.0", id: 111, method: "session.stop", params: { sessionId } });
+
+    // Verify the stopped session exists in the unfiltered list before testing the filter
+    const allResponse = await server.handleMessage({ jsonrpc: "2.0", id: 112, method: "session.list" });
+    const allSessions = (allResponse.result as Record<string, unknown>)["sessions"] as Array<Record<string, unknown>>;
+    assert.ok(allSessions.some((s) => s["sessionId"] === sessionId), "stopped session must appear in unfiltered list");
+
+    const response = await server.handleMessage({
+      jsonrpc: "2.0", id: 113,
+      method: "session.list",
+      params: { status: "active" },
+    });
+    const sessions = (response.result as Record<string, unknown>)["sessions"] as Array<Record<string, unknown>>;
+
+    assert.ok(!sessions.some((s) => s["sessionId"] === sessionId), "stopped session must not appear in active list");
+    assert.ok(sessions.every((s) => s["status"] === "active"), "only active sessions expected");
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+  }
+});
+
+test("session.list with status all returns all sessions", async () => {
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-list-all-"));
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* () {
+    yield { type: "system", subtype: "init", session_id: "list-all-sdk" };
+    yield { result: "done" };
+  };
+
+  try {
+    const server = new BridgeServer();
+    await server.handleMessage({ jsonrpc: "2.0", id: 120, method: "session.start", params: { workspace: ws, prompt: "x" } });
+    await server.handleMessage({ jsonrpc: "2.0", id: 121, method: "session.start", params: { workspace: ws, prompt: "y" } });
+
+    const response = await server.handleMessage({
+      jsonrpc: "2.0", id: 122,
+      method: "session.list",
+      params: { status: "all" },
+    });
+    const sessions = (response.result as Record<string, unknown>)["sessions"] as unknown[];
+    assert.ok(sessions.length >= 2);
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+  }
+});
+
+test("session.list with unknown status value returns -32602", async () => {
+  const server = new BridgeServer();
+  const response = await server.handleMessage({
+    jsonrpc: "2.0", id: 130,
+    method: "session.list",
+    params: { status: "pending" },
+  });
+  assert.ok(response.error, "should return an error");
+  assert.equal(response.error?.code, -32602);
+});
+
+test("session.list caps response at 100 entries when more exist", async () => {
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-list-cap-"));
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* () {
+    yield { type: "system", subtype: "init", session_id: "cap-sdk" };
+    yield { result: "done" };
+  };
+
+  try {
+    const server = new BridgeServer();
+    await Promise.all(
+      Array.from({ length: 101 }, (_, i) =>
+        server.handleMessage({
+          jsonrpc: "2.0", id: `cap-${i}`,
+          method: "session.start",
+          params: { workspace: ws, prompt: `session-${i}` },
+        }),
+      ),
+    );
+
+    const response = await server.handleMessage({ jsonrpc: "2.0", id: "cap-list", method: "session.list" });
+    const sessions = (response.result as Record<string, unknown>)["sessions"] as unknown[];
+    assert.equal(sessions.length, 100);
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+  }
+});
+
+test("session.list returns sessions ordered by createdAt descending", async () => {
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-list-order-"));
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* () {
+    yield { type: "system", subtype: "init", session_id: "order-sdk" };
+    yield { result: "done" };
+  };
+
+  try {
+    const server = new BridgeServer();
+    const ids: string[] = [];
+
+    for (const prompt of ["first", "second", "third"]) {
+      const r = await server.handleMessage({
+        jsonrpc: "2.0", id: `order-${prompt}`,
+        method: "session.start",
+        params: { workspace: ws, prompt },
+      });
+      ids.push((r.result as Record<string, unknown>)["sessionId"] as string);
+      // small delay to ensure distinct createdAt timestamps
+      await new Promise<void>((resolve) => setTimeout(resolve, 5));
+    }
+
+    const response = await server.handleMessage({ jsonrpc: "2.0", id: "order-list", method: "session.list" });
+    const sessions = (response.result as Record<string, unknown>)["sessions"] as Array<Record<string, unknown>>;
+
+    // most recently created session must appear first
+    const returnedIds = sessions.map((s) => s["sessionId"]);
+    const firstIdx = returnedIds.indexOf(ids[0]);
+    const secondIdx = returnedIds.indexOf(ids[1]);
+    const thirdIdx = returnedIds.indexOf(ids[2]);
+
+    assert.ok(thirdIdx < secondIdx, "third session should appear before second");
+    assert.ok(secondIdx < firstIdx, "second session should appear before first");
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+  }
+});
+
+// ── agent control parameters ──────────────────────────────────────────────────
+
+test("session.start with model passes it to the agent query", async () => {
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-model-"));
+  let capturedOptions: Record<string, unknown> = {};
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* ({ options }: { prompt: string; options: Record<string, unknown> }) {
+    capturedOptions = options;
+    yield { type: "system", subtype: "init", session_id: "model-test" };
+    yield { result: "done" };
+  };
+
+  try {
+    const server = new BridgeServer();
+    await server.handleMessage({
+      jsonrpc: "2.0", id: 140,
+      method: "session.start",
+      params: { workspace: ws, prompt: "hi", model: "claude-opus-4-6" },
+    });
+    assert.equal(capturedOptions["model"], "claude-opus-4-6");
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+  }
+});
+
+test("session.start with allowedTools passes it to the agent query", async () => {
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-allowed-"));
+  let capturedOptions: Record<string, unknown> = {};
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* ({ options }: { prompt: string; options: Record<string, unknown> }) {
+    capturedOptions = options;
+    yield { type: "system", subtype: "init", session_id: "allowed-test" };
+    yield { result: "done" };
+  };
+
+  try {
+    const server = new BridgeServer();
+    await server.handleMessage({
+      jsonrpc: "2.0", id: 141,
+      method: "session.start",
+      params: { workspace: ws, prompt: "hi", allowedTools: ["Read", "Glob"] },
+    });
+    assert.deepEqual(capturedOptions["allowedTools"], ["Read", "Glob"]);
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+  }
+});
+
+test("session.start with disallowedTools passes it to the agent query", async () => {
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-disallowed-"));
+  let capturedOptions: Record<string, unknown> = {};
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* ({ options }: { prompt: string; options: Record<string, unknown> }) {
+    capturedOptions = options;
+    yield { type: "system", subtype: "init", session_id: "disallowed-test" };
+    yield { result: "done" };
+  };
+
+  try {
+    const server = new BridgeServer();
+    await server.handleMessage({
+      jsonrpc: "2.0", id: 142,
+      method: "session.start",
+      params: { workspace: ws, prompt: "hi", disallowedTools: ["Bash"] },
+    });
+    assert.deepEqual(capturedOptions["disallowedTools"], ["Bash"]);
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+  }
+});
+
+test("session.start with permissionMode acceptEdits passes it to the agent query", async () => {
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-perm-"));
+  let capturedOptions: Record<string, unknown> = {};
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* ({ options }: { prompt: string; options: Record<string, unknown> }) {
+    capturedOptions = options;
+    yield { type: "system", subtype: "init", session_id: "perm-test" };
+    yield { result: "done" };
+  };
+
+  try {
+    const server = new BridgeServer();
+    await server.handleMessage({
+      jsonrpc: "2.0", id: 143,
+      method: "session.start",
+      params: { workspace: ws, prompt: "hi", permissionMode: "acceptEdits" },
+    });
+    assert.equal(capturedOptions["permissionMode"], "acceptEdits");
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+  }
+});
+
+test("session.start without permissionMode defaults to bypassPermissions", async () => {
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-perm-default-"));
+  let capturedOptions: Record<string, unknown> = {};
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* ({ options }: { prompt: string; options: Record<string, unknown> }) {
+    capturedOptions = options;
+    yield { type: "system", subtype: "init", session_id: "perm-default-test" };
+    yield { result: "done" };
+  };
+
+  try {
+    const server = new BridgeServer();
+    await server.handleMessage({
+      jsonrpc: "2.0", id: 144,
+      method: "session.start",
+      params: { workspace: ws, prompt: "hi" },
+    });
+    assert.equal(capturedOptions["permissionMode"], "bypassPermissions");
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+  }
+});
+
+test("session.start with maxTurns passes it to the agent query", async () => {
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-maxturns-"));
+  let capturedOptions: Record<string, unknown> = {};
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* ({ options }: { prompt: string; options: Record<string, unknown> }) {
+    capturedOptions = options;
+    yield { type: "system", subtype: "init", session_id: "maxturns-test" };
+    yield { result: "done" };
+  };
+
+  try {
+    const server = new BridgeServer();
+    await server.handleMessage({
+      jsonrpc: "2.0", id: 145,
+      method: "session.start",
+      params: { workspace: ws, prompt: "hi", maxTurns: 5 },
+    });
+    assert.equal(capturedOptions["maxTurns"], 5);
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+  }
+});
+
+test("session.start with systemPrompt passes it to the agent query", async () => {
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-sysprompt-"));
+  let capturedOptions: Record<string, unknown> = {};
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* ({ options }: { prompt: string; options: Record<string, unknown> }) {
+    capturedOptions = options;
+    yield { type: "system", subtype: "init", session_id: "sysprompt-test" };
+    yield { result: "done" };
+  };
+
+  try {
+    const server = new BridgeServer();
+    await server.handleMessage({
+      jsonrpc: "2.0", id: 146,
+      method: "session.start",
+      params: { workspace: ws, prompt: "hi", systemPrompt: "You are strict." },
+    });
+    assert.equal(capturedOptions["systemPrompt"], "You are strict.");
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+  }
+});
+
+test("session.start with invalid permissionMode returns -32602", async () => {
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-perm-invalid-"));
+  const server = new BridgeServer();
+  const response = await server.handleMessage({
+    jsonrpc: "2.0", id: 150,
+    method: "session.start",
+    params: { workspace: ws, prompt: "hi", permissionMode: "superuser" },
+  });
+  assert.ok(response.error, "should return an error");
+  assert.equal(response.error?.code, -32602);
+});
+
+test("session.start with maxTurns as string returns -32602", async () => {
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-maxturns-invalid-"));
+  const server = new BridgeServer();
+  const response = await server.handleMessage({
+    jsonrpc: "2.0", id: 151,
+    method: "session.start",
+    params: { workspace: ws, prompt: "hi", maxTurns: "five" },
+  });
+  assert.ok(response.error, "should return an error");
+  assert.equal(response.error?.code, -32602);
+});
+
+test("session.start with allowedTools as string (not array) returns -32602", async () => {
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-allowed-invalid-"));
+  const server = new BridgeServer();
+  const response = await server.handleMessage({
+    jsonrpc: "2.0", id: 152,
+    method: "session.start",
+    params: { workspace: ws, prompt: "hi", allowedTools: "Read" },
+  });
+  assert.ok(response.error, "should return an error");
+  assert.equal(response.error?.code, -32602);
+});
+
+test("control parameters apply on session.resume with the same validation", async () => {
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-resume-ctrl-"));
+  let resumeCaptured: Record<string, unknown> = {};
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* ({ options }: { prompt: string; options: Record<string, unknown> }) {
+    if (options["resume"] !== undefined) {
+      resumeCaptured = options;
+    }
+    yield { type: "system", subtype: "init", session_id: "resume-ctrl-sdk" };
+    yield { result: "done" };
+  };
+
+  try {
+    const server = new BridgeServer();
+    const start = await server.handleMessage({
+      jsonrpc: "2.0", id: 160,
+      method: "session.start",
+      params: { workspace: ws, prompt: "first" },
+    });
+    const sessionId = (start.result as Record<string, unknown>)["sessionId"] as string;
+
+    await server.handleMessage({
+      jsonrpc: "2.0", id: 161,
+      method: "session.resume",
+      params: { sessionId, prompt: "second", model: "claude-opus-4-6", permissionMode: "default" },
+    });
+
+    assert.equal(resumeCaptured["model"], "claude-opus-4-6");
+    assert.equal(resumeCaptured["permissionMode"], "default");
+
+    // Validation also applies: invalid permissionMode on resume
+    const bad = await server.handleMessage({
+      jsonrpc: "2.0", id: 162,
+      method: "session.resume",
+      params: { sessionId, prompt: "third", permissionMode: "superuser" },
+    });
+    assert.ok(bad.error, "should return an error");
+    assert.equal(bad.error?.code, -32602);
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+  }
+});
+
 async function waitForSessionStarted(
   notifications: Array<Record<string, unknown>>,
 ): Promise<string> {
