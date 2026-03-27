@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"go-cli/bridge"
@@ -103,7 +104,7 @@ func main() {
 
 		// Dispatch slash commands.
 		if strings.HasPrefix(input, "/") {
-			if handleCommand(client, sm, wr, input) {
+			if handleCommand(client, sm, wr, absWorkspace, input) {
 				// /quit returns true.
 				return
 			}
@@ -130,7 +131,7 @@ func main() {
 }
 
 // handleCommand dispatches a slash command. Returns true if the CLI should exit.
-func handleCommand(client *bridge.Client, sm *session.Manager, wr *workflow.Runner, input string) bool {
+func handleCommand(client *bridge.Client, sm *session.Manager, wr *workflow.Runner, absWorkspace string, input string) bool {
 	parts := strings.Fields(input)
 	cmd := parts[0]
 	args := parts[1:]
@@ -356,6 +357,197 @@ func handleCommand(client *bridge.Client, sm *session.Manager, wr *workflow.Runn
 			fmt.Println(string(pretty))
 		}
 
+	case "/mcp":
+		// MCP server management.
+		if len(args) == 0 {
+			// List MCP servers for the workspace.
+			result, err := client.Call("mcp.list", map[string]any{"workspace": absWorkspace})
+			if err != nil {
+				fmt.Printf("Error: %v\n", err)
+			} else {
+				pretty, _ := json.MarshalIndent(result, "", "  ")
+				fmt.Println(string(pretty))
+			}
+			return false
+		}
+		switch args[0] {
+		case "add":
+			if len(args) < 3 {
+				fmt.Println("Usage: /mcp add <name> <command> [args...]")
+				return false
+			}
+			mcpArgs := []string{}
+			if len(args) > 3 {
+				mcpArgs = args[3:]
+			}
+			result, err := client.Call("mcp.add", map[string]any{
+				"workspace": absWorkspace,
+				"name":      args[1],
+				"command":   args[2],
+				"args":      mcpArgs,
+			})
+			if err != nil {
+				fmt.Printf("Error: %v\n", err)
+			} else {
+				pretty, _ := json.MarshalIndent(result, "", "  ")
+				fmt.Printf("MCP server added:\n%s\n", string(pretty))
+			}
+		case "remove":
+			if len(args) < 2 {
+				fmt.Println("Usage: /mcp remove <name>")
+				return false
+			}
+			result, err := client.Call("mcp.remove", map[string]any{
+				"workspace": absWorkspace,
+				"name":      args[1],
+			})
+			if err != nil {
+				fmt.Printf("Error: %v\n", err)
+			} else {
+				pretty, _ := json.MarshalIndent(result, "", "  ")
+				fmt.Println(string(pretty))
+			}
+		case "start":
+			if len(args) < 2 {
+				fmt.Println("Usage: /mcp start <name>")
+				return false
+			}
+			result, err := client.Call("mcp.start", map[string]any{
+				"workspace": absWorkspace,
+				"name":      args[1],
+			})
+			if err != nil {
+				fmt.Printf("Error: %v\n", err)
+			} else {
+				pretty, _ := json.MarshalIndent(result, "", "  ")
+				fmt.Println(string(pretty))
+			}
+		case "stop":
+			if len(args) < 2 {
+				fmt.Println("Usage: /mcp stop <name>")
+				return false
+			}
+			result, err := client.Call("mcp.stop", map[string]any{
+				"workspace": absWorkspace,
+				"name":      args[1],
+			})
+			if err != nil {
+				fmt.Printf("Error: %v\n", err)
+			} else {
+				pretty, _ := json.MarshalIndent(result, "", "  ")
+				fmt.Println(string(pretty))
+			}
+		default:
+			fmt.Printf("Unknown MCP subcommand: %s\nUse: /mcp [add|remove|start|stop] or /mcp to list\n", args[0])
+		}
+
+	case "/config":
+		// Configuration management.
+		if len(args) == 0 {
+			// List all config.
+			result, err := client.Call("config.list", map[string]any{"workspace": absWorkspace})
+			if err != nil {
+				fmt.Printf("Error: %v\n", err)
+			} else {
+				pretty, _ := json.MarshalIndent(result, "", "  ")
+				fmt.Println(string(pretty))
+			}
+			return false
+		}
+		switch args[0] {
+		case "get":
+			if len(args) < 2 {
+				fmt.Println("Usage: /config get <key>")
+				return false
+			}
+			result, err := client.Call("config.get", map[string]any{
+				"key":       args[1],
+				"workspace": absWorkspace,
+			})
+			if err != nil {
+				fmt.Printf("Error: %v\n", err)
+			} else {
+				pretty, _ := json.MarshalIndent(result, "", "  ")
+				fmt.Println(string(pretty))
+			}
+		case "set":
+			if len(args) < 4 {
+				fmt.Println("Usage: /config set <key> <value> <project|user>")
+				return false
+			}
+			var value any = args[2]
+			// Try to parse as number or bool for non-string values.
+			if n, err := strconv.Atoi(args[2]); err == nil {
+				value = n
+			} else if b, err := strconv.ParseBool(args[2]); err == nil {
+				value = b
+			}
+			result, err := client.Call("config.set", map[string]any{
+				"key":       args[1],
+				"value":     value,
+				"scope":     args[3],
+				"workspace": absWorkspace,
+			})
+			if err != nil {
+				fmt.Printf("Error: %v\n", err)
+			} else {
+				pretty, _ := json.MarshalIndent(result, "", "  ")
+				fmt.Println(string(pretty))
+			}
+		default:
+			fmt.Printf("Unknown config subcommand: %s\nUse: /config [get|set] or /config to list\n", args[0])
+		}
+
+	case "/hooks":
+		// Hooks management.
+		if len(args) == 0 {
+			result, err := client.Call("hooks.list", map[string]any{"workspace": absWorkspace})
+			if err != nil {
+				fmt.Printf("Error: %v\n", err)
+			} else {
+				pretty, _ := json.MarshalIndent(result, "", "  ")
+				fmt.Println(string(pretty))
+			}
+			return false
+		}
+		switch args[0] {
+		case "add":
+			if len(args) < 4 {
+				fmt.Println("Usage: /hooks add <event> <command> <project|user> [matcher]")
+				return false
+			}
+			params := map[string]any{
+				"event":   args[1],
+				"command": args[2],
+				"scope":   args[3],
+			}
+			if len(args) > 4 {
+				params["matcher"] = args[4]
+			}
+			params["workspace"] = absWorkspace
+			result, err := client.Call("hooks.add", params)
+			if err != nil {
+				fmt.Printf("Error: %v\n", err)
+			} else {
+				pretty, _ := json.MarshalIndent(result, "", "  ")
+				fmt.Printf("Hook added:\n%s\n", string(pretty))
+			}
+		case "remove":
+			if len(args) < 2 {
+				fmt.Println("Usage: /hooks remove <hook-id>")
+				return false
+			}
+			result, err := client.Call("hooks.remove", map[string]any{"hookId": args[1]})
+			if err != nil {
+				fmt.Printf("Error: %v\n", err)
+			} else {
+				pretty, _ := json.MarshalIndent(result, "", "  ")
+				fmt.Println(string(pretty))
+			}
+		default:
+			fmt.Printf("Unknown hooks subcommand: %s\nUse: /hooks [add|remove] or /hooks to list\n", args[0])
+		}
+
 	default:
 		fmt.Printf("Unknown command: %s\nType /help for available commands.\n", cmd)
 	}
@@ -390,6 +582,13 @@ func printHelp() {
   %s/tools%s                         List available tools
   %s/workspace%s <path>              Register a workspace
   %s/workspaces%s                    List registered workspaces
+  %s/config%s [get|set]              Manage configuration
+  %s/hooks%s [add|remove]             Manage automation hooks
+
+%sMCP:%s
+  %s/mcp%s [add|remove|start|stop]   Manage MCP servers
+  %s/mcp add%s <name> <cmd> [args]   Add and start an MCP server
+  %s/mcp stop%s <name>              Stop an MCP server
 
 %sWorkflow:%s
   %s/workflow%s [name] [args...]      Run a workflow (no name = list available)
@@ -408,7 +607,9 @@ func printHelp() {
 		colorBold, colorReset,
 		colorCyan, colorReset, colorCyan, colorReset, colorCyan, colorReset,
 		colorBold, colorReset,
-		colorCyan, colorReset, colorCyan, colorReset, colorCyan, colorReset, colorCyan, colorReset, colorCyan, colorReset, colorCyan, colorReset,
+		colorCyan, colorReset, colorCyan, colorReset, colorCyan, colorReset, colorCyan, colorReset, colorCyan, colorReset, colorCyan, colorReset, colorCyan, colorReset,
+		colorBold, colorReset,
+		colorCyan, colorReset, colorCyan, colorReset, colorCyan, colorReset,
 		colorBold, colorReset,
 		colorCyan, colorReset,
 		colorBold, colorReset,

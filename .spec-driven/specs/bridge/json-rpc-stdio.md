@@ -243,3 +243,141 @@ The project MUST include a Go CLI example under `example/go-cli/` that demonstra
 - GIVEN the Go CLI is running
 - WHEN a session emits `bridge/session_event` or `bridge/tool_approval_requested` notifications
 - THEN the CLI renders the events to the terminal in real time
+
+### Requirement: MCP Server Management Methods
+The bridge MUST expose the following methods for managing MCP server instances, scoped per workspace:
+
+- `mcp.add` — Register and auto-start an MCP server for a workspace
+- `mcp.remove` — Stop and remove an MCP server
+- `mcp.start` — Start a stopped MCP server
+- `mcp.stop` — Stop a running MCP server without removing its configuration
+- `mcp.list` — List MCP servers for a workspace with their status
+
+#### Scenario: Add an MCP server to a workspace
+- GIVEN a client calls `mcp.add` with `{ workspace, name, command, args, env }`
+- WHEN the bridge processes the request
+- THEN the server configuration is persisted under the workspace's `.claude/mcp/` directory, the server process is started, and the response includes `{ name, status: "running", pid }`
+
+#### Scenario: Remove an MCP server
+- GIVEN an MCP server is configured and running for a workspace
+- WHEN a client calls `mcp.remove` with `{ workspace, name }`
+- THEN the server process is stopped, its configuration is deleted, and the response confirms removal
+
+#### Scenario: Stop a running MCP server
+- GIVEN an MCP server is running for a workspace
+- WHEN a client calls `mcp.stop` with `{ workspace, name }`
+- THEN the server process is terminated and the response includes `{ name, status: "stopped" }`
+
+#### Scenario: Start a stopped MCP server
+- GIVEN an MCP server is configured but stopped for a workspace
+- WHEN a client calls `mcp.start` with `{ workspace, name }`
+- THEN the server process is started and the response includes `{ name, status: "running", pid }`
+
+#### Scenario: List MCP servers for a workspace
+- GIVEN multiple MCP servers are configured for a workspace
+- WHEN a client calls `mcp.list` with `{ workspace }`
+- THEN the response includes a `servers` array where each entry has `name`, `status` (`"running"` | `"stopped"` | `"error"`), and optional `pid`
+
+#### Scenario: MCP server name is unique per workspace
+- GIVEN an MCP server named "my-server" already exists for a workspace
+- WHEN a client calls `mcp.add` with the same workspace and name
+- THEN the bridge returns a `-32602` error indicating the server name already exists
+
+### Requirement: MCP Server Notifications
+The bridge MUST emit the following notifications for MCP server lifecycle events:
+
+| Notification | Required fields |
+|---|---|
+| `mcp/server_started` | `workspace`, `name`, `pid` |
+| `mcp/server_stopped` | `workspace`, `name`, `exitCode` |
+| `mcp/server_error` | `workspace`, `name`, `error` |
+
+#### Scenario: Server started notification
+- GIVEN an MCP server is started (via `mcp.add` or `mcp.start`)
+- WHEN the server process begins running
+- THEN the bridge emits an `mcp/server_started` notification
+
+#### Scenario: Server stopped notification
+- GIVEN an MCP server process exits
+- WHEN the bridge detects the process exit
+- THEN the bridge emits an `mcp/server_stopped` notification with the exit code
+
+#### Scenario: Server error notification
+- GIVEN an MCP server process encounters an error
+- WHEN the bridge detects the error
+- THEN the bridge emits an `mcp/server_error` notification with the error message
+
+### Requirement: MCP Server Capability Advertisement
+The `bridge.capabilities` response MUST include `mcp.add`, `mcp.remove`, `mcp.start`, `mcp.stop`, and `mcp.list` in its supported methods list.
+
+### Requirement: Config Management Methods
+The bridge MUST expose the following methods for reading and writing configuration:
+
+- `config.get` — Read one or all configuration values
+- `config.set` — Write a configuration value
+- `config.list` — List all configuration keys and their values
+
+Configuration has two scopes: `project` (stored in `<workspace>/.claude/settings.json`) and `user` (stored in `~/.claude/settings.json`). Project-level values override user-level values when both exist.
+
+#### Scenario: Get a specific config value
+- GIVEN a client calls `config.get` with `{ key }`
+- THEN the response includes `{ key, value, scope }` with the resolved value
+
+#### Scenario: Set a project-scoped config value
+- GIVEN a client calls `config.set` with `{ workspace, key, value, scope: "project" }`
+- THEN the value is written to `<workspace>/.claude/settings.json`
+
+#### Scenario: Set a user-scoped config value
+- GIVEN a client calls `config.set` with `{ key, value, scope: "user" }`
+- THEN the value is written to `~/.claude/settings.json`
+
+#### Scenario: List all config
+- GIVEN a client calls `config.list` with `{ workspace }`
+- THEN the response includes a `settings` array showing each key with its resolved value
+
+#### Scenario: Config validation for known keys
+- GIVEN a client calls `config.set` with an invalid value for a known key
+- THEN the bridge returns a `-32602` error indicating the value is invalid
+
+#### Scenario: Unknown config keys are allowed
+- GIVEN a client calls `config.set` with an unknown key
+- THEN the value is stored without validation error (passthrough)
+
+### Requirement: Config Capability Advertisement
+The `bridge.capabilities` response MUST include `config.get`, `config.set`, and `config.list` in its supported methods list.
+
+### Requirement: Hooks Management Methods
+The bridge MUST expose the following methods for managing automation hooks:
+
+- `hooks.add` — Register a new hook
+- `hooks.remove` — Remove a hook by ID
+- `hooks.list` — List configured hooks
+
+A hook is defined by: `event` (the trigger event type), `command` (shell command to execute), `matcher` (optional tool name pattern), and `scope` (project or user).
+
+Defined hook events: `pre_tool_use`, `post_tool_use`, `notification`, `stop`, `subagent_stop`
+
+#### Scenario: Add a hook
+- GIVEN a client calls `hooks.add` with `{ event, command, matcher?, scope, workspace? }`
+- THEN the hook is persisted and the response includes `{ hookId, event, command, matcher, scope }`
+
+#### Scenario: Remove a hook
+- GIVEN a hook with a given ID exists
+- WHEN a client calls `hooks.remove` with `{ hookId }`
+- THEN the hook is deleted and the response confirms removal
+
+#### Scenario: List hooks for a workspace
+- GIVEN a client calls `hooks.list` with `{ workspace }`
+- THEN the response includes all hooks (user-scoped and project-scoped)
+
+#### Scenario: Invalid hook event is rejected
+- GIVEN a client calls `hooks.add` with an invalid event type
+- THEN the bridge returns a `-32602` error
+
+### Requirement: Hook Execution Notification
+When a hook fires during session execution, the bridge MUST emit a `bridge/hook_triggered` notification containing: `sessionId`, `hookId`, `event`, `command`, and `matcher` (if present).
+
+Only `pre_tool_use` hooks block agent execution. All other hook events are fire-and-forget.
+
+### Requirement: Hooks Capability Advertisement
+The `bridge.capabilities` response MUST include `hooks.add`, `hooks.remove`, and `hooks.list` in its supported methods list, and MUST list the supported hook events.

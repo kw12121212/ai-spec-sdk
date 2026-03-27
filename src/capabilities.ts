@@ -87,6 +87,7 @@ export interface Capabilities {
   agentControlParams: readonly string[];
   models: readonly ModelInfo[];
   tools: readonly ToolInfo[];
+  hookEvents: readonly string[];
 }
 
 export function getCapabilities(): Capabilities {
@@ -119,6 +120,17 @@ export function getCapabilities(): Capabilities {
       "tools.list",
       "session.approveTool",
       "session.rejectTool",
+      "mcp.add",
+      "mcp.remove",
+      "mcp.start",
+      "mcp.stop",
+      "mcp.list",
+      "config.get",
+      "config.set",
+      "config.list",
+      "hooks.add",
+      "hooks.remove",
+      "hooks.list",
     ],
     agentControlParams: [
       "model",
@@ -130,5 +142,12 @@ export function getCapabilities(): Capabilities {
     ],
     models: SUPPORTED_MODELS,
     tools: BUILTIN_TOOLS,
+    hookEvents: [
+      "pre_tool_use",
+      "post_tool_use",
+      "notification",
+      "stop",
+      "subagent_stop",
+    ],
   };
 }

@@ -1,0 +1,57 @@
+# Design: bridge-extensibility
+
+## Approach
+
+Add three new method groups to the existing `BridgeServer` dispatch table, each backed by a dedicated store module that follows the same patterns as `SessionStore` and `WorkspaceStore` (in-memory state, optional disk persistence, atomic writes).
+
+### New modules:
+- `src/mcp-store.ts` — MCP server registry and process lifecycle, scoped per workspace
+- `src/config-store.ts` — Configuration key-value store with scope resolution (project overrides user)
+- `src/hooks-store.ts` — Hook registry with event pattern matching
+
+### Method dispatch:
+Each new method group is added to the `switch` in `bridge.ts` alongside existing session, workspace, and workflow handlers. No existing handler is modified.
+
+### MCP server lifecycle:
+- `mcp.add` validates the command, persists the config under the workspace's `.claude/mcp/` directory, and spawns the server process
+- `mcp.start` / `mcp.stop` control individual server processes without removing configuration
+- `mcp.remove` stops the server and deletes its configuration
+- `mcp.list` returns servers for a given workspace with their status (running/stopped/error)
+- MCP servers are identified by name within a workspace (workspace + name = unique key)
+
+### Configuration management:
+- Two scopes: `project` (stored in workspace `.claude/settings.json`) and `user` (stored in `~/.claude/settings.json`)
+- `config.get` accepts an optional `scope` parameter; when omitted, returns the merged view (project overrides user)
+- `config.set` requires an explicit `scope` parameter
+- Known keys (e.g., `permissions`, `env`, `preferredModel`) are validated against a schema; unknown keys are stored as passthrough
+
+### Hooks system:
+- `hooks.add` accepts: `event` (one of the defined hook events), `command` (shell command to execute), `matcher` (optional tool name pattern for `pre_tool_use`/`post_tool_use`)
+- `hooks.list` returns hooks for an optional workspace scope; without scope, returns global hooks
+- `hooks.remove` deletes a hook by its ID
+- When a matching event fires during a session, the bridge emits `bridge/hook_triggered` and, for blocking hooks (`pre_tool_use`), waits for completion before proceeding
+- Hooks are persisted alongside config in the appropriate scope
+
+## Key Decisions
+
+1. **MCP servers are workspace-scoped** — Each workspace has its own MCP server set. This matches Claude Code's behavior where MCP servers are configured per-project. Servers are stored in `<workspace>/.claude/mcp/`.
+
+2. **Auto-start on add** — `mcp.add` immediately starts the server process. This reduces the number of round-trips needed and matches the user expectation that configuring a server makes it available.
+
+3. **Hooks via dedicated methods, not config.set** — Although hooks could be represented as config entries, dedicated `hooks.*` methods provide clearer semantics, better validation, and allow the bridge to track hook state separately from general settings.
+
+4. **Config scope resolution: project overrides user** — When reading config without specifying a scope, project-level values take precedence over user-level values. This matches Claude Code's behavior.
+
+5. **Blocking hooks for pre_tool_use only** — Only `pre_tool_use` hooks block agent execution. All other hook events are fire-and-forget notifications. This minimizes latency impact while still allowing pre-tool validation.
+
+## Alternatives Considered
+
+1. **Global MCP servers** — Rejected because Claude Code uses workspace-scoped servers and most MCP configs are project-specific (e.g., database connections, project APIs).
+
+2. **MCP config-only (no lifecycle management)** — Rejected because without process management, consumers would need to implement their own server lifecycle, defeating the purpose of the bridge abstraction.
+
+3. **Hooks as config entries** — Rejected because hooks have different lifecycle semantics (event matching, blocking behavior) that don't map cleanly to key-value config. Dedicated methods provide a cleaner API.
+
+4. **Single-scope config (no project/user split)** — Rejected because Claude Code explicitly supports both project-level and user-level settings with merge semantics. The bridge should mirror this.
+
+5. **Hook output capture** — Considered but deferred. Capturing hook stdout/stderr adds complexity and is not needed for the initial use case. The `bridge/hook_triggered` notification carries enough information for consumers to correlate events.

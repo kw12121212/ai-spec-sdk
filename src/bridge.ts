@@ -6,6 +6,11 @@ import { getCapabilities, BUILTIN_SPEC_SKILLS, SUPPORTED_MODELS, BUILTIN_TOOLS }
 import { runWorkflow } from "./workflow.js";
 import { SessionStore } from "./session-store.js";
 import { WorkspaceStore } from "./workspace-store.js";
+import { McpStore } from "./mcp-store.js";
+import type { McpServerConfig } from "./mcp-store.js";
+import { ConfigStore } from "./config-store.js";
+import { HooksStore } from "./hooks-store.js";
+import type { HookEvent } from "./hooks-store.js";
 import { runClaudeQuery } from "./claude-agent-runner.js";
 
 const METHOD_NOT_FOUND = -32601;
@@ -216,6 +221,9 @@ export class BridgeServer {
   private notify: (message: unknown) => void;
   private sessionStore: SessionStore;
   private workspaceStore: WorkspaceStore;
+  private mcpStore: McpStore;
+  private configStore: ConfigStore;
+  private hooksStore: HooksStore;
   private eventLog: Map<string, BufferedEvent[]>;
   private eventSeq: Map<string, number>;
   private pendingApprovals: Map<string, PendingApproval>;
@@ -224,6 +232,11 @@ export class BridgeServer {
     this.notify = notify;
     this.sessionStore = new SessionStore(sessionsDir);
     this.workspaceStore = new WorkspaceStore(workspacesDir);
+    this.mcpStore = new McpStore((method, params) => {
+      this.notify({ jsonrpc: "2.0", method, params });
+    });
+    this.configStore = new ConfigStore();
+    this.hooksStore = new HooksStore();
     this.eventLog = new Map();
     this.eventSeq = new Map();
     this.pendingApprovals = new Map();
@@ -353,6 +366,28 @@ export class BridgeServer {
           behavior: "deny",
           message: typeof params["message"] === "string" ? params["message"] : "Tool use rejected by user",
         });
+      case "mcp.add":
+        return this.mcpAdd(params);
+      case "mcp.remove":
+        return this.mcpRemove(params);
+      case "mcp.start":
+        return this.mcpStart(params);
+      case "mcp.stop":
+        return this.mcpStop(params);
+      case "mcp.list":
+        return this.mcpList(params);
+      case "config.get":
+        return this.configGet(params);
+      case "config.set":
+        return this.configSet(params);
+      case "config.list":
+        return this.configList(params);
+      case "hooks.add":
+        return this.hooksAdd(params);
+      case "hooks.remove":
+        return this.hooksRemove(params);
+      case "hooks.list":
+        return this.hooksList(params);
       default:
         throw new BridgeError(METHOD_NOT_FOUND, `Method not found: ${method}`);
     }
@@ -541,11 +576,22 @@ export class BridgeServer {
           message,
         });
 
+        const msgType = classifyMessageType(message);
         this.emit(
           "bridge/session_event",
-          { sessionId: session.id, type: "agent_message", messageType: classifyMessageType(message), message },
+          { sessionId: session.id, type: "agent_message", messageType: msgType, message },
           requestId,
         );
+
+        // Fire hooks based on message type
+        if (msgType === "tool_use") {
+          const toolName = this._extractToolName(message);
+          this._fireHooks("pre_tool_use", session.id, context.cwd, toolName);
+        } else if (msgType === "tool_result") {
+          this._fireHooks("post_tool_use", session.id, context.cwd);
+        }
+
+        this._fireHooks("notification", session.id, context.cwd);
       },
     });
 
@@ -597,6 +643,8 @@ export class BridgeServer {
         pending.resolve({ behavior: "deny", message: "Session stopped" });
       }
     }
+
+    this._fireHooks("stop", sessionId, session.workspace);
 
     return { sessionId, status: session.status };
   }
@@ -744,5 +792,251 @@ export class BridgeServer {
         };
       }),
     };
+  }
+
+  // --- Hook helpers ---
+
+  private _extractToolName(message: unknown): string | undefined {
+    if (message === null || typeof message !== "object") return undefined;
+    const msg = message as Record<string, unknown>;
+    const innerMsg = msg["message"] as Record<string, unknown> | undefined;
+    const content = innerMsg?.["content"] ?? msg["content"];
+    if (!Array.isArray(content)) return undefined;
+    for (const block of content as Array<Record<string, unknown>>) {
+      if (block["type"] === "tool_use" && typeof block["name"] === "string") {
+        return block["name"];
+      }
+    }
+    return undefined;
+  }
+
+  private _fireHooks(event: HookEvent, sessionId: string, workspace?: string, toolName?: string): void {
+    const matchingHooks = this.hooksStore.findMatching(event, toolName, workspace);
+    for (const hook of matchingHooks) {
+      this.notify({
+        jsonrpc: "2.0",
+        method: "bridge/hook_triggered",
+        params: {
+          sessionId,
+          hookId: hook.hookId,
+          event: hook.event,
+          command: hook.command,
+          ...(hook.matcher && { matcher: hook.matcher }),
+        },
+      });
+    }
+  }
+
+  // --- MCP methods ---
+
+  private mcpAdd(params: Record<string, unknown>): unknown {
+    const { workspace, name, command, args, env } = params;
+
+    if (!workspace || typeof workspace !== "string") {
+      throw new BridgeError(-32602, "'workspace' must be provided");
+    }
+    if (!name || typeof name !== "string") {
+      throw new BridgeError(-32602, "'name' must be provided");
+    }
+    if (!command || typeof command !== "string") {
+      throw new BridgeError(-32602, "'command' must be provided");
+    }
+
+    const resolvedWorkspace = path.resolve(workspace);
+    if (!fs.existsSync(resolvedWorkspace) || !fs.statSync(resolvedWorkspace).isDirectory()) {
+      throw new BridgeError(-32001, "Workspace path does not exist", { workspace: resolvedWorkspace });
+    }
+
+    const config: McpServerConfig = {
+      name,
+      command,
+      args: Array.isArray(args) ? (args as string[]) : [],
+      env: env && typeof env === "object" && !Array.isArray(env)
+        ? env as Record<string, string>
+        : {},
+    };
+
+    try {
+      const entry = this.mcpStore.add(resolvedWorkspace, config);
+      return {
+        name: entry.name,
+        status: entry.status,
+        pid: entry.pid,
+      };
+    } catch (err) {
+      throw new BridgeError(-32602, (err as Error).message);
+    }
+  }
+
+  private mcpRemove(params: Record<string, unknown>): unknown {
+    const { workspace, name } = params;
+
+    if (!workspace || typeof workspace !== "string") {
+      throw new BridgeError(-32602, "'workspace' must be provided");
+    }
+    if (!name || typeof name !== "string") {
+      throw new BridgeError(-32602, "'name' must be provided");
+    }
+
+    const resolvedWorkspace = path.resolve(workspace);
+
+    try {
+      this.mcpStore.remove(resolvedWorkspace, name);
+      return { name, removed: true };
+    } catch (err) {
+      throw new BridgeError(-32602, (err as Error).message);
+    }
+  }
+
+  private mcpStart(params: Record<string, unknown>): unknown {
+    const { workspace, name } = params;
+
+    if (!workspace || typeof workspace !== "string") {
+      throw new BridgeError(-32602, "'workspace' must be provided");
+    }
+    if (!name || typeof name !== "string") {
+      throw new BridgeError(-32602, "'name' must be provided");
+    }
+
+    const resolvedWorkspace = path.resolve(workspace);
+
+    try {
+      const entry = this.mcpStore.start(resolvedWorkspace, name);
+      return { name: entry.name, status: entry.status, pid: entry.pid };
+    } catch (err) {
+      throw new BridgeError(-32602, (err as Error).message);
+    }
+  }
+
+  private mcpStop(params: Record<string, unknown>): unknown {
+    const { workspace, name } = params;
+
+    if (!workspace || typeof workspace !== "string") {
+      throw new BridgeError(-32602, "'workspace' must be provided");
+    }
+    if (!name || typeof name !== "string") {
+      throw new BridgeError(-32602, "'name' must be provided");
+    }
+
+    const resolvedWorkspace = path.resolve(workspace);
+
+    try {
+      const entry = this.mcpStore.stop(resolvedWorkspace, name);
+      return { name: entry.name, status: entry.status };
+    } catch (err) {
+      throw new BridgeError(-32602, (err as Error).message);
+    }
+  }
+
+  private mcpList(params: Record<string, unknown>): unknown {
+    const { workspace } = params;
+
+    if (!workspace || typeof workspace !== "string") {
+      throw new BridgeError(-32602, "'workspace' must be provided");
+    }
+
+    const resolvedWorkspace = path.resolve(workspace);
+    const servers = this.mcpStore.list(resolvedWorkspace);
+    return { servers };
+  }
+
+  // --- Config methods ---
+
+  private configGet(params: Record<string, unknown>): unknown {
+    const { key, workspace } = params;
+
+    if (!key || typeof key !== "string") {
+      throw new BridgeError(-32602, "'key' must be provided");
+    }
+
+    const resolvedWorkspace = typeof workspace === "string" ? path.resolve(workspace) : undefined;
+    const entry = this.configStore.get(key, resolvedWorkspace);
+
+    if (!entry) {
+      return { key, value: null, scope: null };
+    }
+
+    return entry;
+  }
+
+  private configSet(params: Record<string, unknown>): unknown {
+    const { key, value, scope, workspace } = params;
+
+    if (!key || typeof key !== "string") {
+      throw new BridgeError(-32602, "'key' must be provided");
+    }
+    if (value === undefined) {
+      throw new BridgeError(-32602, "'value' must be provided");
+    }
+    if (scope !== "project" && scope !== "user") {
+      throw new BridgeError(-32602, "'scope' must be 'project' or 'user'");
+    }
+
+    const resolvedWorkspace = typeof workspace === "string" ? path.resolve(workspace) : undefined;
+
+    try {
+      return this.configStore.set(key, value, { scope, workspace: resolvedWorkspace });
+    } catch (err) {
+      throw new BridgeError(-32602, (err as Error).message);
+    }
+  }
+
+  private configList(params: Record<string, unknown>): unknown {
+    const { workspace } = params;
+    const resolvedWorkspace = typeof workspace === "string" ? path.resolve(workspace) : undefined;
+    const settings = this.configStore.list(resolvedWorkspace);
+    return { settings };
+  }
+
+  // --- Hooks methods ---
+
+  private hooksAdd(params: Record<string, unknown>): unknown {
+    const { event, command, matcher, scope, workspace } = params;
+
+    if (!event || typeof event !== "string") {
+      throw new BridgeError(-32602, "'event' must be provided");
+    }
+    if (!command || typeof command !== "string") {
+      throw new BridgeError(-32602, "'command' must be provided");
+    }
+    if (scope !== "project" && scope !== "user") {
+      throw new BridgeError(-32602, "'scope' must be 'project' or 'user'");
+    }
+
+    const resolvedWorkspace = typeof workspace === "string" ? path.resolve(workspace) : undefined;
+
+    try {
+      return this.hooksStore.add({
+        event,
+        command,
+        matcher: typeof matcher === "string" ? matcher : undefined,
+        scope,
+        workspace: resolvedWorkspace,
+      });
+    } catch (err) {
+      throw new BridgeError(-32602, (err as Error).message);
+    }
+  }
+
+  private hooksRemove(params: Record<string, unknown>): unknown {
+    const { hookId } = params;
+
+    if (!hookId || typeof hookId !== "string") {
+      throw new BridgeError(-32602, "'hookId' must be provided");
+    }
+
+    try {
+      this.hooksStore.remove(hookId);
+      return { hookId, removed: true };
+    } catch (err) {
+      throw new BridgeError(-32602, (err as Error).message);
+    }
+  }
+
+  private hooksList(params: Record<string, unknown>): unknown {
+    const { workspace } = params;
+    const resolvedWorkspace = typeof workspace === "string" ? path.resolve(workspace) : undefined;
+    const hooks = this.hooksStore.list(resolvedWorkspace);
+    return { hooks };
   }
 }
