@@ -5,6 +5,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { BridgeError } from "./errors.js";
 import { SUPPORTED_WORKFLOWS } from "./capabilities.js";
+import { defaultLogger as logger } from "./logger.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -103,6 +104,7 @@ export async function runWorkflow(
     workflow: workflow as string,
     workspace: resolvedWorkspace,
   });
+  logger.info("workflow started", { workflow: workflow as string, workspace: resolvedWorkspace });
 
   try {
     const scriptSubcommand = WORKFLOW_SCRIPT_MAP[workflow as string] ?? (workflow as string);
@@ -117,6 +119,7 @@ export async function runWorkflow(
       workspace: resolvedWorkspace,
     });
 
+    logger.info("workflow completed", { workflow: workflow as string });
     return {
       workflow: workflow as string,
       workspace: resolvedWorkspace,
@@ -125,6 +128,7 @@ export async function runWorkflow(
       parsed: safelyParseJson(stdout),
     };
   } catch (error) {
+    logger.error("workflow failed", { workflow: workflow as string, error: (error as Error).message });
     emitNotification("bridge/progress", {
       phase: "workflow_failed",
       workflow: workflow as string,

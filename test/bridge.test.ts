@@ -686,3 +686,41 @@ test("bridge.capabilities includes maintenance and migrate in workflows", async 
   assert.equal(skillMap["maintenance"], "spec-driven-maintenance");
   assert.equal(skillMap["migrate"], "spec-driven-maintenance");
 });
+
+test("bridge.setLogLevel sets a valid level", async () => {
+  const server = new BridgeServer();
+  const response = await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 700,
+    method: "bridge.setLogLevel",
+    params: { level: "debug" },
+  });
+
+  assert.equal((response.result as Record<string, unknown>)["level"], "debug");
+});
+
+test("bridge.setLogLevel rejects an invalid level", async () => {
+  const server = new BridgeServer();
+  const response = await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 701,
+    method: "bridge.setLogLevel",
+    params: { level: "verbose" },
+  });
+
+  assert.ok(response.error, "should return error for invalid level");
+  assert.equal(response.error!.code, -32602);
+});
+
+test("bridge.setLogLevel is listed in capabilities", async () => {
+  const server = new BridgeServer();
+  const response = await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 702,
+    method: "bridge.capabilities",
+  });
+
+  const result = response.result as Record<string, unknown>;
+  const methods = result["methods"] as string[];
+  assert.ok(methods.includes("bridge.setLogLevel"), "capabilities must list bridge.setLogLevel");
+});

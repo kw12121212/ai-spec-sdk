@@ -1,5 +1,5 @@
 export { BridgeServer } from "./bridge.js";
-export type { ProxyParams } from "./bridge.js";
+export type { BridgeServerOptions, ProxyParams } from "./bridge.js";
 export {
   getCapabilities,
   BUILTIN_SPEC_SKILLS,
@@ -15,3 +15,5 @@ export type { McpServerConfig, McpServerEntry } from "./mcp-store.js";
 export type { ConfigEntry } from "./config-store.js";
 export type { HookEntry, HookEvent } from "./hooks-store.js";
 export type { ContextFile } from "./context-store.js";
+export { Logger, defaultLogger } from "./logger.js";
+export type { LogLevel, LogBindings } from "./logger.js";

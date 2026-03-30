@@ -148,6 +148,7 @@ export function getCapabilities(): Capabilities {
       "context.list",
       "session.branch",
       "session.search",
+      "bridge.setLogLevel",
     ],
     agentControlParams: [
       "model",

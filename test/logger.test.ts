@@ -1,0 +1,93 @@
+import { describe, it, expect } from "bun:test";
+import { Logger, VALID_LOG_LEVELS } from "../src/logger.js";
+
+function capture(): { lines: string[]; output: (line: string) => void } {
+  const lines: string[] = [];
+  return {
+    lines,
+    output: (line: string) => { lines.push(line); },
+  };
+}
+
+describe("Logger", () => {
+  it("filters messages below current level", () => {
+    const { lines, output } = capture();
+    const log = new Logger("warn", {}, output);
+
+    log.trace("should not appear");
+    log.debug("should not appear");
+    log.info("should not appear");
+    log.warn("should appear");
+    log.error("should also appear");
+
+    expect(lines.length).toBe(2);
+  });
+
+  it("outputs valid JSON with required fields", () => {
+    const { lines, output } = capture();
+    const log = new Logger("trace", {}, output);
+
+    log.info("test message");
+
+    expect(lines.length).toBe(1);
+    const parsed = JSON.parse(lines[0]!);
+    expect(parsed.level).toBe("info");
+    expect(parsed.message).toBe("test message");
+    expect(typeof parsed.timestamp).toBe("string");
+  });
+
+  it("includes extra bindings in output", () => {
+    const { lines, output } = capture();
+    const log = new Logger("debug", {}, output);
+
+    log.debug("hello", { sessionId: "abc-123", durationMs: 42 });
+
+    const parsed = JSON.parse(lines[0]!);
+    expect(parsed.sessionId).toBe("abc-123");
+    expect(parsed.durationMs).toBe(42);
+  });
+
+  it("child logger propagates context bindings", () => {
+    const { lines, output } = capture();
+    const parent = new Logger("debug", { requestId: "req-1" }, output);
+    const child = parent.child({ sessionId: "sess-1" });
+
+    child.info("child message");
+
+    const parsed = JSON.parse(lines[0]!);
+    expect(parsed.requestId).toBe("req-1");
+    expect(parsed.sessionId).toBe("sess-1");
+  });
+
+  it("setLevel changes filtering at runtime", () => {
+    const { lines, output } = capture();
+    const log = new Logger("error", {}, output);
+
+    log.info("before");
+    expect(lines.length).toBe(0);
+
+    log.setLevel("info");
+    log.info("after");
+    expect(lines.length).toBe(1);
+
+    const parsed = JSON.parse(lines[0]!);
+    expect(parsed.message).toBe("after");
+  });
+
+  it("getLevel returns current level", () => {
+    const log = new Logger("debug");
+    expect(log.getLevel()).toBe("debug");
+
+    log.setLevel("error");
+    expect(log.getLevel()).toBe("error");
+  });
+
+  it("VALID_LOG_LEVELS contains all five levels", () => {
+    expect(VALID_LOG_LEVELS).toEqual(new Set(["trace", "debug", "info", "warn", "error"]));
+  });
+
+  it("defaults to info level when constructed without arguments", () => {
+    const log = new Logger(undefined, {}, () => {});
+    expect(log.getLevel()).toBe("info");
+  });
+});

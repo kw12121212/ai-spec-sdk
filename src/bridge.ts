@@ -13,6 +13,7 @@ import { HooksStore } from "./hooks-store.js";
 import type { HookEvent } from "./hooks-store.js";
 import { ContextStore } from "./context-store.js";
 import { runClaudeQuery } from "./claude-agent-runner.js";
+import { defaultLogger, VALID_LOG_LEVELS, type Logger, type LogLevel } from "./logger.js";
 
 const METHOD_NOT_FOUND = -32601;
 const INTERNAL_ERROR = -32603;
@@ -206,6 +207,7 @@ export interface BridgeServerOptions {
   notify?: (message: unknown) => void;
   sessionsDir?: string;
   workspacesDir?: string;
+  logger?: Logger;
 }
 
 interface AgentQueryContext {
@@ -220,6 +222,7 @@ interface PendingApproval {
 
 export class BridgeServer {
   private notify: (message: unknown) => void;
+  private logger: Logger;
   private sessionStore: SessionStore;
   private workspaceStore: WorkspaceStore;
   private mcpStore: McpStore;
@@ -230,8 +233,9 @@ export class BridgeServer {
   private eventSeq: Map<string, number>;
   private pendingApprovals: Map<string, PendingApproval>;
 
-  constructor({ notify = () => {}, sessionsDir, workspacesDir }: BridgeServerOptions = {}) {
+  constructor({ notify = () => {}, sessionsDir, workspacesDir, logger }: BridgeServerOptions = {}) {
     this.notify = notify;
+    this.logger = logger ?? defaultLogger;
     this.sessionStore = new SessionStore(sessionsDir);
     this.workspaceStore = new WorkspaceStore(workspacesDir);
     this.mcpStore = new McpStore((method, params) => {
@@ -297,9 +301,11 @@ export class BridgeServer {
     }
 
     const request = payload as JsonRpcRequest;
+    const start = Date.now();
 
     try {
       const result = await this.dispatch(request.method, request.params ?? {}, request.id);
+      this.logger.debug("dispatch completed", { method: request.method, durationMs: Date.now() - start });
       return {
         jsonrpc: "2.0",
         id,
@@ -312,6 +318,13 @@ export class BridgeServer {
           : new BridgeError(INTERNAL_ERROR, "Internal bridge error", {
               message: (error as Error).message,
             });
+
+      this.logger.error("dispatch error", {
+        method: request.method,
+        durationMs: Date.now() - start,
+        error: bridgeError.message,
+        code: bridgeError.code,
+      });
 
       return {
         jsonrpc: "2.0",
@@ -329,6 +342,8 @@ export class BridgeServer {
     switch (method) {
       case "bridge.capabilities":
         return getCapabilities();
+      case "bridge.setLogLevel":
+        return this.setLogLevel(params);
       case "bridge.ping":
         return { pong: true, ts: new Date().toISOString() };
       case "skills.list":
@@ -1244,6 +1259,19 @@ export class BridgeServer {
       branchedFrom: sessionId,
       historyCopied: branchIndex,
     };
+  }
+
+  // --- Bridge log level ---
+
+  private setLogLevel(params: Record<string, unknown>): unknown {
+    const { level } = params;
+
+    if (typeof level !== "string" || !VALID_LOG_LEVELS.has(level.toLowerCase())) {
+      throw new BridgeError(-32602, `'level' must be one of: ${[...VALID_LOG_LEVELS].join(", ")}`);
+    }
+
+    this.logger.setLevel(level.toLowerCase() as LogLevel);
+    return { level: this.logger.getLevel() };
   }
 
   // --- Session search ---

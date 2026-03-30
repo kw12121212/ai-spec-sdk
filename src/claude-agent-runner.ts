@@ -1,4 +1,5 @@
 import { query } from "@anthropic-ai/claude-agent-sdk";
+import { defaultLogger as logger } from "./logger.js";
 
 type QueryFunction = typeof query;
 
@@ -42,44 +43,53 @@ export async function runClaudeQuery({
   shouldStop = () => false,
 }: RunClaudeQueryOptions): Promise<QueryResult> {
   const queryFn = getQueryFunction();
-  let terminalResult: unknown = null;
-  let terminalUsage: TokenUsage | null = null;
+  logger.debug("query started", { promptLength: prompt.length });
 
-  const sdkOptions: Record<string, unknown> = { ...options };
-  if (cwd !== undefined) sdkOptions["cwd"] = cwd;
-  if (env !== undefined) sdkOptions["env"] = env;
+  try {
+    let terminalResult: unknown = null;
+    let terminalUsage: TokenUsage | null = null;
 
-  for await (const message of queryFn({ prompt, options: sdkOptions } as Parameters<QueryFunction>[0])) {
-    if (shouldStop()) {
-      return {
-        status: "stopped",
-        result: null,
-        usage: null,
-      };
-    }
+    const sdkOptions: Record<string, unknown> = { ...options };
+    if (cwd !== undefined) sdkOptions["cwd"] = cwd;
+    if (env !== undefined) sdkOptions["env"] = env;
 
-    onEvent(message);
+    for await (const message of queryFn({ prompt, options: sdkOptions } as Parameters<QueryFunction>[0])) {
+      if (shouldStop()) {
+        logger.debug("query stopped by caller");
+        return {
+          status: "stopped",
+          result: null,
+          usage: null,
+        };
+      }
 
-    if (
-      message !== null &&
-      typeof message === "object" &&
-      Object.prototype.hasOwnProperty.call(message, "result")
-    ) {
-      terminalResult = (message as Record<string, unknown>)["result"];
+      onEvent(message);
 
-      const rawUsage = (message as Record<string, unknown>)["usage"];
-      if (rawUsage !== null && typeof rawUsage === "object") {
-        const u = rawUsage as Record<string, unknown>;
-        if (typeof u["input_tokens"] === "number" && typeof u["output_tokens"] === "number") {
-          terminalUsage = { inputTokens: u["input_tokens"], outputTokens: u["output_tokens"] };
+      if (
+        message !== null &&
+        typeof message === "object" &&
+        Object.prototype.hasOwnProperty.call(message, "result")
+      ) {
+        terminalResult = (message as Record<string, unknown>)["result"];
+
+        const rawUsage = (message as Record<string, unknown>)["usage"];
+        if (rawUsage !== null && typeof rawUsage === "object") {
+          const u = rawUsage as Record<string, unknown>;
+          if (typeof u["input_tokens"] === "number" && typeof u["output_tokens"] === "number") {
+            terminalUsage = { inputTokens: u["input_tokens"], outputTokens: u["output_tokens"] };
+          }
         }
       }
     }
-  }
 
-  return {
-    status: "completed",
-    result: terminalResult,
-    usage: terminalUsage,
-  };
+    logger.debug("query completed");
+    return {
+      status: "completed",
+      result: terminalResult,
+      usage: terminalUsage,
+    };
+  } catch (err) {
+    logger.error("query error", { error: String(err) });
+    throw err;
+  }
 }

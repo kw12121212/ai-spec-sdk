@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { defaultLogger as logger } from "./logger.js";
 
 export interface SessionHistoryEntry {
   type: string;
@@ -86,6 +87,7 @@ export class SessionStore {
 
     this.sessions.set(sessionId, session);
     this._persist(session);
+    logger.info("session created", { sessionId, workspace });
     return session;
   }
 
@@ -132,6 +134,7 @@ export class SessionStore {
     session.result = result;
     session.updatedAt = nowIso();
     this._persist(session);
+    logger.info("session completed", { sessionId });
     return session;
   }
 
@@ -145,6 +148,7 @@ export class SessionStore {
     session.status = "stopped";
     session.updatedAt = nowIso();
     this._persist(session);
+    logger.info("session stopped", { sessionId });
     return session;
   }
 

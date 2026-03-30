@@ -1,6 +1,7 @@
 import { ChildProcess, spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { defaultLogger as logger } from "./logger.js";
 
 export interface McpServerConfig {
   name: string;
@@ -203,12 +204,14 @@ export class McpStore {
       });
 
       entry.pid = child.pid ?? null;
+      logger.info("mcp server started", { workspace, name, pid: entry.pid });
 
       child.on("error", (err) => {
         entry.status = "error";
         entry.error = err.message;
         entry.pid = null;
         this.processes.delete(this._key(workspace, name));
+        logger.error("mcp server error", { workspace, name, error: err.message });
         this.onNotification("mcp/server_error", {
           workspace,
           name,
@@ -222,6 +225,7 @@ export class McpStore {
         }
         entry.pid = null;
         this.processes.delete(this._key(workspace, name));
+        logger.info("mcp server exited", { workspace, name, exitCode: code ?? 0 });
         this.onNotification("mcp/server_stopped", {
           workspace,
           name,
