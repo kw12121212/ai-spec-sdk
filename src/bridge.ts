@@ -19,6 +19,7 @@ const METHOD_NOT_FOUND = -32601;
 const INTERNAL_ERROR = -32603;
 const SDK_SESSION_ID_UNAVAILABLE = -32012;
 const VERSION_MISMATCH = -32050;
+const SESSION_ACTIVE = -32070;
 
 const EVENT_BUFFER_CAP = 500;
 
@@ -428,6 +429,12 @@ export class BridgeServer {
         return this.branchSession(params, requestId);
       case "session.search":
         return this.searchSessions(params);
+      case "session.export":
+        return this.exportSession(params);
+      case "session.delete":
+        return this.deleteSession(params);
+      case "session.cleanup":
+        return this.cleanupSessions(params);
       default:
         throw new BridgeError(METHOD_NOT_FOUND, `Method not found: ${method}`);
     }
@@ -1375,5 +1382,63 @@ export class BridgeServer {
     }
 
     return { results };
+  }
+
+  // --- Session export/delete/cleanup ---
+
+  private exportSession(params: Record<string, unknown>): unknown {
+    const { sessionId } = params;
+    if (!sessionId || typeof sessionId !== "string") {
+      throw new BridgeError(-32602, "'sessionId' must be provided");
+    }
+
+    const session = this.sessionStore.get(sessionId);
+    if (!session) {
+      throw new BridgeError(-32011, "Session not found", { sessionId });
+    }
+
+    return {
+      id: session.id,
+      workspace: session.workspace,
+      sdkSessionId: session.sdkSessionId,
+      status: session.status,
+      createdAt: session.createdAt,
+      updatedAt: session.updatedAt,
+      history: session.history,
+      result: session.result,
+    };
+  }
+
+  private deleteSession(params: Record<string, unknown>): unknown {
+    const { sessionId } = params;
+    if (!sessionId || typeof sessionId !== "string") {
+      throw new BridgeError(-32602, "'sessionId' must be provided");
+    }
+
+    const session = this.sessionStore.get(sessionId);
+    if (!session) {
+      throw new BridgeError(-32011, "Session not found", { sessionId });
+    }
+
+    if (session.status === "active") {
+      throw new BridgeError(SESSION_ACTIVE, "Cannot delete an active session", { sessionId });
+    }
+
+    this.sessionStore.delete(sessionId);
+    return { deleted: true, sessionId };
+  }
+
+  private cleanupSessions(params: Record<string, unknown>): unknown {
+    const { olderThanDays } = params;
+
+    if (olderThanDays !== undefined) {
+      if (typeof olderThanDays !== "number" || !Number.isInteger(olderThanDays) || olderThanDays < 1) {
+        throw new BridgeError(-32602, "'olderThanDays' must be an integer >= 1");
+      }
+    }
+
+    const days = Math.min(typeof olderThanDays === "number" ? olderThanDays : 30, 365);
+    const removedCount = this.sessionStore.cleanup(days);
+    return { removedCount };
   }
 }

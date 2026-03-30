@@ -16,7 +16,7 @@ export interface Session {
   sdkSessionId: string | null;
   createdAt: string;
   updatedAt: string;
-  status: "active" | "completed" | "stopped";
+  status: "active" | "completed" | "stopped" | "interrupted";
   stopRequested: boolean;
   history: SessionHistoryEntry[];
   result: unknown;
@@ -47,6 +47,11 @@ export class SessionStore {
         const raw = fs.readFileSync(path.join(dir, file), "utf8");
         const session = JSON.parse(raw) as Session;
         if (session && typeof session.id === "string" && Array.isArray(session.history)) {
+          if (session.status === "active") {
+            session.status = "interrupted";
+            this._persist(session);
+            logger.info("session recovered as interrupted", { sessionId: session.id });
+          }
           this.sessions.set(session.id, session);
         }
       } catch {
@@ -156,5 +161,56 @@ export class SessionStore {
     const all = Array.from(this.sessions.values());
     const filtered = filter === "active" ? all.filter((s) => s.status === "active") : all;
     return filtered.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)).slice(0, 100);
+  }
+
+  export(sessionId: string): Session | null {
+    return this.get(sessionId);
+  }
+
+  delete(sessionId: string): "ok" | "active" | "not_found" {
+    const session = this.sessions.get(sessionId);
+    if (!session) return "not_found";
+    if (session.status === "active") return "active";
+
+    this.sessions.delete(sessionId);
+
+    if (this.sessionsDir) {
+      const filePath = path.join(this.sessionsDir, `${sessionId}.json`);
+      try {
+        fs.unlinkSync(filePath);
+      } catch {
+        // file may not exist in in-memory-only tests
+      }
+    }
+
+    logger.info("session deleted", { sessionId });
+    return "ok";
+  }
+
+  cleanup(olderThanDays: number = 30): number {
+    const days = Math.min(olderThanDays, 365);
+    const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+    let removedCount = 0;
+
+    for (const [id, session] of this.sessions) {
+      if (session.status === "active") continue;
+      const updatedMs = new Date(session.updatedAt).getTime();
+      if (updatedMs < cutoff) {
+        this.sessions.delete(id);
+        if (this.sessionsDir) {
+          try {
+            fs.unlinkSync(path.join(this.sessionsDir, `${id}.json`));
+          } catch {
+            // file may not exist
+          }
+        }
+        removedCount++;
+      }
+    }
+
+    if (removedCount > 0) {
+      logger.info("session cleanup completed", { removedCount, olderThanDays });
+    }
+    return removedCount;
   }
 }

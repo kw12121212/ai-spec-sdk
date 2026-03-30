@@ -448,6 +448,7 @@ methods:
         enum:
           - completed
           - stopped
+          - interrupted
       result:
         type: any
         nullable: true
@@ -509,6 +510,7 @@ methods:
         enum:
           - completed
           - stopped
+          - interrupted
       result:
         type: any
         nullable: true
@@ -558,6 +560,7 @@ methods:
           - active
           - completed
           - stopped
+          - interrupted
       createdAt:
         type: string
         format: ISO 8601 UTC
@@ -598,13 +601,24 @@ environment:
 # Session lifecycle notes
 # ---------------------------------------------------------------------------
 session_lifecycle:
-  storage: in-memory only; sessions are lost when the bridge process exits
+  storage: >
+    File-based persistence. Each session is stored as an individual JSON file
+    in the sessions directory (default: ~/.ai-spec-sdk/sessions/). Sessions survive
+    bridge process restarts. When the sessionsDir constructor option is omitted,
+    the store operates in-memory only.
   id_format: UUID v4 (crypto.randomUUID)
   status_transitions:
     active -> completed: agent finishes normally
     active -> stopped: session.stop is called and the stop flag is observed
+    active -> interrupted: bridge process restarts while session was active
     completed -> (terminal): no further transitions
     stopped -> (terminal): no further transitions
+    interrupted -> (terminal): no further transitions
+  recovery: >
+    On bridge startup, the SessionStore loads all session files from disk.
+    Any session with status "active" is changed to "interrupted" and persisted
+    before any client requests are served. Interrupted sessions can be resumed
+    (creates a new SDK session context).
   stop_semantics: >
     session.stop sets stopRequested=true and status="stopped" immediately.
     The running query loop checks shouldStop() between each yielded message.
@@ -615,3 +629,81 @@ session_lifecycle:
     - Each resumed session appends one entry of type "resume_prompt".
     - Each agent yield appends one entry of type "agent_message".
     - historyLength in session.status reflects the total entry count.
+
+  # -------------------------------------------------------------------------
+  session.export:
+    description: Exports the full session data for a given session.
+    params:
+      sessionId:
+        type: string
+        required: true
+        format: UUID v4
+    result:
+      id:
+        type: string
+        format: UUID v4
+      workspace:
+        type: string
+      sdkSessionId:
+        type: string
+        nullable: true
+      status:
+        type: string
+        enum:
+          - active
+          - completed
+          - stopped
+          - interrupted
+          - interrupted
+      createdAt:
+        type: string
+        format: ISO 8601 UTC
+      updatedAt:
+        type: string
+        format: ISO 8601 UTC
+      history:
+        type: array
+        notes: Full session history entries.
+      result:
+        type: any
+        nullable: true
+    errors:
+      - -32602  # missing or invalid sessionId
+      - -32011  # session not found
+
+  # -------------------------------------------------------------------------
+  session.delete:
+    description: >
+      Removes a session from both memory and disk. Active sessions cannot be
+      deleted; stop or complete the session first.
+    params:
+      sessionId:
+        type: string
+        required: true
+        format: UUID v4
+    result:
+      deleted:
+        type: boolean
+      sessionId:
+        type: string
+    errors:
+      - -32602  # missing or invalid sessionId
+      - -32011  # session not found
+      - -32070  # cannot delete an active session
+
+  # -------------------------------------------------------------------------
+  session.cleanup:
+    description: >
+      Removes sessions older than a specified number of days based on updatedAt.
+      Active sessions are preserved. Uses default of 30 days if not specified.
+    params:
+      olderThanDays:
+        type: number
+        required: false
+        default: 30
+        notes: Must be >= 1. Capped at 365.
+    result:
+      removedCount:
+        type: number
+    errors:
+      - -32602  # olderThanDays is not a positive integer

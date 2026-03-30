@@ -41,7 +41,7 @@ test("SessionStore with sessionsDir reloads sessions from disk on construction",
     assert.ok(loaded, "session should be reloaded from disk");
     assert.equal(loaded!.id, session.id);
     assert.equal(loaded!.workspace, ws);
-    assert.equal(loaded!.status, "active");
+    assert.equal(loaded!.status, "interrupted");
     assert.equal(loaded!.history[0]?.prompt, "persist me");
   } finally {
     fs.rmSync(sessionsDir, { recursive: true, force: true });
@@ -111,4 +111,219 @@ test("SessionStore persists updated state after complete", () => {
   } finally {
     fs.rmSync(sessionsDir, { recursive: true, force: true });
   }
+});
+
+// --- Interrupted recovery ---
+
+test("SessionStore marks active sessions as interrupted on reload", () => {
+  const sessionsDir = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-interrupted-"));
+
+  try {
+    const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-ws6-"));
+
+    // Create an active session, then simulate crash (don't call complete/stop)
+    const store1 = new SessionStore(sessionsDir);
+    const session = store1.create(ws, "crash me");
+
+    // Reload — active session should become interrupted
+    const store2 = new SessionStore(sessionsDir);
+    const loaded = store2.get(session.id);
+
+    assert.ok(loaded);
+    assert.equal(loaded!.status, "interrupted");
+
+    // Verify persisted to disk as interrupted
+    const filePath = path.join(sessionsDir, `${session.id}.json`);
+    const parsed = JSON.parse(fs.readFileSync(filePath, "utf8")) as Record<string, unknown>;
+    assert.equal(parsed["status"], "interrupted");
+  } finally {
+    fs.rmSync(sessionsDir, { recursive: true, force: true });
+  }
+});
+
+test("SessionStore leaves completed and stopped sessions unchanged on reload", () => {
+  const sessionsDir = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-nochange-"));
+
+  try {
+    const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-ws7-"));
+    const store1 = new SessionStore(sessionsDir);
+    const s1 = store1.create(ws, "completed one");
+    store1.complete(s1.id, "done");
+    const s2 = store1.create(ws, "stopped one");
+    store1.stop(s2.id);
+
+    const store2 = new SessionStore(sessionsDir);
+    assert.equal(store2.get(s1.id)!.status, "completed");
+    assert.equal(store2.get(s2.id)!.status, "stopped");
+  } finally {
+    fs.rmSync(sessionsDir, { recursive: true, force: true });
+  }
+});
+
+// --- Export ---
+
+test("SessionStore.export returns full session data", () => {
+  const store = new SessionStore();
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-ws8-"));
+
+  try {
+    const session = store.create(ws, "export test");
+    store.appendEvent(session.id, { type: "agent_message", message: { text: "hello" } });
+
+    const exported = store.export(session.id);
+    assert.ok(exported);
+    assert.equal(exported!.id, session.id);
+    assert.equal(exported!.workspace, ws);
+    assert.equal(exported!.status, "active");
+    assert.equal(exported!.history.length, 2);
+  } finally {
+    fs.rmSync(ws, { recursive: true, force: true });
+  }
+});
+
+test("SessionStore.export returns null for unknown session", () => {
+  const store = new SessionStore();
+  assert.equal(store.export("nonexistent"), null);
+});
+
+// --- Delete ---
+
+test("SessionStore.delete removes completed session from memory and disk", () => {
+  const sessionsDir = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-delete-"));
+
+  try {
+    const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-ws9-"));
+    const store = new SessionStore(sessionsDir);
+    const session = store.create(ws, "delete me");
+    store.complete(session.id, "done");
+
+    const result = store.delete(session.id);
+    assert.equal(result, "ok");
+
+    assert.equal(store.get(session.id), null);
+    assert.ok(!fs.existsSync(path.join(sessionsDir, `${session.id}.json`)));
+  } finally {
+    fs.rmSync(sessionsDir, { recursive: true, force: true });
+  }
+});
+
+test("SessionStore.delete rejects active session", () => {
+  const sessionsDir = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-delactive-"));
+
+  try {
+    const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-ws10-"));
+    const store = new SessionStore(sessionsDir);
+    const session = store.create(ws, "still running");
+
+    const result = store.delete(session.id);
+    assert.equal(result, "active");
+
+    // Session should still exist
+    assert.ok(store.get(session.id));
+  } finally {
+    fs.rmSync(sessionsDir, { recursive: true, force: true });
+  }
+});
+
+test("SessionStore.delete returns not_found for unknown session", () => {
+  const store = new SessionStore();
+  assert.equal(store.delete("nonexistent"), "not_found");
+});
+
+// --- Cleanup ---
+
+test("SessionStore.cleanup removes old non-active sessions", () => {
+  const sessionsDir = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-cleanup-"));
+
+  try {
+    const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-ws11-"));
+    const store = new SessionStore(sessionsDir);
+
+    // Create a session and manually set updatedAt to 31 days ago
+    const session = store.create(ws, "old session");
+    store.complete(session.id, "done");
+    const thirtyOneDaysAgo = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000).toISOString();
+    // Manually mutate to simulate old session
+    const loaded = store.get(session.id)!;
+    loaded.updatedAt = thirtyOneDaysAgo;
+    // Write to disk manually since we mutated the object directly
+    const filePath = path.join(sessionsDir, `${session.id}.json`);
+    fs.writeFileSync(filePath, JSON.stringify(loaded), "utf8");
+
+    const removed = store.cleanup(30);
+    assert.equal(removed, 1);
+    assert.equal(store.get(session.id), null);
+    assert.ok(!fs.existsSync(path.join(sessionsDir, `${session.id}.json`)));
+  } finally {
+    fs.rmSync(sessionsDir, { recursive: true, force: true });
+  }
+});
+
+test("SessionStore.cleanup uses default 30 days", () => {
+  const sessionsDir = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-cleanupdef-"));
+
+  try {
+    const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-ws12-"));
+    const store = new SessionStore(sessionsDir);
+
+    const session = store.create(ws, "old");
+    store.complete(session.id, "done");
+    const loaded = store.get(session.id)!;
+    loaded.updatedAt = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000).toISOString();
+    fs.writeFileSync(path.join(sessionsDir, `${session.id}.json`), JSON.stringify(loaded), "utf8");
+
+    const removed = store.cleanup();
+    assert.equal(removed, 1);
+  } finally {
+    fs.rmSync(sessionsDir, { recursive: true, force: true });
+  }
+});
+
+test("SessionStore.cleanup preserves active sessions", () => {
+  const sessionsDir = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-cleanupact-"));
+
+  try {
+    const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-ws13-"));
+    const store = new SessionStore(sessionsDir);
+
+    const session = store.create(ws, "still active");
+    const loaded = store.get(session.id)!;
+    loaded.updatedAt = new Date(Date.now() - 100 * 24 * 60 * 60 * 1000).toISOString();
+    fs.writeFileSync(path.join(sessionsDir, `${session.id}.json`), JSON.stringify(loaded), "utf8");
+
+    const removed = store.cleanup(1);
+    assert.equal(removed, 0);
+    assert.ok(store.get(session.id));
+  } finally {
+    fs.rmSync(sessionsDir, { recursive: true, force: true });
+  }
+});
+
+test("SessionStore.cleanup caps olderThanDays at 365", () => {
+  const sessionsDir = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-cleanupcap-"));
+
+  try {
+    const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-ws14-"));
+    const store = new SessionStore(sessionsDir);
+
+    const session = store.create(ws, "very old");
+    store.complete(session.id, "done");
+    const loaded = store.get(session.id)!;
+    // 400 days ago — older than 365 cap
+    loaded.updatedAt = new Date(Date.now() - 400 * 24 * 60 * 60 * 1000).toISOString();
+    fs.writeFileSync(path.join(sessionsDir, `${session.id}.json`), JSON.stringify(loaded), "utf8");
+
+    const removed = store.cleanup(500);
+    assert.equal(removed, 1, "should remove because cap is 365 and session is 400 days old");
+  } finally {
+    fs.rmSync(sessionsDir, { recursive: true, force: true });
+  }
+});
+
+test("SessionStore.cleanup with olderThanDays 0 is handled gracefully", () => {
+  const store = new SessionStore();
+  // With 0 days, cutoff is Date.now() so all non-active sessions are removed
+  // But cleanup itself just calls with the number — the bridge validates
+  const removed = store.cleanup(0);
+  assert.equal(removed, 0);
 });
