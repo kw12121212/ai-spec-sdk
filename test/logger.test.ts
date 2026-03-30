@@ -1,4 +1,7 @@
 import { describe, it, expect } from "bun:test";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { Logger, VALID_LOG_LEVELS } from "../src/logger.js";
 
 function capture(): { lines: string[]; output: (line: string) => void } {
@@ -89,5 +92,33 @@ describe("Logger", () => {
   it("defaults to info level when constructed without arguments", () => {
     const log = new Logger(undefined, {}, () => {});
     expect(log.getLevel()).toBe("info");
+  });
+
+  it("writes to file when logFile is set", async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "logger-file-"));
+    const logPath = path.join(tmpDir, "test.log");
+    try {
+      const log = new Logger("debug", {}, undefined, logPath);
+      log.info("file test", { key: "value" });
+
+      // Wait for write stream to flush
+      await new Promise((r) => setTimeout(r, 50));
+
+      const content = fs.readFileSync(logPath, "utf8").trim();
+      expect(content.length).toBeGreaterThan(0);
+      const parsed = JSON.parse(content);
+      expect(parsed.message).toBe("file test");
+      expect(parsed.key).toBe("value");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("does not create file when logFile is not set", () => {
+    const { lines, output } = capture();
+    const log = new Logger("debug", {}, output);
+    log.info("no file");
+
+    expect(lines.length).toBe(1);
   });
 });

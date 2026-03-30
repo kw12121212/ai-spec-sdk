@@ -1,3 +1,5 @@
+import fs from "node:fs";
+
 export type LogLevel = "trace" | "debug" | "info" | "warn" | "error";
 
 const LEVEL_ORDER: Record<LogLevel, number> = {
@@ -19,6 +21,17 @@ function parseLevel(raw: string | undefined): LogLevel {
 
 export type LogBindings = Record<string, unknown>;
 
+function makeOutput(logFile?: string): (line: string) => void {
+  if (!logFile) {
+    return (line: string) => { process.stderr.write(line + "\n"); };
+  }
+  const stream = fs.createWriteStream(logFile, { flags: "a" });
+  return (line: string) => {
+    process.stderr.write(line + "\n");
+    stream.write(line + "\n");
+  };
+}
+
 export class Logger {
   private level: LogLevel;
   private bindings: LogBindings;
@@ -28,10 +41,12 @@ export class Logger {
     level?: LogLevel,
     bindings?: LogBindings,
     output?: (line: string) => void,
+    logFile?: string,
   ) {
     this.level = level ?? parseLevel(process.env["AI_SPEC_SDK_LOG_LEVEL"]);
     this.bindings = bindings ?? {};
-    this.output = output ?? ((line: string) => { process.stderr.write(line + "\n"); });
+    const file = logFile ?? process.env["AI_SPEC_SDK_LOG_FILE"];
+    this.output = output ?? makeOutput(file || undefined);
   }
 
   child(bindings: LogBindings): Logger {
@@ -85,4 +100,4 @@ export class Logger {
   }
 }
 
-export const defaultLogger = new Logger();
+export const defaultLogger = new Logger(undefined, undefined, undefined, process.env["AI_SPEC_SDK_LOG_FILE"]);

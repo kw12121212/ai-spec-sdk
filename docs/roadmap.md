@@ -4,7 +4,7 @@
 
 | # | Direction | Priority | Depends On |
 |---|-----------|----------|------------|
-| 1 | Structured Logging | P0 | — |
+| 1 | ✅ Structured Logging | P0 | — |
 | 2 | API Versioning | P0 | Structured Logging |
 | 3 | Session Persistence | P0 | Structured Logging |
 | 4 | HTTP/SSE Transport | P1 | API Versioning |
@@ -60,12 +60,12 @@ Replace console.log / scattered error handling with a unified, structured loggin
 - `specs/observability/structured-logging.md`
 
 ### Tasks
-1. Create `src/logger.ts` with level filtering, JSON formatting, stderr output
-2. Integrate into `bridge.ts` dispatch (method call, duration, error)
-3. Integrate into `session-store.ts`, `claude-agent-runner.ts`, `mcp-store.ts`, `workflow.ts`
-4. Add `bridge.setLogLevel` JSON-RPC method
-5. Update tests: verify log output format and level filtering
-6. Add `AI_SPEC_SDK_LOG_LEVEL` env var support
+1. [x] Create `src/logger.ts` with level filtering, JSON formatting, stderr output
+2. [x] Integrate into `bridge.ts` dispatch (method call, duration, error)
+3. [x] Integrate into `session-store.ts`, `claude-agent-runner.ts`, `mcp-store.ts`, `workflow.ts`
+4. [x] Add `bridge.setLogLevel` JSON-RPC method
+5. [x] Update tests: verify log output format and level filtering
+6. [x] Add `AI_SPEC_SDK_LOG_LEVEL` env var support
 
 ---
 
@@ -334,9 +334,9 @@ Dependencies (minimal):
 ## Implementation Timeline
 
 ```
-Phase 1 (v0.2.0): Java CLI Demo + Structured Logging + API Versioning
+Phase 1 (v0.2.0): Java CLI Demo + ✅ Structured Logging + API Versioning
   ├── Java CLI Demo: independent, can ship immediately
-  ├── Logging: foundation, all modules get log instrumentation
+  ├── ✅ Logging: foundation, all modules get log instrumentation
   └── Versioning: bridge.capabilities + negotiateVersion
 
 Phase 2 (v0.3.0): Session Persistence
@@ -357,7 +357,7 @@ Phases 2 and 3 can overlap — persistence and HTTP transport are independent on
 
 | Version | Includes | Breaking Changes |
 |---------|----------|-----------------|
-| v0.2.0 | Java CLI Demo, Structured Logging, API Versioning | None (additive) |
+| v0.2.0 | Java CLI Demo, ✅ Structured Logging, API Versioning | None (additive) |
 | v0.3.0 | Session Persistence | `SessionStore` internal refactor (no API break) |
 | v0.4.0 | HTTP/SSE Transport | None (new transport, stdio unchanged) |
 | v0.5.0 | Auth | HTTP requests now require Bearer token by default |
