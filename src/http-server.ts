@@ -3,6 +3,8 @@ import { URL } from "node:url";
 import { BridgeServer } from "./bridge.js";
 import { BridgeError } from "./errors.js";
 import { API_VERSION } from "./capabilities.js";
+import { loadKeys } from "./key-store.js";
+import { verifyKey, checkScope, METHOD_SCOPES } from "./auth.js";
 
 const MAX_BODY_BYTES = 10 * 1024 * 1024; // 10 MB
 
@@ -67,6 +69,8 @@ export interface HttpServerOptions {
   port?: number;
   sessionsDir?: string;
   workspacesDir?: string;
+  noAuth?: boolean;
+  keysFile?: string;
 }
 
 export interface HttpServerHandle {
@@ -80,7 +84,7 @@ export interface HttpServerHandle {
  * the actual bound port (useful when port 0 is passed for a random port).
  */
 export function startHttpServer(options: HttpServerOptions = {}): Promise<HttpServerHandle> {
-  const { port = 8765, sessionsDir, workspacesDir } = options;
+  const { port = 8765, sessionsDir, workspacesDir, noAuth = false, keysFile } = options;
   const corsOrigins = process.env["AI_SPEC_SDK_CORS_ORIGINS"] ?? "*";
 
   const sseManager = new SseManager();
@@ -133,6 +137,41 @@ export function startHttpServer(options: HttpServerOptions = {}): Promise<HttpSe
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ jsonrpc: "2.0", id: null, error: { code: -32700, message: "Parse error" } }));
           return;
+        }
+
+        // Auth check
+        if (!noAuth) {
+          const method =
+            payload !== null && typeof payload === "object"
+              ? ((payload as Record<string, unknown>)["method"] as string | undefined) ?? ""
+              : "";
+          const id =
+            payload !== null && typeof payload === "object" && "id" in (payload as object)
+              ? (payload as Record<string, unknown>)["id"]
+              : null;
+
+          const requiredScope = method in METHOD_SCOPES ? METHOD_SCOPES[method] : "admin";
+          if (requiredScope !== null) {
+            const authHeader = req.headers["authorization"];
+            if (!authHeader || !authHeader.startsWith("Bearer ")) {
+              res.writeHead(200, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ jsonrpc: "2.0", id, error: { code: -32061, message: "Authentication required" } }));
+              return;
+            }
+            const token = authHeader.slice(7);
+            const keys = loadKeys(keysFile);
+            const key = verifyKey(token, keys);
+            if (!key) {
+              res.writeHead(200, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ jsonrpc: "2.0", id, error: { code: -32061, message: "Invalid or expired API key" } }));
+              return;
+            }
+            if (!checkScope(key, method)) {
+              res.writeHead(200, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ jsonrpc: "2.0", id, error: { code: -32060, message: `Insufficient scope: requires ${requiredScope}` } }));
+              return;
+            }
+          }
         }
 
         let response: unknown;
@@ -195,7 +234,7 @@ export function startHttpServer(options: HttpServerOptions = {}): Promise<HttpSe
       return;
     }
 
-    // GET /health
+    // GET /health — always unauthenticated
     if (req.method === "GET" && pathname === "/health") {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ status: "ok", apiVersion: API_VERSION }));

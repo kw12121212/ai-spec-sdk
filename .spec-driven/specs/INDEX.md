@@ -10,3 +10,4 @@
 - `skills/builtin-spec-skills.md` — Built-in spec-driven skill discovery and workflow-to-skill alignment
 - `workflow/spec-driven-workflows.md` — Workflow invocation, result reporting, capability mapping, workspace-scoped safety, and Go CLI workflow execution example
 - `observability/structured-logging.md` — Structured JSON logging to stderr with level filtering, child context propagation, and AI_SPEC_SDK_LOG_LEVEL env var
+- `security/authentication.md` — HTTP transport API-key authentication, scope-based authorization, public unauthenticated discovery methods, key management CLI, and no-auth development mode

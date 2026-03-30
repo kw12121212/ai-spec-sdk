@@ -7,7 +7,7 @@
 | 1 | ✅ Structured Logging | P0 | — |
 | 2 | ✅ API Versioning | P0 | Structured Logging |
 | 3 | ✅ Session Persistence | P0 | Structured Logging |
-| 4 | HTTP/SSE Transport | P1 | API Versioning |
+| 4 | ✅ HTTP/SSE Transport | P1 | API Versioning |
 | 5 | Authentication & Authorization | P1 | HTTP/SSE Transport |
 | 6 | Java CLI Demo | P0 | — |
 
@@ -342,7 +342,7 @@ Phase 1 (v0.2.0): Java CLI Demo + ✅ Structured Logging + API Versioning
 Phase 2 (v0.3.0): ✅ Session Persistence
   └── File-based storage, crash recovery, cleanup
 
-Phase 3 (v0.4.0): HTTP/SSE Transport
+Phase 3 (v0.4.0): ✅ HTTP/SSE Transport
   └── POST /rpc + GET /events + health check
 
 Phase 4 (v0.5.0): Authentication & Authorization
@@ -359,6 +359,6 @@ Phases 2 and 3 can overlap — persistence and HTTP transport are independent on
 |---------|----------|-----------------|
 | v0.2.0 | Java CLI Demo, ✅ Structured Logging, API Versioning | None (additive) |
 | v0.3.0 | ✅ Session Persistence | `SessionStore` internal refactor (no API break) |
-| v0.4.0 | HTTP/SSE Transport | None (new transport, stdio unchanged) |
+| v0.4.0 | ✅ HTTP/SSE Transport | None (new transport, stdio unchanged) |
 | v0.5.0 | Auth | HTTP requests now require Bearer token by default |
 | v1.0.0 | All above stabilized | First stability guarantee |

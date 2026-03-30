@@ -6,6 +6,9 @@ import path from "node:path";
 import os from "node:os";
 import { startHttpServer } from "../src/http-server.js";
 import { API_VERSION } from "../src/capabilities.js";
+import { addKey } from "../src/key-store.js";
+import { generateKey } from "../src/auth.js";
+import type { StoredKey } from "../src/key-store.js";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -119,10 +122,10 @@ function queryStub() {
   };
 }
 
-// ── tests ─────────────────────────────────────────────────────────────────────
+// ── existing transport tests (noAuth: true) ───────────────────────────────────
 
 test("POST /rpc happy path: bridge.ping returns pong", async () => {
-  const { shutdown, port } = await startHttpServer({ port: 0 });
+  const { shutdown, port } = await startHttpServer({ port: 0, noAuth: true });
   try {
     const { status, body } = await rpc(port, { jsonrpc: "2.0", id: 1, method: "bridge.ping" });
     assert.equal(status, 200);
@@ -135,7 +138,7 @@ test("POST /rpc happy path: bridge.ping returns pong", async () => {
 });
 
 test("POST /rpc: bridge.capabilities includes transport: http", async () => {
-  const { shutdown, port } = await startHttpServer({ port: 0 });
+  const { shutdown, port } = await startHttpServer({ port: 0, noAuth: true });
   try {
     const { status, body } = await rpc(port, {
       jsonrpc: "2.0",
@@ -151,7 +154,7 @@ test("POST /rpc: bridge.capabilities includes transport: http", async () => {
 });
 
 test("POST /rpc: wrong Content-Type returns 415", async () => {
-  const { shutdown, port } = await startHttpServer({ port: 0 });
+  const { shutdown, port } = await startHttpServer({ port: 0, noAuth: true });
   try {
     const { status } = await rpc(
       port,
@@ -165,7 +168,7 @@ test("POST /rpc: wrong Content-Type returns 415", async () => {
 });
 
 test("POST /rpc: invalid JSON returns parse error", async () => {
-  const { shutdown, port } = await startHttpServer({ port: 0 });
+  const { shutdown, port } = await startHttpServer({ port: 0, noAuth: true });
   try {
     const { status, body } = await new Promise<{ status: number; body: unknown }>(
       (resolve, reject) => {
@@ -205,7 +208,7 @@ test("POST /rpc: invalid JSON returns parse error", async () => {
 });
 
 test("POST /rpc: body exceeding 10 MB returns 413", async () => {
-  const { shutdown, port } = await startHttpServer({ port: 0 });
+  const { shutdown, port } = await startHttpServer({ port: 0, noAuth: true });
   try {
     const { status } = await new Promise<{ status: number; body: unknown }>(
       (resolve, reject) => {
@@ -241,7 +244,7 @@ test("POST /rpc: body exceeding 10 MB returns 413", async () => {
 });
 
 test("GET /health returns { status: ok, apiVersion }", async () => {
-  const { shutdown, port } = await startHttpServer({ port: 0 });
+  const { shutdown, port } = await startHttpServer({ port: 0, noAuth: true });
   try {
     const { status, body } = await httpGet(port, "/health");
     assert.equal(status, 200);
@@ -254,7 +257,7 @@ test("GET /health returns { status: ok, apiVersion }", async () => {
 });
 
 test("GET /health includes CORS header", async () => {
-  const { shutdown, port } = await startHttpServer({ port: 0 });
+  const { shutdown, port } = await startHttpServer({ port: 0, noAuth: true });
   try {
     const { headers } = await httpGet(port, "/health");
     assert.ok(
@@ -267,7 +270,7 @@ test("GET /health includes CORS header", async () => {
 });
 
 test("GET /events without sessionId returns 400", async () => {
-  const { shutdown, port } = await startHttpServer({ port: 0 });
+  const { shutdown, port } = await startHttpServer({ port: 0, noAuth: true });
   try {
     const { status } = await httpGet(port, "/events");
     assert.equal(status, 400);
@@ -279,7 +282,7 @@ test("GET /events without sessionId returns 400", async () => {
 test("SSE fan-out: two subscribers receive the same session-scoped notification", async () => {
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-http-"));
   globalThis.__AI_SPEC_SDK_QUERY__ = queryStub();
-  const { shutdown, port } = await startHttpServer({ port: 0 });
+  const { shutdown, port } = await startHttpServer({ port: 0, noAuth: true });
   try {
     // First start a session to obtain a real sessionId
     const startRes = await rpc(port, {
@@ -328,7 +331,7 @@ test("SSE fan-out: two subscribers receive the same session-scoped notification"
 });
 
 test("SSE: notification without sessionId is not delivered to any subscriber", async () => {
-  const { shutdown, port } = await startHttpServer({ port: 0 });
+  const { shutdown, port } = await startHttpServer({ port: 0, noAuth: true });
   try {
     const sub = sseCollect(port, "no-notification-session");
     await new Promise((r) => setTimeout(r, 50));
@@ -355,7 +358,7 @@ test("graceful shutdown: in-flight POST /rpc completes before SSE connections ar
     yield { result: "done" };
   };
 
-  const { shutdown, port } = await startHttpServer({ port: 0 });
+  const { shutdown, port } = await startHttpServer({ port: 0, noAuth: true });
   let didShutdown = false;
   try {
     // Start a long-running RPC request
@@ -382,5 +385,175 @@ test("graceful shutdown: in-flight POST /rpc completes before SSE connections ar
     delete globalThis.__AI_SPEC_SDK_QUERY__;
     if (!didShutdown) await shutdown();
     fs.rmSync(workspace, { recursive: true, force: true });
+  }
+});
+
+// ── auth middleware tests ─────────────────────────────────────────────────────
+
+function makeTempKeysFile(): { keysFile: string; cleanup: () => void } {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-keys-"));
+  const keysFile = path.join(dir, "keys.json");
+  return { keysFile, cleanup: () => fs.rmSync(dir, { recursive: true, force: true }) };
+}
+
+function makeKey(scopes: string[], keysFile: string): { token: string; key: StoredKey } {
+  const { token, hash } = generateKey();
+  const key: StoredKey = {
+    id: `test-${Math.random()}`,
+    name: "test",
+    hash,
+    createdAt: new Date().toISOString(),
+    scopes,
+  };
+  addKey(key, keysFile);
+  return { token, key };
+}
+
+test("auth: unauthenticated POST /rpc to authenticated method returns -32061", async () => {
+  const { keysFile, cleanup } = makeTempKeysFile();
+  const { shutdown, port } = await startHttpServer({ port: 0, keysFile });
+  try {
+    const { status, body } = await rpc(port, { jsonrpc: "2.0", id: 1, method: "session.list" });
+    assert.equal(status, 200);
+    const error = (body as Record<string, unknown>)["error"] as Record<string, unknown>;
+    assert.equal(error["code"], -32061);
+  } finally {
+    await shutdown();
+    cleanup();
+  }
+});
+
+test("auth: invalid bearer token returns -32061", async () => {
+  const { keysFile, cleanup } = makeTempKeysFile();
+  const { shutdown, port } = await startHttpServer({ port: 0, keysFile });
+  try {
+    const { body } = await rpc(
+      port,
+      { jsonrpc: "2.0", id: 1, method: "session.list" },
+      { Authorization: "Bearer invalidtoken" },
+    );
+    const error = (body as Record<string, unknown>)["error"] as Record<string, unknown>;
+    assert.equal(error["code"], -32061);
+  } finally {
+    await shutdown();
+    cleanup();
+  }
+});
+
+test("auth: valid key with correct scope dispatches the request", async () => {
+  const { keysFile, cleanup } = makeTempKeysFile();
+  const { token } = makeKey(["session:read"], keysFile);
+  const { shutdown, port } = await startHttpServer({ port: 0, keysFile });
+  try {
+    const { status, body } = await rpc(
+      port,
+      { jsonrpc: "2.0", id: 1, method: "session.list" },
+      { Authorization: `Bearer ${token}` },
+    );
+    assert.equal(status, 200);
+    assert.ok("result" in (body as Record<string, unknown>), "expected result, got error");
+  } finally {
+    await shutdown();
+    cleanup();
+  }
+});
+
+test("auth: valid key with insufficient scope returns -32060", async () => {
+  const { keysFile, cleanup } = makeTempKeysFile();
+  const { token } = makeKey(["session:read"], keysFile);
+  const { shutdown, port } = await startHttpServer({ port: 0, keysFile });
+  try {
+    const { body } = await rpc(
+      port,
+      { jsonrpc: "2.0", id: 1, method: "session.start", params: { workspace: "/tmp", prompt: "x" } },
+      { Authorization: `Bearer ${token}` },
+    );
+    const error = (body as Record<string, unknown>)["error"] as Record<string, unknown>;
+    assert.equal(error["code"], -32060);
+  } finally {
+    await shutdown();
+    cleanup();
+  }
+});
+
+test("auth: admin key passes all scope checks", async () => {
+  const { keysFile, cleanup } = makeTempKeysFile();
+  const { token } = makeKey(["admin"], keysFile);
+  const { shutdown, port } = await startHttpServer({ port: 0, keysFile });
+  try {
+    const { body } = await rpc(
+      port,
+      { jsonrpc: "2.0", id: 1, method: "session.list" },
+      { Authorization: `Bearer ${token}` },
+    );
+    assert.ok("result" in (body as Record<string, unknown>), "admin key should pass all checks");
+  } finally {
+    await shutdown();
+    cleanup();
+  }
+});
+
+test("auth: bridge.capabilities requires no key even with auth enabled", async () => {
+  const { keysFile, cleanup } = makeTempKeysFile();
+  const { shutdown, port } = await startHttpServer({ port: 0, keysFile });
+  try {
+    const { status, body } = await rpc(port, { jsonrpc: "2.0", id: 1, method: "bridge.capabilities" });
+    assert.equal(status, 200);
+    assert.ok("result" in (body as Record<string, unknown>));
+  } finally {
+    await shutdown();
+    cleanup();
+  }
+});
+
+test("auth: --no-auth mode dispatches all requests without credentials", async () => {
+  const { shutdown, port } = await startHttpServer({ port: 0, noAuth: true });
+  try {
+    const { status, body } = await rpc(port, { jsonrpc: "2.0", id: 1, method: "session.list" });
+    assert.equal(status, 200);
+    assert.ok("result" in (body as Record<string, unknown>));
+  } finally {
+    await shutdown();
+  }
+});
+
+test("auth: GET /health is always unauthenticated", async () => {
+  const { keysFile, cleanup } = makeTempKeysFile();
+  const { shutdown, port } = await startHttpServer({ port: 0, keysFile });
+  try {
+    const { status, body } = await httpGet(port, "/health");
+    assert.equal(status, 200);
+    assert.equal((body as Record<string, unknown>)["status"], "ok");
+  } finally {
+    await shutdown();
+    cleanup();
+  }
+});
+
+test("auth: expired key returns -32061", async () => {
+  const { keysFile, cleanup } = makeTempKeysFile();
+  const { token, hash } = generateKey();
+  const expiredKey: StoredKey = {
+    id: "expired-key",
+    name: "expired",
+    hash,
+    createdAt: new Date(Date.now() - 10000).toISOString(),
+    expiresAt: new Date(Date.now() - 5000).toISOString(), // expired 5s ago
+    scopes: ["session:read"],
+  };
+  addKey(expiredKey, keysFile);
+
+  const { shutdown, port } = await startHttpServer({ port: 0, keysFile });
+  try {
+    const { body } = await rpc(
+      port,
+      { jsonrpc: "2.0", id: 1, method: "session.list" },
+      { Authorization: `Bearer ${token}` },
+    );
+    const error = (body as Record<string, unknown>)["error"] as Record<string, unknown>;
+    assert.equal(error["code"], -32061);
+  } finally {
+    await shutdown();
+    cleanup();
   }
 });
