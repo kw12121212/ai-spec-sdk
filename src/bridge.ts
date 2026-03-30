@@ -210,6 +210,7 @@ export interface BridgeServerOptions {
   sessionsDir?: string;
   workspacesDir?: string;
   logger?: Logger;
+  transport?: string;
 }
 
 interface AgentQueryContext {
@@ -225,6 +226,7 @@ interface PendingApproval {
 export class BridgeServer {
   private notify: (message: unknown) => void;
   private logger: Logger;
+  private transport: string;
   private sessionStore: SessionStore;
   private workspaceStore: WorkspaceStore;
   private mcpStore: McpStore;
@@ -235,9 +237,10 @@ export class BridgeServer {
   private eventSeq: Map<string, number>;
   private pendingApprovals: Map<string, PendingApproval>;
 
-  constructor({ notify = () => {}, sessionsDir, workspacesDir, logger }: BridgeServerOptions = {}) {
+  constructor({ notify = () => {}, sessionsDir, workspacesDir, logger, transport = "stdio" }: BridgeServerOptions = {}) {
     this.notify = notify;
     this.logger = logger ?? defaultLogger;
+    this.transport = transport;
     this.sessionStore = new SessionStore(sessionsDir);
     this.workspaceStore = new WorkspaceStore(workspacesDir);
     this.mcpStore = new McpStore((method, params) => {
@@ -352,7 +355,7 @@ export class BridgeServer {
 
     switch (method) {
       case "bridge.capabilities":
-        return getCapabilities();
+        return getCapabilities(this.transport);
       case "bridge.negotiateVersion":
         return this.negotiateVersion(params);
       case "bridge.setLogLevel":

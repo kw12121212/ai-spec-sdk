@@ -1,5 +1,5 @@
 # Bridge Contract
-# ai-spec-sdk JSON-RPC 2.0 over stdio
+# ai-spec-sdk JSON-RPC 2.0
 #
 # This file is the authoritative integration reference.
 # Every field, type, enum value, and error code is derived directly from source.
@@ -11,35 +11,88 @@
 #   enum: exhaustive list of valid values
 
 # ---------------------------------------------------------------------------
-# Transport
+# Transport modes
 # ---------------------------------------------------------------------------
 transport:
-  protocol: jsonrpc-2.0
-  medium: stdio
-  framing: one JSON object per line (newline-delimited, no pretty-printing)
-  encoding: UTF-8
-  direction:
-    client_to_bridge: one request object per line on stdin
-    bridge_to_client: one response or notification object per line on stdout
-  notes:
-    - The bridge process is started as a subprocess by the host tool.
-    - The bridge never writes to stderr for protocol messages; stderr is reserved for
-      unexpected runtime errors only.
-    - Notifications are emitted on stdout interleaved with responses; the client MUST
-      distinguish them by the presence of "method" (notification) vs "result"/"error"
-      (response).
+
+  stdio:
+    protocol: jsonrpc-2.0
+    medium: stdio
+    framing: one JSON object per line (newline-delimited, no pretty-printing)
+    encoding: UTF-8
+    direction:
+      client_to_bridge: one request object per line on stdin
+      bridge_to_client: one response or notification object per line on stdout
+    notes:
+      - The bridge process is started as a subprocess by the host tool.
+      - The bridge never writes to stderr for protocol messages; stderr is reserved for
+        unexpected runtime errors only.
+      - Notifications are emitted on stdout interleaved with responses; the client MUST
+        distinguish them by the presence of "method" (notification) vs "result"/"error"
+        (response).
+
+  http:
+    protocol: jsonrpc-2.0
+    medium: HTTP/1.1
+    encoding: UTF-8
+    endpoints:
+      POST /rpc:
+        description: Send a JSON-RPC 2.0 request; receive a JSON-RPC 2.0 response.
+        content_type: application/json (required)
+        body_limit: 10 MB
+        response_status:
+          200: JSON-RPC response (result or error)
+          413: request body exceeded 10 MB
+          415: Content-Type was not application/json
+      GET /events:
+        description: SSE stream of bridge notifications scoped to one session.
+        query_params:
+          sessionId: required; only notifications for this session are emitted
+        content_type: text/event-stream
+        notes:
+          - Multiple clients may subscribe to the same sessionId (fan-out).
+          - Notifications that do not carry a sessionId are never emitted on any SSE stream.
+          - A `: connected` comment is sent immediately on connection.
+          - Heartbeat comments (`: heartbeat`) are sent every 30 seconds.
+          - Response status 400 if sessionId query param is absent.
+      GET /health:
+        description: Health check; no authentication required.
+        response: '{ "status": "ok", "apiVersion": "<semver>" }'
+    cors:
+      header: Access-Control-Allow-Origin
+      default: "*"
+      configurable_via: AI_SPEC_SDK_CORS_ORIGINS env var
+    graceful_shutdown:
+      trigger: SIGTERM
+      sequence:
+        1: stop accepting new connections
+        2: wait for all in-flight POST /rpc requests to complete
+        3: close all SSE connections
+        4: exit
 
 # ---------------------------------------------------------------------------
 # Process startup
 # ---------------------------------------------------------------------------
 startup:
-  binary: node dist/src/cli.js
-  bin_alias: ai-spec-bridge   # available after "bun run build" and install
-  stdin: line-buffered JSON-RPC requests
-  stdout: line-buffered JSON-RPC responses and notifications
-  exit_code:
-    0: normal shutdown (stdin closed)
-    non-zero: unexpected runtime crash
+
+  stdio_mode:
+    binary: node dist/src/cli.js
+    bin_alias: ai-spec-bridge   # available after "bun run build" and install
+    stdin: line-buffered JSON-RPC requests
+    stdout: line-buffered JSON-RPC responses and notifications
+    exit_code:
+      0: normal shutdown (stdin closed)
+      non-zero: unexpected runtime crash
+
+  http_mode:
+    command: ai-spec-bridge --transport http --port 8765
+    env_vars:
+      AI_SPEC_SDK_TRANSPORT: set to "http" to start in HTTP mode
+      AI_SPEC_SDK_PORT: override the default port (8765)
+      AI_SPEC_SDK_CORS_ORIGINS: allowed CORS origins (default "*")
+    exit_code:
+      0: normal shutdown after SIGTERM drain
+      non-zero: unexpected runtime crash
 
 # ---------------------------------------------------------------------------
 # Envelope shapes
@@ -226,7 +279,8 @@ methods:
         value: "jsonrpc-2.0"
       transport:
         type: string
-        value: "stdio"
+        enum: ["stdio", "http"]
+        notes: Reflects the active transport mode. "stdio" for subprocess mode, "http" for HTTP/SSE mode.
       bridgeVersion:
         type: string
         example: "0.2.0"

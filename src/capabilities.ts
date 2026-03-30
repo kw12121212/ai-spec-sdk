@@ -104,10 +104,10 @@ export interface Capabilities {
   hookEvents: readonly string[];
 }
 
-export function getCapabilities(): Capabilities {
+export function getCapabilities(transport = "stdio"): Capabilities {
   return {
     protocol: "jsonrpc-2.0",
-    transport: "stdio",
+    transport,
     bridgeVersion: BRIDGE_VERSION,
     apiVersion: API_VERSION,
     notifications: {

@@ -4,6 +4,7 @@ import path from "node:path";
 import os from "node:os";
 import { BridgeServer } from "./bridge.js";
 import { BridgeError } from "./errors.js";
+import { startHttpServer } from "./http-server.js";
 
 function writeMessage(message: unknown): void {
   process.stdout.write(`${JSON.stringify(message)}\n`);
@@ -11,57 +12,75 @@ function writeMessage(message: unknown): void {
 
 const sessionsDir = path.join(os.homedir(), ".ai-spec-sdk", "sessions");
 
-const server = new BridgeServer({
-  notify: (message) => writeMessage(message),
-  sessionsDir,
-});
+// Parse transport mode and port from flags or env vars
+function getArg(flag: string): string | undefined {
+  const idx = process.argv.indexOf(flag);
+  return idx !== -1 ? process.argv[idx + 1] : undefined;
+}
 
-const rl = readline.createInterface({
-  input: process.stdin,
-  crlfDelay: Infinity,
-});
+const transport = getArg("--transport") ?? process.env["AI_SPEC_SDK_TRANSPORT"] ?? "stdio";
+const portRaw = getArg("--port") ?? process.env["AI_SPEC_SDK_PORT"];
+const port = portRaw !== undefined ? parseInt(portRaw, 10) : 8765;
 
-rl.on("line", async (line: string) => {
-  const trimmed = line.trim();
-  if (!trimmed) {
-    return;
-  }
+if (transport === "http") {
+  const { shutdown } = await startHttpServer({ port, sessionsDir });
+  process.on("SIGTERM", async () => {
+    await shutdown();
+    process.exit(0);
+  });
+} else {
+  const server = new BridgeServer({
+    notify: (message) => writeMessage(message),
+    sessionsDir,
+  });
 
-  let payload: unknown;
-  try {
-    payload = JSON.parse(trimmed) as unknown;
-  } catch {
-    writeMessage({
-      jsonrpc: "2.0",
-      id: null,
-      error: {
-        code: -32700,
-        message: "Parse error",
-      },
-    });
-    return;
-  }
+  const rl = readline.createInterface({
+    input: process.stdin,
+    crlfDelay: Infinity,
+  });
 
-  try {
-    const response = await server.handleMessage(payload);
-    writeMessage(response);
-  } catch (error) {
-    const bridgeError =
-      error instanceof BridgeError
-        ? error
-        : new BridgeError(-32603, "Internal bridge error", {
-            message: error instanceof Error ? error.message : String(error),
-          });
+  rl.on("line", async (line: string) => {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      return;
+    }
 
-    writeMessage({
-      jsonrpc: "2.0",
-      id:
-        payload !== null &&
-        typeof payload === "object" &&
-        Object.prototype.hasOwnProperty.call(payload, "id")
-          ? (payload as Record<string, unknown>)["id"]
-          : null,
-      error: bridgeError.toJsonRpcError(),
-    });
-  }
-});
+    let payload: unknown;
+    try {
+      payload = JSON.parse(trimmed) as unknown;
+    } catch {
+      writeMessage({
+        jsonrpc: "2.0",
+        id: null,
+        error: {
+          code: -32700,
+          message: "Parse error",
+        },
+      });
+      return;
+    }
+
+    try {
+      const response = await server.handleMessage(payload);
+      writeMessage(response);
+    } catch (error) {
+      const bridgeError =
+        error instanceof BridgeError
+          ? error
+          : new BridgeError(-32603, "Internal bridge error", {
+              message: error instanceof Error ? error.message : String(error),
+            });
+
+      writeMessage({
+        jsonrpc: "2.0",
+        id:
+          payload !== null &&
+          typeof payload === "object" &&
+          Object.prototype.hasOwnProperty.call(payload, "id")
+            ? (payload as Record<string, unknown>)["id"]
+            : null,
+        error: bridgeError.toJsonRpcError(),
+      });
+    }
+  });
+}
