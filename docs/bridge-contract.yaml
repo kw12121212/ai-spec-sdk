@@ -64,6 +64,10 @@ envelope:
         type: object
         required: false
         notes: Omit or pass {} when a method takes no parameters.
+               An optional `apiVersion` field (string) MAY be included to
+               opt in to per-request version validation. If present and not
+               matching the bridge's API version, the request is rejected
+               with error code -32050.
 
   response:
     fields:
@@ -197,6 +201,15 @@ error_codes:
     data:
       hint:
         type: string
+  -32050:
+    name: VersionMismatch
+    message: "Unsupported API version: <version>" | "No compatible API version found"
+    cause: Client requested an API version that does not match the bridge's current version.
+    data:
+      supportedVersions:
+        type: array
+        items: string
+        notes: Array containing the bridge's current API version string.
 
 # ---------------------------------------------------------------------------
 # Methods
@@ -216,7 +229,11 @@ methods:
         value: "stdio"
       bridgeVersion:
         type: string
-        example: "0.1.0"
+        example: "0.2.0"
+      apiVersion:
+        type: string
+        example: "0.2.0"
+        notes: Current API version for version negotiation. Semver string.
       notifications:
         type: object
         fields:
@@ -270,6 +287,7 @@ methods:
         items: string
         value:
           - bridge.capabilities
+          - bridge.negotiateVersion
           - workflow.run
           - skills.list
           - session.start
@@ -277,6 +295,29 @@ methods:
           - session.stop
           - session.status
     errors: none
+
+  # -------------------------------------------------------------------------
+  bridge.negotiateVersion:
+    description: >
+      Allows clients to declare their supported API versions and receive
+      the negotiated result. Returns the full capabilities object on match.
+      This is the recommended first call for new clients to verify compatibility.
+    params:
+      supportedVersions:
+        type: array
+        items: string
+        required: true
+        notes: Non-empty array of semver version strings the client supports.
+    result:
+      negotiatedVersion:
+        type: string
+        notes: The matched version string from the client's list.
+      capabilities:
+        type: object
+        notes: Full capabilities object (same shape as bridge.capabilities result).
+    errors:
+      - -32602  # supportedVersions missing, empty, or contains non-strings
+      - -32050  # no compatible version found
 
   # -------------------------------------------------------------------------
   skills.list:

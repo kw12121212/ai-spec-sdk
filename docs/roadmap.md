@@ -5,7 +5,7 @@
 | # | Direction | Priority | Depends On |
 |---|-----------|----------|------------|
 | 1 | ✅ Structured Logging | P0 | — |
-| 2 | API Versioning | P0 | Structured Logging |
+| 2 | ✅ API Versioning | P0 | Structured Logging |
 | 3 | Session Persistence | P0 | Structured Logging |
 | 4 | HTTP/SSE Transport | P1 | API Versioning |
 | 5 | Authentication & Authorization | P1 | HTTP/SSE Transport |
@@ -98,13 +98,13 @@ Add explicit API version negotiation so clients can declare which version they t
 - `specs/bridge/api-versioning.md` (delta on `bridge/json-rpc-stdio.md`)
 
 ### Tasks
-1. Add `API_VERSION` constant to `src/capabilities.ts`
-2. Add `apiVersion` to `bridge.capabilities` response
-3. Implement `bridge.negotiateVersion` method
-4. Add version validation in `dispatch()` when `apiVersion` is present in params
-5. Define error code `-32050` for version mismatch
-6. Update tests
-7. Update `docs/bridge-contract.yaml`
+1. [x] Add `API_VERSION` constant to `src/capabilities.ts`
+2. [x] Add `apiVersion` to `bridge.capabilities` response
+3. [x] Implement `bridge.negotiateVersion` method
+4. [x] Add version validation in `dispatch()` when `apiVersion` is present in params
+5. [x] Define error code `-32050` for version mismatch
+6. [x] Update tests
+7. [x] Update `docs/bridge-contract.yaml`
 
 ---
 

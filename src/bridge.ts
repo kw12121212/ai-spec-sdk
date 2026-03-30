@@ -2,7 +2,7 @@ import path from "node:path";
 import fs from "node:fs";
 import type { PermissionResult } from "@anthropic-ai/claude-agent-sdk";
 import { BridgeError, isJsonRpcRequest } from "./errors.js";
-import { getCapabilities, BUILTIN_SPEC_SKILLS, SUPPORTED_MODELS, BUILTIN_TOOLS } from "./capabilities.js";
+import { getCapabilities, BUILTIN_SPEC_SKILLS, SUPPORTED_MODELS, BUILTIN_TOOLS, API_VERSION } from "./capabilities.js";
 import { runWorkflow } from "./workflow.js";
 import { SessionStore } from "./session-store.js";
 import { WorkspaceStore } from "./workspace-store.js";
@@ -18,6 +18,7 @@ import { defaultLogger, VALID_LOG_LEVELS, type Logger, type LogLevel } from "./l
 const METHOD_NOT_FOUND = -32601;
 const INTERNAL_ERROR = -32603;
 const SDK_SESSION_ID_UNAVAILABLE = -32012;
+const VERSION_MISMATCH = -32050;
 
 const EVENT_BUFFER_CAP = 500;
 
@@ -339,9 +340,20 @@ export class BridgeServer {
     params: Record<string, unknown>,
     requestId: unknown,
   ): Promise<unknown> {
+    // Per-request version validation (opt-in)
+    if (params["apiVersion"] !== undefined) {
+      if (typeof params["apiVersion"] !== "string" || params["apiVersion"] !== API_VERSION) {
+        throw new BridgeError(VERSION_MISMATCH, `Unsupported API version: ${params["apiVersion"]}`, {
+          supportedVersions: [API_VERSION],
+        });
+      }
+    }
+
     switch (method) {
       case "bridge.capabilities":
         return getCapabilities();
+      case "bridge.negotiateVersion":
+        return this.negotiateVersion(params);
       case "bridge.setLogLevel":
         return this.setLogLevel(params);
       case "bridge.ping":
@@ -1258,6 +1270,32 @@ export class BridgeServer {
       workspace: newSession.workspace,
       branchedFrom: sessionId,
       historyCopied: branchIndex,
+    };
+  }
+
+  // --- Version negotiation ---
+
+  private negotiateVersion(params: Record<string, unknown>): unknown {
+    const { supportedVersions } = params;
+
+    if (!Array.isArray(supportedVersions) || supportedVersions.length === 0) {
+      throw new BridgeError(-32602, "'supportedVersions' must be a non-empty array of strings");
+    }
+
+    if (!supportedVersions.every((v) => typeof v === "string")) {
+      throw new BridgeError(-32602, "'supportedVersions' must contain only strings");
+    }
+
+    const matched = supportedVersions.find((v) => v === API_VERSION);
+    if (!matched) {
+      throw new BridgeError(VERSION_MISMATCH, "No compatible API version found", {
+        supportedVersions: [API_VERSION],
+      });
+    }
+
+    return {
+      negotiatedVersion: matched,
+      capabilities: getCapabilities(),
     };
   }
 

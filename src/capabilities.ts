@@ -1,4 +1,5 @@
 export const BRIDGE_VERSION = "0.2.0";
+export const API_VERSION = BRIDGE_VERSION;
 
 export interface ModelInfo {
   id: string;
@@ -91,6 +92,7 @@ export interface Capabilities {
   protocol: string;
   transport: string;
   bridgeVersion: string;
+  apiVersion: string;
   notifications: { progress: boolean; sessionEvent: boolean };
   workflows: readonly string[];
   skills: readonly SkillInfo[];
@@ -107,6 +109,7 @@ export function getCapabilities(): Capabilities {
     protocol: "jsonrpc-2.0",
     transport: "stdio",
     bridgeVersion: BRIDGE_VERSION,
+    apiVersion: API_VERSION,
     notifications: {
       progress: true,
       sessionEvent: true,
@@ -116,6 +119,7 @@ export function getCapabilities(): Capabilities {
     workflowSkillMap: WORKFLOW_SKILL_MAP,
     methods: [
       "bridge.capabilities",
+      "bridge.negotiateVersion",
       "bridge.ping",
       "workflow.run",
       "skills.list",

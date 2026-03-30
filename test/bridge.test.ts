@@ -724,3 +724,126 @@ test("bridge.setLogLevel is listed in capabilities", async () => {
   const methods = result["methods"] as string[];
   assert.ok(methods.includes("bridge.setLogLevel"), "capabilities must list bridge.setLogLevel");
 });
+
+// ---------------------------------------------------------------------------
+// API Versioning tests
+// ---------------------------------------------------------------------------
+
+test("bridge.capabilities includes apiVersion", async () => {
+  const server = new BridgeServer();
+  const response = await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 800,
+    method: "bridge.capabilities",
+  });
+
+  const result = response.result as Record<string, unknown>;
+  assert.equal(typeof result["apiVersion"], "string", "apiVersion must be a string");
+  assert.ok(/^\d+\.\d+\.\d+$/.test(result["apiVersion"] as string), "apiVersion must be semver");
+});
+
+test("bridge.capabilities includes bridge.negotiateVersion in methods", async () => {
+  const server = new BridgeServer();
+  const response = await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 801,
+    method: "bridge.capabilities",
+  });
+
+  const result = response.result as Record<string, unknown>;
+  const methods = result["methods"] as string[];
+  assert.ok(methods.includes("bridge.negotiateVersion"), "capabilities must list bridge.negotiateVersion");
+});
+
+test("bridge.negotiateVersion returns negotiatedVersion and capabilities on match", async () => {
+  const server = new BridgeServer();
+  const response = await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 802,
+    method: "bridge.negotiateVersion",
+    params: { supportedVersions: ["0.2.0"] },
+  });
+
+  assert.equal(response.jsonrpc, "2.0");
+  assert.equal(response.id, 802);
+  const result = response.result as Record<string, unknown>;
+  assert.equal(result["negotiatedVersion"], "0.2.0");
+  assert.equal(typeof (result["capabilities"] as Record<string, unknown>)["apiVersion"], "string");
+});
+
+test("bridge.negotiateVersion returns -32050 when no version matches", async () => {
+  const server = new BridgeServer();
+  const response = await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 803,
+    method: "bridge.negotiateVersion",
+    params: { supportedVersions: ["99.0.0"] },
+  });
+
+  assert.equal(response.error!.code, -32050);
+  const data = response.error!.data as Record<string, unknown>;
+  assert.ok(Array.isArray(data["supportedVersions"]));
+  assert.ok((data["supportedVersions"] as string[]).includes("0.2.0"));
+});
+
+test("bridge.negotiateVersion rejects empty supportedVersions", async () => {
+  const server = new BridgeServer();
+  const response = await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 804,
+    method: "bridge.negotiateVersion",
+    params: { supportedVersions: [] },
+  });
+
+  assert.equal(response.error!.code, -32602);
+});
+
+test("bridge.negotiateVersion rejects non-string supportedVersions", async () => {
+  const server = new BridgeServer();
+  const response = await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 805,
+    method: "bridge.negotiateVersion",
+    params: { supportedVersions: [123] },
+  });
+
+  assert.equal(response.error!.code, -32602);
+});
+
+test("request with matching apiVersion in params succeeds", async () => {
+  const server = new BridgeServer();
+  const response = await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 806,
+    method: "bridge.ping",
+    params: { apiVersion: "0.2.0" },
+  });
+
+  assert.equal(response.result!.pong, true);
+});
+
+test("request with unsupported apiVersion returns -32050", async () => {
+  const server = new BridgeServer();
+  const response = await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 807,
+    method: "bridge.ping",
+    params: { apiVersion: "99.0.0" },
+  });
+
+  assert.equal(response.error!.code, -32050);
+  const data = response.error!.data as Record<string, unknown>;
+  assert.ok(Array.isArray(data["supportedVersions"]));
+  assert.ok((data["supportedVersions"] as string[]).includes("0.2.0"));
+});
+
+test("request without apiVersion succeeds normally (opt-in)", async () => {
+  const server = new BridgeServer();
+  const response = await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 808,
+    method: "bridge.ping",
+  });
+
+  assert.equal(response.result!.pong, true);
+});
