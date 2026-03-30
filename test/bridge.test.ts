@@ -613,3 +613,76 @@ test("bridge.capabilities advertises context.*, session.branch, session.search",
   assert.ok(methods.includes("session.branch"), "must advertise session.branch");
   assert.ok(methods.includes("session.search"), "must advertise session.search");
 });
+
+// --- Skills list tests ---
+
+test("skills.list returns SkillInfo objects with name, description, hasScript, parameters", async () => {
+  const server = new BridgeServer();
+  const response = await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 600,
+    method: "skills.list",
+  });
+
+  assert.ok(!response.error, `unexpected error: ${JSON.stringify(response.error)}`);
+  const result = response.result as Record<string, unknown>;
+  const skills = result["skills"] as Array<Record<string, unknown>>;
+  assert.ok(Array.isArray(skills) && skills.length > 0, "skills must be a non-empty array");
+  for (const s of skills) {
+    assert.equal(typeof s["name"], "string", "each skill must have a name string");
+    assert.equal(typeof s["description"], "string", "each skill must have a description string");
+    assert.equal(typeof s["hasScript"], "boolean", "each skill must have a hasScript boolean");
+    assert.ok(Array.isArray(s["parameters"]), "each skill must have a parameters array");
+  }
+});
+
+test("skills.list returns 12 skills including spec-driven-maintenance", async () => {
+  const server = new BridgeServer();
+  const response = await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 601,
+    method: "skills.list",
+  });
+
+  const skills = (response.result as Record<string, unknown>)["skills"] as Array<Record<string, unknown>>;
+  assert.equal(skills.length, 12, "should have 12 skills");
+  const maintenance = skills.find((s) => s["name"] === "spec-driven-maintenance");
+  assert.ok(maintenance, "must include spec-driven-maintenance");
+  assert.equal(maintenance!["hasScript"], true);
+});
+
+test("skills.list AI-only skills have hasScript false", async () => {
+  const server = new BridgeServer();
+  const response = await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 602,
+    method: "skills.list",
+  });
+
+  const skills = (response.result as Record<string, unknown>)["skills"] as Array<Record<string, unknown>>;
+  const aiOnly = ["spec-driven-brainstorm", "spec-driven-auto", "spec-driven-review", "spec-driven-spec-content"];
+  for (const name of aiOnly) {
+    const skill = skills.find((s) => s["name"] === name);
+    assert.ok(skill, `${name} should be in skills list`);
+    assert.equal(skill!["hasScript"], false, `${name} should have hasScript: false`);
+    assert.deepEqual(skill!["parameters"], [], `${name} should have empty parameters`);
+  }
+});
+
+test("bridge.capabilities includes maintenance and migrate in workflows", async () => {
+  const server = new BridgeServer();
+  const response = await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 603,
+    method: "bridge.capabilities",
+  });
+
+  const result = response.result as Record<string, unknown>;
+  const workflows = result["workflows"] as string[];
+  assert.ok(workflows.includes("maintenance"), "must include maintenance workflow");
+  assert.ok(workflows.includes("migrate"), "must include migrate workflow");
+
+  const skillMap = result["workflowSkillMap"] as Record<string, string>;
+  assert.equal(skillMap["maintenance"], "spec-driven-maintenance");
+  assert.equal(skillMap["migrate"], "spec-driven-maintenance");
+});

@@ -8,6 +8,11 @@ import { SUPPORTED_WORKFLOWS } from "./capabilities.js";
 
 const execFileAsync = promisify(execFile);
 
+/** Map bridge workflow names to spec-driven.js script subcommands. */
+const WORKFLOW_SCRIPT_MAP: Readonly<Record<string, string>> = {
+  maintenance: "run-maintenance",
+};
+
 function resolveSpecDrivenScript(): string {
   if (process.env["SPEC_DRIVEN_SCRIPT"]) {
     return process.env["SPEC_DRIVEN_SCRIPT"];
@@ -100,7 +105,8 @@ export async function runWorkflow(
   });
 
   try {
-    const invocationArgs = [scriptPath, workflow as string, ...args.map((value) => String(value))];
+    const scriptSubcommand = WORKFLOW_SCRIPT_MAP[workflow as string] ?? (workflow as string);
+    const invocationArgs = [scriptPath, scriptSubcommand, ...args.map((value) => String(value))];
     const { stdout, stderr } = await execFileAsync("node", invocationArgs, {
       cwd: resolvedWorkspace,
     });

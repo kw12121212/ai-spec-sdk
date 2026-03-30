@@ -1,4 +1,4 @@
-export const BRIDGE_VERSION = "0.1.0";
+export const BRIDGE_VERSION = "0.2.0";
 
 export interface ModelInfo {
   id: string;
@@ -47,20 +47,30 @@ export const SUPPORTED_WORKFLOWS: readonly string[] = [
   "archive",
   "cancel",
   "list",
+  "maintenance",
+  "migrate",
 ];
 
-export const BUILTIN_SPEC_SKILLS: readonly string[] = [
-  "spec-driven-brainstorm",
-  "spec-driven-init",
-  "spec-driven-propose",
-  "spec-driven-modify",
-  "spec-driven-spec-content",
-  "spec-driven-apply",
-  "spec-driven-verify",
-  "spec-driven-review",
-  "spec-driven-archive",
-  "spec-driven-cancel",
-  "spec-driven-auto",
+export interface SkillInfo {
+  name: string;
+  description: string;
+  hasScript: boolean;
+  parameters: readonly string[];
+}
+
+export const BUILTIN_SPEC_SKILLS: readonly SkillInfo[] = [
+  { name: "spec-driven-brainstorm", description: "Discuss a rough idea, converge on scope, and generate a proposal after confirmation", hasScript: false, parameters: [] },
+  { name: "spec-driven-init", description: "Initialize .spec-driven/ in a project with config.yaml and specs scaffold", hasScript: true, parameters: ["[path]"] },
+  { name: "spec-driven-propose", description: "Read existing specs and scaffold a new change with all five artifacts", hasScript: true, parameters: ["<name>"] },
+  { name: "spec-driven-modify", description: "Edit an existing change artifact (proposal, specs, design, tasks, questions)", hasScript: true, parameters: ["[name]"] },
+  { name: "spec-driven-spec-content", description: "Classify spec content and place it in the correct delta spec file", hasScript: false, parameters: [] },
+  { name: "spec-driven-apply", description: "Implement tasks one by one and update delta specs when done", hasScript: true, parameters: ["<change>"] },
+  { name: "spec-driven-verify", description: "Check task completion, implementation evidence, and spec alignment", hasScript: true, parameters: ["<name>"] },
+  { name: "spec-driven-review", description: "Review a completed change for code quality before archive", hasScript: false, parameters: [] },
+  { name: "spec-driven-archive", description: "Merge delta specs into specs/, update INDEX.md, and move to archive/", hasScript: true, parameters: ["<name>"] },
+  { name: "spec-driven-cancel", description: "Permanently delete an in-progress change", hasScript: true, parameters: ["<name>"] },
+  { name: "spec-driven-auto", description: "Run full workflow automatically with one confirmation checkpoint", hasScript: false, parameters: [] },
+  { name: "spec-driven-maintenance", description: "Run automated maintenance: lint, test, typecheck, and auto-fix", hasScript: true, parameters: ["[path]"] },
 ];
 
 export const WORKFLOW_SKILL_MAP: Readonly<Record<string, string>> = {
@@ -73,6 +83,8 @@ export const WORKFLOW_SKILL_MAP: Readonly<Record<string, string>> = {
   cancel: "spec-driven-cancel",
   // "list" uses spec-driven-modify to enumerate active changes
   list: "spec-driven-modify",
+  maintenance: "spec-driven-maintenance",
+  migrate: "spec-driven-maintenance",
 };
 
 export interface Capabilities {
@@ -81,7 +93,7 @@ export interface Capabilities {
   bridgeVersion: string;
   notifications: { progress: boolean; sessionEvent: boolean };
   workflows: readonly string[];
-  skills: readonly string[];
+  skills: readonly SkillInfo[];
   workflowSkillMap: Readonly<Record<string, string>>;
   methods: string[];
   agentControlParams: readonly string[];
