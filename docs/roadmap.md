@@ -6,7 +6,7 @@
 |---|-----------|----------|------------|
 | 1 | ✅ Structured Logging | P0 | — |
 | 2 | ✅ API Versioning | P0 | Structured Logging |
-| 3 | Session Persistence | P0 | Structured Logging |
+| 3 | ✅ Session Persistence | P0 | Structured Logging |
 | 4 | HTTP/SSE Transport | P1 | API Versioning |
 | 5 | Authentication & Authorization | P1 | HTTP/SSE Transport |
 | 6 | Java CLI Demo | P0 | — |
@@ -143,14 +143,14 @@ Persist session state to disk so sessions survive bridge restarts and can be ins
 - `specs/session/session-persistence.md` (delta on `session/agent-sessions.md`)
 
 ### Tasks
-1. Refactor `SessionStore` to support pluggable storage backend (interface: `load`, `save`, `list`, `delete`)
-2. Implement `FileSessionStorage` with JSON file per session
-3. Add debounced write with immediate flush on complete/stop
-4. Implement session recovery on bridge start (scan dir, mark interrupted)
-5. Add `session.export`, `session.delete`, `session.cleanup` methods to bridge
-6. Update `SessionStore` to use `FileSessionStorage` by default (fall back to in-memory if dir unavailable)
-7. Update tests: test disk persistence, recovery, interrupted status
-8. Update `docs/bridge-contract.yaml`
+1. [x] ~~Refactor `SessionStore` to support pluggable storage backend~~ Skipped (YAGNI — only one storage backend needed)
+2. [x] ~~Implement `FileSessionStorage` with JSON file per session~~ Already implemented in prior work
+3. [x] ~~Add debounced write with immediate flush on complete/stop~~ Skipped (immediate flush is sufficient for local SDK)
+4. [x] Implement session recovery on bridge start (scan dir, mark `interrupted`)
+5. [x] Add `session.export`, `session.delete`, `session.cleanup` methods to bridge
+6. [x] ~~Update `SessionStore` to use `FileSessionStorage` by default~~ Already done (constructor accepts `sessionsDir`)
+7. [x] Update tests: test disk persistence, recovery, interrupted status
+8. [x] Update `docs/bridge-contract.yaml`
 
 ---
 
@@ -339,7 +339,7 @@ Phase 1 (v0.2.0): Java CLI Demo + ✅ Structured Logging + API Versioning
   ├── ✅ Logging: foundation, all modules get log instrumentation
   └── Versioning: bridge.capabilities + negotiateVersion
 
-Phase 2 (v0.3.0): Session Persistence
+Phase 2 (v0.3.0): ✅ Session Persistence
   └── File-based storage, crash recovery, cleanup
 
 Phase 3 (v0.4.0): HTTP/SSE Transport
@@ -358,7 +358,7 @@ Phases 2 and 3 can overlap — persistence and HTTP transport are independent on
 | Version | Includes | Breaking Changes |
 |---------|----------|-----------------|
 | v0.2.0 | Java CLI Demo, ✅ Structured Logging, API Versioning | None (additive) |
-| v0.3.0 | Session Persistence | `SessionStore` internal refactor (no API break) |
+| v0.3.0 | ✅ Session Persistence | `SessionStore` internal refactor (no API break) |
 | v0.4.0 | HTTP/SSE Transport | None (new transport, stdio unchanged) |
 | v0.5.0 | Auth | HTTP requests now require Bearer token by default |
 | v1.0.0 | All above stabilized | First stability guarantee |
