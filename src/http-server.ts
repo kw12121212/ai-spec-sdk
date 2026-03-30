@@ -93,6 +93,13 @@ export function startHttpServer(options: HttpServerOptions = {}): Promise<HttpSe
     sessionsDir,
     workspacesDir,
     transport: "http",
+    runtimeInfoOptions: {
+      transport: "http",
+      authMode: noAuth ? "none" : "bearer",
+      sessionsDir,
+      keysFile,
+      httpPort: port,
+    },
   });
 
   let inflight = 0;

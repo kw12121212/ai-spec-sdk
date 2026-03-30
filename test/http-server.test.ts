@@ -557,3 +557,70 @@ test("auth: expired key returns -32061", async () => {
     cleanup();
   }
 });
+
+// ── bridge.info HTTP auth tests ───────────────────────────────────────────────
+
+test("auth: bridge.info requires admin scope", async () => {
+  const { keysFile, cleanup } = makeTempKeysFile();
+  const { token } = makeKey(["session:read"], keysFile);
+  const { shutdown, port } = await startHttpServer({ port: 0, keysFile });
+  try {
+    const { body } = await rpc(
+      port,
+      { jsonrpc: "2.0", id: 1, method: "bridge.info" },
+      { Authorization: `Bearer ${token}` },
+    );
+    const error = (body as Record<string, unknown>)["error"] as Record<string, unknown>;
+    assert.equal(error["code"], -32060, "bridge.info with non-admin scope should return -32060");
+  } finally {
+    await shutdown();
+    cleanup();
+  }
+});
+
+test("auth: bridge.info returns runtime info with admin key", async () => {
+  const { keysFile, cleanup } = makeTempKeysFile();
+  const { token } = makeKey(["admin"], keysFile);
+  const { shutdown, port } = await startHttpServer({ port: 0, keysFile });
+  try {
+    const { body } = await rpc(
+      port,
+      { jsonrpc: "2.0", id: 1, method: "bridge.info" },
+      { Authorization: `Bearer ${token}` },
+    );
+    assert.ok("result" in (body as Record<string, unknown>), "admin key should succeed for bridge.info");
+    const result = (body as Record<string, unknown>)["result"] as Record<string, unknown>;
+    assert.equal(result["transport"], "http");
+    assert.equal(typeof result["bridgeVersion"], "string");
+    assert.equal(result["authMode"], "bearer");
+  } finally {
+    await shutdown();
+    cleanup();
+  }
+});
+
+test("auth: bridge.info requires auth when auth is enabled (no key)", async () => {
+  const { keysFile, cleanup } = makeTempKeysFile();
+  const { shutdown, port } = await startHttpServer({ port: 0, keysFile });
+  try {
+    const { body } = await rpc(port, { jsonrpc: "2.0", id: 1, method: "bridge.info" });
+    const error = (body as Record<string, unknown>)["error"] as Record<string, unknown>;
+    assert.equal(error["code"], -32061, "bridge.info without token should return -32061");
+  } finally {
+    await shutdown();
+    cleanup();
+  }
+});
+
+test("auth: bridge.info accessible in noAuth mode without credentials", async () => {
+  const { shutdown, port } = await startHttpServer({ port: 0, noAuth: true });
+  try {
+    const { body } = await rpc(port, { jsonrpc: "2.0", id: 1, method: "bridge.info" });
+    assert.ok("result" in (body as Record<string, unknown>), "bridge.info should succeed in noAuth mode");
+    const result = (body as Record<string, unknown>)["result"] as Record<string, unknown>;
+    assert.equal(result["transport"], "http");
+    assert.equal(result["authMode"], "none");
+  } finally {
+    await shutdown();
+  }
+});

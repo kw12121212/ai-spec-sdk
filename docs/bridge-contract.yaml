@@ -95,6 +95,1299 @@ startup:
       non-zero: unexpected runtime crash
 
 # ---------------------------------------------------------------------------
+# CLI diagnostic commands (do not start a transport)
+# ---------------------------------------------------------------------------
+cli_commands:
+
+  help:
+    usage: ai-spec-bridge --help
+    alias: ai-spec-bridge -h
+    description: Print usage information and exit. Does not start stdio or HTTP transport.
+    exit_code: 0
+
+  doctor:
+    usage: ai-spec-bridge doctor [--json] [--transport <stdio|http>] [--port <n>] [--no-auth]
+    description: >
+      Print runtime diagnostics and exit. Resolves the same metadata as bridge.info
+      plus runs filesystem health checks. Use --json to get machine-readable output.
+    output_modes:
+      default: human-readable table printed to stdout
+      --json: JSON object on stdout matching the DoctorInfo schema below
+    exit_code:
+      0: all checks passed
+      1: one or more checks failed (warnings detected)
+    json_schema:
+      info:
+        type: object
+        description: RuntimeInfo — same fields as bridge.info result
+        fields:
+          bridgeVersion: string
+          apiVersion: string
+          transport: string
+          authMode: string
+          logLevel: string
+          sessionsPath: string
+          keysPath: string
+          specDrivenScriptPath: string
+          http:
+            type: object | null
+            fields:
+              port: number
+              corsOrigins: string
+          nodeVersion: string
+      checks:
+        type: array
+        items:
+          name: string
+          ok: boolean
+          detail: string
+
+# ---------------------------------------------------------------------------
+# Envelope shapes
+# ---------------------------------------------------------------------------
+envelope:
+
+  request:
+    fields:
+      jsonrpc:
+        type: string
+        required: true
+        value: "2.0"
+      id:
+        type: string | number | null
+        required: true
+        notes: Echoed verbatim in the matching response. Use null for fire-and-forget
+               (no response will be sent).
+      method:
+        type: string
+        required: true
+      params:
+        type: object
+        required: false
+        notes: Omit or pass {} when a method takes no parameters.
+               An optional `apiVersion` field (string) MAY be included to
+               opt in to per-request version validation. If present and not
+               matching the bridge's API version, the request is rejected
+               with error code -32050.
+
+  response:
+    fields:
+      jsonrpc:
+        type: string
+        value: "2.0"
+      id:
+        type: string | number | null
+        notes: Matches the request id. null when the request id could not be parsed.
+      result:
+        type: object
+        notes: Present on success. Mutually exclusive with "error".
+      error:
+        type: object
+        notes: Present on failure. Mutually exclusive with "result".
+        fields:
+          code:
+            type: number
+          message:
+            type: string
+          data:
+            type: object
+            required: false
+            notes: Additional structured context. Present only when the error has
+                   extra diagnostic fields.
+
+  notification:
+    notes: Server-initiated message with no "id" field. The client MUST NOT send a
+           response to a notification.
+    fields:
+      jsonrpc:
+        type: string
+        value: "2.0"
+      method:
+        type: string
+        enum:
+          - bridge/progress
+          - bridge/session_event
+          - bridge/hook_triggered
+          - bridge/file_changed
+          - bridge/tool_approval_requested
+      params:
+        type: object
+        fields:
+          requestId:
+            type: string | number | null
+            notes: id of the originating request, or null if not applicable.
+          # Additional fields depend on the notification method — see below.
+
+# ---------------------------------------------------------------------------
+# Error codes
+# ---------------------------------------------------------------------------
+error_codes:
+  # Standard JSON-RPC codes
+  -32700:
+    name: ParseError
+    message: "Parse error"
+    cause: Request line was not valid JSON.
+    data: none
+  -32600:
+    name: InvalidRequest
+    message: "Invalid JSON-RPC request"
+    cause: Parsed object missing "jsonrpc":"2.0" or "method" string.
+    data: none
+  -32601:
+    name: MethodNotFound
+    message: "Method not found: <method>"
+    cause: method is not in the supported methods list.
+    data: none
+  -32602:
+    name: InvalidParams
+    message: varies (e.g. "'workspace' must be provided")
+    cause: A required param is missing, wrong type, or fails validation.
+    data: none
+  -32603:
+    name: InternalError
+    message: "Internal bridge error"
+    cause: Unhandled exception inside the bridge.
+    data:
+      message:
+        type: string
+        notes: Original exception message.
+
+  # Application-defined codes
+  -32001:
+    name: WorkspaceNotFound
+    message: "Workspace path does not exist"
+    cause: workspace param resolves to a path that does not exist or is not a directory.
+    data:
+      workspace:
+        type: string
+        notes: Resolved absolute path that was checked.
+  -32002:
+    name: ScriptNotFound
+    message: "spec-driven script not found"
+    cause: The spec-driven CLI script could not be located on this host.
+           Set SPEC_DRIVEN_SCRIPT env var to an explicit path to resolve this.
+    data:
+      scriptPath:
+        type: string
+        notes: Candidate path that was checked last.
+  -32003:
+    name: WorkflowFailed
+    message: "Workflow execution failed"
+    cause: The spec-driven script exited with a non-zero status.
+    data:
+      workflow:
+        type: string
+      workspace:
+        type: string
+      message:
+        type: string
+        notes: Node child_process error message.
+      stdout:
+        type: string
+      stderr:
+        type: string
+      code:
+        type: string | null
+        notes: Process exit code or signal name, if available.
+  -32011:
+    name: SessionNotFound
+    message: "Session not found"
+    cause: sessionId does not match any in-memory session. Sessions are lost on
+           bridge process restart.
+    data:
+      sessionId:
+        type: string
+  -32012:
+    name: SDKSessionIdUnavailable
+    message: "Session SDK ID not available"
+    cause: session.resume called on a session whose SDK session ID has not been set yet.
+    data:
+      sessionId:
+        type: string
+  -32020:
+    name: ApprovalNotFound
+    message: "Approval request not found"
+    cause: session.approveTool / session.rejectTool called with a requestId that is
+           no longer pending (already resolved, timed out, or session was stopped).
+    data:
+      requestId:
+        type: string
+  -32050:
+    name: VersionMismatch
+    message: '"Unsupported API version: <version>" | "No compatible API version found"'
+    cause: Client requested an API version that does not match the bridge's current version.
+    data:
+      supportedVersions:
+        type: array
+        items: string
+        notes: Array containing the bridge's current API version string.
+  -32060:
+    name: InsufficientScope
+    message: '"Insufficient scope: requires <scope>"'
+    cause: The API key provided does not have the scope required by the method (HTTP auth mode only).
+    data: none
+  -32061:
+    name: AuthRequired
+    message: '"Authentication required" | "Invalid or expired API key"'
+    cause: HTTP auth mode is enabled but the request has no Authorization header or the token is invalid/expired.
+    data: none
+  -32070:
+    name: SessionActive
+    message: "Cannot delete an active session"
+    cause: session.delete called on a session with status "active". Stop the session first.
+    data:
+      sessionId:
+        type: string
+
+# ---------------------------------------------------------------------------
+# Authentication (HTTP transport only)
+# ---------------------------------------------------------------------------
+authentication:
+  mode: Bearer token (API key)
+  header: "Authorization: Bearer <token>"
+  disabled_by: --no-auth flag
+  key_management:
+    generate: ai-spec-bridge keygen [--name <n>] [--scopes <s>] [--expires <iso>]
+    list: ai-spec-bridge keys list
+    revoke: ai-spec-bridge keys revoke <id>
+    storage: ~/.ai-spec-sdk/keys.json (default; overridable at startup)
+  scope_table:
+    # null = no authentication required
+    bridge.capabilities: null
+    bridge.ping: null
+    bridge.negotiateVersion: null
+    models.list: null
+    tools.list: null
+    skills.list: null
+    bridge.info: admin
+    bridge.setLogLevel: admin
+    mcp.add: admin
+    mcp.remove: admin
+    mcp.start: admin
+    mcp.stop: admin
+    mcp.list: admin
+    hooks.add: admin
+    hooks.remove: admin
+    hooks.list: admin
+    session.start: "session:write"
+    session.resume: "session:write"
+    session.stop: "session:write"
+    session.delete: "session:write"
+    session.cleanup: "session:write"
+    session.approveTool: "session:write"
+    session.rejectTool: "session:write"
+    session.branch: "session:write"
+    session.status: "session:read"
+    session.list: "session:read"
+    session.history: "session:read"
+    session.events: "session:read"
+    session.export: "session:read"
+    session.search: "session:read"
+    workflow.run: "workflow:run"
+    config.get: "config:read"
+    config.list: "config:read"
+    context.read: "config:read"
+    context.list: "config:read"
+    config.set: "config:write"
+    context.write: "config:write"
+    workspace.register: "config:write"
+    workspace.list: "config:write"
+  unknown_methods: default to "admin" scope requirement
+
+# ---------------------------------------------------------------------------
+# Methods
+# ---------------------------------------------------------------------------
+methods:
+  # Complete list of advertised methods (matches bridge.capabilities.methods):
+  #   bridge.capabilities, bridge.negotiateVersion, bridge.ping, bridge.info,
+  #   bridge.setLogLevel, workflow.run, skills.list,
+  #   session.start, session.resume, session.stop, session.status, session.list,
+  #   session.history, session.events, session.export, session.delete, session.cleanup,
+  #   session.approveTool, session.rejectTool, session.branch, session.search,
+  #   models.list, workspace.register, workspace.list, tools.list,
+  #   mcp.add, mcp.remove, mcp.start, mcp.stop, mcp.list,
+  #   config.get, config.set, config.list,
+  #   hooks.add, hooks.remove, hooks.list,
+  #   context.read, context.write, context.list
+
+  # -------------------------------------------------------------------------
+  bridge.capabilities:
+    description: Returns static metadata about this bridge process.
+    auth: none (always unauthenticated)
+    params: none
+    result:
+      protocol:
+        type: string
+        value: "jsonrpc-2.0"
+      transport:
+        type: string
+        enum: ["stdio", "http"]
+        notes: Reflects the active transport mode. "stdio" for subprocess mode, "http" for HTTP/SSE mode.
+      bridgeVersion:
+        type: string
+        example: "0.2.0"
+      apiVersion:
+        type: string
+        example: "0.2.0"
+        notes: Current API version for version negotiation. Semver string.
+      notifications:
+        type: object
+        fields:
+          progress:
+            type: boolean
+            value: true
+          sessionEvent:
+            type: boolean
+            value: true
+      workflows:
+        type: array
+        items: string
+        enum:
+          - init
+          - propose
+          - modify
+          - apply
+          - verify
+          - archive
+          - cancel
+          - list
+          - maintenance
+          - migrate
+      skills:
+        type: array
+        items: object
+        notes: Each element has { name, description, hasScript, parameters[] }
+      workflowSkillMap:
+        type: object
+        description: Maps each workflow name to its backing built-in skill.
+      methods:
+        type: array
+        items: string
+        notes: Complete list of callable JSON-RPC methods on this bridge instance.
+      agentControlParams:
+        type: array
+        items: string
+        notes: Top-level parameter names accepted by session.start / session.resume.
+      models:
+        type: array
+        items: object
+        notes: Each element has { id, displayName }
+      tools:
+        type: array
+        items: object
+        notes: Each element has { name, description }
+      hookEvents:
+        type: array
+        items: string
+    errors: none
+
+  # -------------------------------------------------------------------------
+  bridge.ping:
+    description: Liveness check. No parameters. Always succeeds.
+    auth: none
+    params: none
+    result:
+      pong:
+        type: boolean
+        value: true
+      ts:
+        type: string
+        format: ISO 8601 UTC
+        notes: Server timestamp at the time the request was processed.
+    errors: none
+
+  # -------------------------------------------------------------------------
+  bridge.negotiateVersion:
+    description: >
+      Allows clients to declare their supported API versions and receive
+      the negotiated result. Returns the full capabilities object on match.
+      This is the recommended first call for new clients to verify compatibility.
+    auth: none
+    params:
+      supportedVersions:
+        type: array
+        items: string
+        required: true
+        notes: Non-empty array of semver version strings the client supports.
+    result:
+      negotiatedVersion:
+        type: string
+        notes: The matched version string from the client's list.
+      capabilities:
+        type: object
+        notes: Full capabilities object (same shape as bridge.capabilities result).
+    errors:
+      - -32602  # supportedVersions missing, empty, or contains non-strings
+      - -32050  # no compatible version found
+
+  # -------------------------------------------------------------------------
+  bridge.info:
+    description: >
+      Returns runtime metadata about the running bridge process: version, transport,
+      auth mode, resolved filesystem paths, log level, and HTTP settings (when in HTTP mode).
+      This is the programmatic counterpart to `ai-spec-bridge doctor`.
+    auth: admin
+    params: none
+    result:
+      bridgeVersion:
+        type: string
+        example: "0.2.0"
+      apiVersion:
+        type: string
+        example: "0.2.0"
+      transport:
+        type: string
+        enum: ["stdio", "http"]
+      authMode:
+        type: string
+        enum: ["none", "bearer"]
+        notes: '"none" in stdio mode or when --no-auth is set; "bearer" in authenticated HTTP mode.'
+      logLevel:
+        type: string
+        enum: ["debug", "info", "warn", "error", "silent"]
+      sessionsPath:
+        type: string
+        notes: Resolved absolute path to the sessions directory.
+      keysPath:
+        type: string
+        notes: Resolved absolute path to the keys file.
+      specDrivenScriptPath:
+        type: string
+        notes: Resolved path to the spec-driven.js script (may not exist yet).
+      http:
+        type: object | null
+        notes: Non-null only when transport is "http".
+        fields:
+          port:
+            type: number
+          corsOrigins:
+            type: string
+      nodeVersion:
+        type: string
+        notes: Node.js version string (e.g. "v20.11.0").
+    errors:
+      - -32060  # insufficient scope (HTTP auth mode, non-admin key)
+      - -32061  # auth required (HTTP auth mode, no token)
+
+  # -------------------------------------------------------------------------
+  bridge.setLogLevel:
+    description: Dynamically change the bridge's internal log level.
+    auth: admin
+    params:
+      level:
+        type: string
+        required: true
+        enum: ["debug", "info", "warn", "error", "silent"]
+    result:
+      level:
+        type: string
+        notes: Confirmed log level now in effect.
+    errors:
+      - -32602  # invalid level value
+
+  # -------------------------------------------------------------------------
+  skills.list:
+    description: Returns the list of bundled spec-driven skills.
+    auth: none
+    params: none
+    result:
+      skills:
+        type: array
+        items: object
+        notes: Same set as bridge.capabilities.skills.
+    errors: none
+
+  # -------------------------------------------------------------------------
+  workflow.run:
+    description: >
+      Executes a spec-driven workflow script in the given workspace.
+      Emits bridge/progress notifications before and after execution.
+    auth: "workflow:run"
+    params:
+      workspace:
+        type: string
+        required: true
+        notes: Absolute or relative path to the target project directory.
+               Resolved to an absolute path before use.
+      workflow:
+        type: string
+        required: true
+        enum:
+          - init
+          - propose
+          - modify
+          - apply
+          - verify
+          - archive
+          - cancel
+          - list
+          - maintenance
+          - migrate
+      args:
+        type: array
+        items: string
+        required: false
+        default: []
+        notes: Extra positional arguments forwarded to the spec-driven script
+               (e.g. change name for verify/apply/archive).
+    notifications:
+      - method: bridge/progress
+        params:
+          phase: workflow_started
+          workflow: string
+          workspace: string   # resolved absolute path
+          requestId: string | number | null
+      - method: bridge/progress
+        params:
+          phase: workflow_completed | workflow_failed
+          workflow: string
+          workspace: string
+          requestId: string | number | null
+    result:
+      workflow:
+        type: string
+        notes: Echoes the workflow that was run.
+      workspace:
+        type: string
+        notes: Resolved absolute path.
+      stdout:
+        type: string
+        notes: Trimmed stdout from the script.
+      stderr:
+        type: string
+        notes: Trimmed stderr from the script.
+      parsed:
+        type: object | null
+        notes: JSON.parse of stdout if stdout is valid JSON; otherwise null.
+    errors:
+      - -32602  # invalid or missing workspace / workflow / args
+      - -32001  # workspace directory not found
+      - -32002  # spec-driven script not found on this host
+      - -32003  # script exited non-zero
+
+  # -------------------------------------------------------------------------
+  session.start:
+    description: >
+      Starts a new Claude agent session for the given workspace and prompt.
+      The method is long-running: it resolves only after the agent finishes
+      or is stopped. Progress is streamed via bridge/session_event notifications.
+    auth: "session:write"
+    params:
+      workspace:
+        type: string
+        required: true
+        notes: Absolute or relative path to the target project directory.
+      prompt:
+        type: string
+        required: true
+        notes: Initial user prompt sent to the Claude agent.
+      model:
+        type: string
+        required: false
+      allowedTools:
+        type: array
+        items: string
+        required: false
+      disallowedTools:
+        type: array
+        items: string
+        required: false
+      permissionMode:
+        type: string
+        required: false
+        default: bypassPermissions
+        enum: [default, acceptEdits, bypassPermissions, approve]
+      maxTurns:
+        type: number
+        required: false
+        notes: Must be >= 1.
+      systemPrompt:
+        type: string
+        required: false
+      proxy:
+        type: object
+        required: false
+        fields:
+          http: string
+          https: string
+          noProxy: string
+      options:
+        type: object
+        required: false
+        default: {}
+        notes: Extra options forwarded to the Claude Agent SDK query() call.
+               The 'cwd' key is rejected (bridge-managed via workspace).
+    notifications:
+      - method: bridge/session_event
+        timing: emitted immediately after the session is created
+        params:
+          sessionId: string
+          type: session_started
+          requestId: string | number | null
+      - method: bridge/session_event
+        timing: emitted for each message yielded by the agent
+        params:
+          sessionId: string
+          type: agent_message
+          messageType: string  # system_init | tool_use | tool_result | assistant_text | result | other
+          message: object   # raw SDK message object
+          requestId: string | number | null
+      - method: bridge/session_event
+        timing: emitted when the session ends (completed or stopped)
+        params:
+          sessionId: string
+          type: session_completed | session_stopped
+          result: any | null   # present on session_completed; null on session_stopped
+          usage: object | null
+          status: string       # present on session_stopped
+          requestId: string | number | null
+      - method: bridge/tool_approval_requested
+        timing: emitted when permissionMode is "approve" and a tool call is pending
+        params:
+          sessionId: string
+          requestId: string   # approval request ID (not JSON-RPC request ID)
+          toolName: string
+          input: object
+    result:
+      sessionId:
+        type: string
+        format: UUID v4
+      status:
+        type: string
+        enum:
+          - completed
+          - stopped
+      result:
+        type: any
+        nullable: true
+        notes: Final result value from the agent. null when status is "stopped".
+      usage:
+        type: object
+        nullable: true
+    errors:
+      - -32602  # missing or invalid workspace / prompt / params
+      - -32001  # workspace directory not found
+
+  # -------------------------------------------------------------------------
+  session.resume:
+    description: >
+      Resumes an existing session identified by sessionId with a new prompt.
+      Behaves identically to session.start after validation; the session id
+      is forwarded to the SDK as options.resume.
+    auth: "session:write"
+    params:
+      sessionId:
+        type: string
+        required: true
+        format: UUID v4
+        notes: Must match a session that is still held in the bridge's memory.
+               Sessions are lost on process restart.
+      prompt:
+        type: string
+        required: true
+        notes: Follow-up prompt for the resumed session.
+      options:
+        type: object
+        required: false
+        default: {}
+        notes: "Merged with {resume: sessionId} before being passed to the SDK."
+    notifications:
+      - method: bridge/session_event
+        timing: emitted immediately after resume is validated
+        params:
+          sessionId: string
+          type: session_resumed
+          requestId: string | number | null
+      - method: bridge/session_event
+        timing: emitted for each agent message (same as session.start)
+        params:
+          sessionId: string
+          type: agent_message
+          message: object
+          requestId: string | number | null
+      - method: bridge/session_event
+        timing: emitted on completion or stop (same as session.start)
+        params:
+          sessionId: string
+          type: session_completed | session_stopped
+          result: any | null
+          status: string
+          requestId: string | number | null
+    result:
+      sessionId:
+        type: string
+        format: UUID v4
+      status:
+        type: string
+        enum:
+          - completed
+          - stopped
+      result:
+        type: any
+        nullable: true
+    errors:
+      - -32602  # missing or invalid sessionId / prompt
+      - -32011  # session not found
+      - -32012  # SDK session ID not yet available
+
+  # -------------------------------------------------------------------------
+  session.stop:
+    description: >
+      Requests cooperative cancellation of an active session.
+      Sets a stopRequested flag that is checked between agent message yields.
+      Returns immediately; the session.start / session.resume call resolves
+      shortly after with status "stopped".
+    auth: "session:write"
+    params:
+      sessionId:
+        type: string
+        required: true
+        format: UUID v4
+    result:
+      sessionId:
+        type: string
+        format: UUID v4
+      status:
+        type: string
+        enum:
+          - stopped
+    errors:
+      - -32602  # missing or invalid sessionId
+      - -32011  # session not found
+
+  # -------------------------------------------------------------------------
+  session.status:
+    description: Returns the current state of a session without blocking.
+    auth: "session:read"
+    params:
+      sessionId:
+        type: string
+        required: true
+        format: UUID v4
+    result:
+      sessionId:
+        type: string
+        format: UUID v4
+      status:
+        type: string
+        enum:
+          - active
+          - completed
+          - stopped
+          - interrupted
+      createdAt:
+        type: string
+        format: ISO 8601 UTC
+      updatedAt:
+        type: string
+        format: ISO 8601 UTC
+      historyLength:
+        type: number
+        notes: Number of entries in the session history, including the initial prompt.
+      result:
+        type: any
+        nullable: true
+        notes: Final result value if status is "completed"; null otherwise.
+    errors:
+      - -32602  # missing or invalid sessionId
+      - -32011  # session not found
+
+  # -------------------------------------------------------------------------
+  session.list:
+    description: Lists sessions held in memory, optionally filtered by status.
+    auth: "session:read"
+    params:
+      status:
+        type: string
+        required: false
+        enum: [active, all]
+        default: active
+    result:
+      sessions:
+        type: array
+        items:
+          sessionId: string
+          status: string
+          workspace: string
+          createdAt: string
+          updatedAt: string
+          prompt: string | null   # first 200 chars of the initial prompt; null if unavailable
+    errors:
+      - -32602  # invalid status value
+
+  # -------------------------------------------------------------------------
+  session.history:
+    description: Returns paginated history entries for a session.
+    auth: "session:read"
+    params:
+      sessionId:
+        type: string
+        required: true
+        format: UUID v4
+      offset:
+        type: number
+        required: false
+        default: 0
+        notes: Non-negative integer.
+      limit:
+        type: number
+        required: false
+        default: 50
+        notes: Positive integer. Capped at 200.
+    result:
+      sessionId: string
+      total: number
+      entries:
+        type: array
+        notes: Slice of history entries from offset to offset+limit.
+    errors:
+      - -32602  # invalid params
+      - -32011  # session not found
+
+  # -------------------------------------------------------------------------
+  session.events:
+    description: Returns buffered notification events for a session (in-memory ring buffer, cap 500).
+    auth: "session:read"
+    params:
+      sessionId:
+        type: string
+        required: true
+        format: UUID v4
+      since:
+        type: number
+        required: false
+        default: 0
+        notes: Return events with seq >= since.
+      limit:
+        type: number
+        required: false
+        default: 50
+        notes: Positive integer. Capped at 500.
+    result:
+      sessionId: string
+      events:
+        type: array
+        items:
+          seq: number
+          payload: object
+      total: number
+    errors:
+      - -32602  # invalid params
+      - -32011  # session not found
+
+  # -------------------------------------------------------------------------
+  session.export:
+    description: Exports the full session data including complete history.
+    auth: "session:read"
+    params:
+      sessionId:
+        type: string
+        required: true
+        format: UUID v4
+    result:
+      id: string
+      workspace: string
+      sdkSessionId:
+        type: string
+        nullable: true
+      status: string
+      createdAt: string
+      updatedAt: string
+      history:
+        type: array
+        notes: Full session history entries.
+      result:
+        type: any
+        nullable: true
+    errors:
+      - -32602  # missing or invalid sessionId
+      - -32011  # session not found
+
+  # -------------------------------------------------------------------------
+  session.delete:
+    description: >
+      Removes a session from both memory and disk. Active sessions cannot be
+      deleted; stop or complete the session first.
+    auth: "session:write"
+    params:
+      sessionId:
+        type: string
+        required: true
+        format: UUID v4
+    result:
+      deleted: boolean
+      sessionId: string
+    errors:
+      - -32602  # missing or invalid sessionId
+      - -32011  # session not found
+      - -32070  # cannot delete an active session
+
+  # -------------------------------------------------------------------------
+  session.cleanup:
+    description: >
+      Removes sessions older than a specified number of days based on updatedAt.
+      Active sessions are preserved.
+    auth: "session:write"
+    params:
+      olderThanDays:
+        type: number
+        required: false
+        default: 30
+        notes: Must be >= 1. Capped at 365.
+    result:
+      removedCount: number
+    errors:
+      - -32602  # olderThanDays is not a positive integer
+
+  # -------------------------------------------------------------------------
+  session.branch:
+    description: >
+      Creates a new session by copying history from an existing session up to
+      an optional index, then optionally starting the new session with a prompt.
+    auth: "session:write"
+    params:
+      sessionId:
+        type: string
+        required: true
+        format: UUID v4
+      fromIndex:
+        type: number
+        required: false
+        notes: Non-negative integer <= history length. Defaults to history length (full copy).
+      prompt:
+        type: string
+        required: false
+        notes: If provided, the branched session is started immediately with this prompt.
+    result:
+      sessionId: string
+      workspace: string
+      branchedFrom: string
+      historyCopied: number
+      # If prompt was provided, result matches session.start result instead
+    errors:
+      - -32602  # invalid params
+      - -32011  # source session not found
+
+  # -------------------------------------------------------------------------
+  session.search:
+    description: Full-text search across session history.
+    auth: "session:read"
+    params:
+      query:
+        type: string
+        required: true
+        notes: Non-empty search string (case-insensitive substring match).
+      workspace:
+        type: string
+        required: false
+        notes: Filter results to sessions from this workspace.
+      status:
+        type: string
+        required: false
+        notes: Filter results by session status.
+      limit:
+        type: number
+        required: false
+        default: 20
+        notes: Positive integer. Capped at 100.
+    result:
+      results:
+        type: array
+        items:
+          sessionId: string
+          workspace: string
+          status: string
+          matches:
+            type: array
+            items:
+              historyIndex: number
+              snippet: string
+    errors:
+      - -32602  # missing or invalid query / limit
+
+  # -------------------------------------------------------------------------
+  session.approveTool:
+    description: Approve a pending tool call request (permissionMode "approve" only).
+    auth: "session:write"
+    params:
+      sessionId:
+        type: string
+        required: true
+      requestId:
+        type: string
+        required: true
+        notes: approval request ID from the bridge/tool_approval_requested notification
+    result:
+      requestId: string
+      behavior: "allow"
+    errors:
+      - -32602  # missing params
+      - -32011  # session not found
+      - -32020  # approval request not found
+
+  # -------------------------------------------------------------------------
+  session.rejectTool:
+    description: Reject a pending tool call request (permissionMode "approve" only).
+    auth: "session:write"
+    params:
+      sessionId:
+        type: string
+        required: true
+      requestId:
+        type: string
+        required: true
+      message:
+        type: string
+        required: false
+        default: "Tool use rejected by user"
+    result:
+      requestId: string
+      behavior: "deny"
+    errors:
+      - -32602  # missing params
+      - -32011  # session not found
+      - -32020  # approval request not found
+
+  # -------------------------------------------------------------------------
+  models.list:
+    description: Returns the list of Claude models supported by this bridge build.
+    auth: none
+    params: none
+    result:
+      models:
+        type: array
+        items:
+          id: string
+          displayName: string
+    errors: none
+
+  # -------------------------------------------------------------------------
+  tools.list:
+    description: Returns the list of built-in Claude Agent tools.
+    auth: none
+    params: none
+    result:
+      tools:
+        type: array
+        items:
+          name: string
+          description: string
+    errors: none
+
+  # -------------------------------------------------------------------------
+  workspace.register:
+    description: Registers a workspace directory for use in future session calls.
+    auth: "config:write"
+    params:
+      workspace:
+        type: string
+        required: true
+    result:
+      workspace:
+        type: object
+    errors:
+      - -32602  # missing or invalid workspace
+      - -32001  # path does not exist
+
+  # -------------------------------------------------------------------------
+  workspace.list:
+    description: Returns all registered workspaces.
+    auth: "config:write"
+    params: none
+    result:
+      workspaces:
+        type: array
+    errors: none
+
+  # -------------------------------------------------------------------------
+  mcp.add / mcp.remove / mcp.start / mcp.stop / mcp.list:
+    description: Manage MCP (Model Context Protocol) server configurations per workspace.
+    auth: admin
+    notes: See source for full parameter shapes.
+
+  # -------------------------------------------------------------------------
+  config.get / config.set / config.list:
+    description: Read and write per-workspace or user-scoped configuration values.
+    auth: '"config:read" for get/list; "config:write" for set'
+    notes: See source for full parameter shapes.
+
+  # -------------------------------------------------------------------------
+  hooks.add / hooks.remove / hooks.list:
+    description: Register shell command hooks that fire on bridge/session lifecycle events.
+    auth: admin
+    notes: >
+      Hook events: pre_tool_use, post_tool_use, notification, stop, subagent_stop.
+      Hooks fire bridge/hook_triggered notifications.
+
+  # -------------------------------------------------------------------------
+  context.read / context.write / context.list:
+    description: Read and write context files in project or user scope.
+    auth: '"config:read" for read/list; "config:write" for write'
+    notes: See source for full parameter shapes.
+
+# ---------------------------------------------------------------------------
+# Environment variables
+# ---------------------------------------------------------------------------
+environment:
+  AI_SPEC_SDK_TRANSPORT:
+    required: false
+    type: string
+    enum: [stdio, http]
+    default: stdio
+    notes: Default transport mode. Overridden by --transport CLI flag.
+  AI_SPEC_SDK_PORT:
+    required: false
+    type: string
+    default: "8765"
+    notes: HTTP port. Overridden by --port CLI flag.
+  AI_SPEC_SDK_CORS_ORIGINS:
+    required: false
+    type: string
+    default: "*"
+    notes: Allowed CORS origins for the HTTP transport.
+  SPEC_DRIVEN_SCRIPT:
+    required: false
+    type: string
+    notes: >
+      Absolute path to the spec-driven CLI script. When set, overrides the
+      automatic candidate search. Useful in CI or non-standard installations.
+      If unset, the bridge searches these paths in order:
+        1. <cwd>/.config/opencode/skills/spec-driven-apply/scripts/spec-driven.js
+        2. <cwd>/.agents/skills/spec-driven-apply/scripts/spec-driven.js
+        3. <HOME>/.slim-spec-driven/skills/spec-driven-apply/scripts/spec-driven.js
+        4. <HOME>/.config/opencode/skills/spec-driven-apply/scripts/spec-driven.js
+        5. <HOME>/.agents/skills/spec-driven-apply/scripts/spec-driven.js
+        6. /home/code/.config/opencode/skills/spec-driven-apply/scripts/spec-driven.js
+        7. /home/code/.agents/skills/spec-driven-apply/scripts/spec-driven.js
+
+# ---------------------------------------------------------------------------
+# Session lifecycle notes
+# ---------------------------------------------------------------------------
+session_lifecycle:
+  storage: >
+    File-based persistence. Each session is stored as an individual JSON file
+    in the sessions directory (default: ~/.ai-spec-sdk/sessions/). Sessions survive
+    bridge process restarts. When the sessionsDir constructor option is omitted,
+    the store operates in-memory only.
+  id_format: UUID v4 (crypto.randomUUID)
+  status_transitions:
+    active -> completed: agent finishes normally
+    active -> stopped: session.stop is called and the stop flag is observed
+    active -> interrupted: bridge process restarts while session was active
+    completed -> (terminal): no further transitions
+    stopped -> (terminal): no further transitions
+    interrupted -> (terminal): no further transitions
+  recovery: >
+    On bridge startup, the SessionStore loads all session files from disk.
+    Any session with status "active" is changed to "interrupted" and persisted
+    before any client requests are served. Interrupted sessions can be resumed
+    (creates a new SDK session context).
+  stop_semantics: >
+    session.stop sets stopRequested=true and status="stopped" immediately.
+    The running query loop checks shouldStop() between each yielded message.
+    The session.start / session.resume response is not sent until the loop
+    exits, so the caller observes status "stopped" in the final response.
+  history:
+    - Each session begins with one entry of type "user_prompt".
+    - Each resumed session appends one entry of type "resume_prompt".
+    - Each agent yield appends one entry of type "agent_message".
+    - historyLength in session.status reflects the total entry count.
+
+#
+# This file is the authoritative integration reference.
+# Every field, type, enum value, and error code is derived directly from source.
+#
+# Conventions used in this file:
+#   type: string | number | boolean | null | object | array
+#   required: true means the field MUST be present; false means it MAY be omitted
+#   nullable: true means the field MAY be null
+#   enum: exhaustive list of valid values
+
+# ---------------------------------------------------------------------------
+# Transport modes
+# ---------------------------------------------------------------------------
+transport:
+
+  stdio:
+    protocol: jsonrpc-2.0
+    medium: stdio
+    framing: one JSON object per line (newline-delimited, no pretty-printing)
+    encoding: UTF-8
+    direction:
+      client_to_bridge: one request object per line on stdin
+      bridge_to_client: one response or notification object per line on stdout
+    notes:
+      - The bridge process is started as a subprocess by the host tool.
+      - The bridge never writes to stderr for protocol messages; stderr is reserved for
+        unexpected runtime errors only.
+      - Notifications are emitted on stdout interleaved with responses; the client MUST
+        distinguish them by the presence of "method" (notification) vs "result"/"error"
+        (response).
+
+  http:
+    protocol: jsonrpc-2.0
+    medium: HTTP/1.1
+    encoding: UTF-8
+    endpoints:
+      POST /rpc:
+        description: Send a JSON-RPC 2.0 request; receive a JSON-RPC 2.0 response.
+        content_type: application/json (required)
+        body_limit: 10 MB
+        response_status:
+          200: JSON-RPC response (result or error)
+          413: request body exceeded 10 MB
+          415: Content-Type was not application/json
+      GET /events:
+        description: SSE stream of bridge notifications scoped to one session.
+        query_params:
+          sessionId: required; only notifications for this session are emitted
+        content_type: text/event-stream
+        notes:
+          - Multiple clients may subscribe to the same sessionId (fan-out).
+          - Notifications that do not carry a sessionId are never emitted on any SSE stream.
+          - A `: connected` comment is sent immediately on connection.
+          - Heartbeat comments (`: heartbeat`) are sent every 30 seconds.
+          - Response status 400 if sessionId query param is absent.
+      GET /health:
+        description: Health check; no authentication required.
+        response: '{ "status": "ok", "apiVersion": "<semver>" }'
+    cors:
+      header: Access-Control-Allow-Origin
+      default: "*"
+      configurable_via: AI_SPEC_SDK_CORS_ORIGINS env var
+    graceful_shutdown:
+      trigger: SIGTERM
+      sequence:
+        1: stop accepting new connections
+        2: wait for all in-flight POST /rpc requests to complete
+        3: close all SSE connections
+        4: exit
+
+# ---------------------------------------------------------------------------
+# Process startup
+# ---------------------------------------------------------------------------
+startup:
+
+  stdio_mode:
+    binary: node dist/src/cli.js
+    bin_alias: ai-spec-bridge   # available after "bun run build" and install
+    stdin: line-buffered JSON-RPC requests
+    stdout: line-buffered JSON-RPC responses and notifications
+    exit_code:
+      0: normal shutdown (stdin closed)
+      non-zero: unexpected runtime crash
+
+  http_mode:
+    command: ai-spec-bridge --transport http --port 8765
+    env_vars:
+      AI_SPEC_SDK_TRANSPORT: set to "http" to start in HTTP mode
+      AI_SPEC_SDK_PORT: override the default port (8765)
+      AI_SPEC_SDK_CORS_ORIGINS: allowed CORS origins (default "*")
+    exit_code:
+      0: normal shutdown after SIGTERM drain
+      non-zero: unexpected runtime crash
+
+# ---------------------------------------------------------------------------
 # Envelope shapes
 # ---------------------------------------------------------------------------
 envelope:
@@ -256,7 +1549,7 @@ error_codes:
         type: string
   -32050:
     name: VersionMismatch
-    message: "Unsupported API version: <version>" | "No compatible API version found"
+    message: '"Unsupported API version: <version>" | "No compatible API version found"'
     cause: Client requested an API version that does not match the bridge's current version.
     data:
       supportedVersions:

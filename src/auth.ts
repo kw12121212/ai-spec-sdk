@@ -66,6 +66,7 @@ export const METHOD_SCOPES: Record<string, string | null> = {
   "hooks.remove": "admin",
   "hooks.list": "admin",
   "bridge.setLogLevel": "admin",
+  "bridge.info": "admin",
 };
 
 /**

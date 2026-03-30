@@ -1,6 +1,6 @@
 {
   "name": "ai-spec-sdk",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Polyglot JSON-RPC bridge for Claude Agent SDK and spec-driven workflows",
   "type": "module",
   "packageManager": "bun@latest",

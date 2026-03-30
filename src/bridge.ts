@@ -14,6 +14,7 @@ import type { HookEvent } from "./hooks-store.js";
 import { ContextStore } from "./context-store.js";
 import { runClaudeQuery } from "./claude-agent-runner.js";
 import { defaultLogger, VALID_LOG_LEVELS, type Logger, type LogLevel } from "./logger.js";
+import { buildRuntimeInfo, type RuntimeInfoOptions } from "./runtime-info.js";
 
 const METHOD_NOT_FOUND = -32601;
 const INTERNAL_ERROR = -32603;
@@ -211,6 +212,8 @@ export interface BridgeServerOptions {
   workspacesDir?: string;
   logger?: Logger;
   transport?: string;
+  /** Options forwarded to buildRuntimeInfo for bridge.info responses. */
+  runtimeInfoOptions?: RuntimeInfoOptions;
 }
 
 interface AgentQueryContext {
@@ -227,6 +230,7 @@ export class BridgeServer {
   private notify: (message: unknown) => void;
   private logger: Logger;
   private transport: string;
+  private runtimeInfoOptions: RuntimeInfoOptions;
   private sessionStore: SessionStore;
   private workspaceStore: WorkspaceStore;
   private mcpStore: McpStore;
@@ -237,10 +241,11 @@ export class BridgeServer {
   private eventSeq: Map<string, number>;
   private pendingApprovals: Map<string, PendingApproval>;
 
-  constructor({ notify = () => {}, sessionsDir, workspacesDir, logger, transport = "stdio" }: BridgeServerOptions = {}) {
+  constructor({ notify = () => {}, sessionsDir, workspacesDir, logger, transport = "stdio", runtimeInfoOptions }: BridgeServerOptions = {}) {
     this.notify = notify;
     this.logger = logger ?? defaultLogger;
     this.transport = transport;
+    this.runtimeInfoOptions = { transport, sessionsDir, ...runtimeInfoOptions };
     this.sessionStore = new SessionStore(sessionsDir);
     this.workspaceStore = new WorkspaceStore(workspacesDir);
     this.mcpStore = new McpStore((method, params) => {
@@ -362,6 +367,8 @@ export class BridgeServer {
         return this.setLogLevel(params);
       case "bridge.ping":
         return { pong: true, ts: new Date().toISOString() };
+      case "bridge.info":
+        return buildRuntimeInfo(this.runtimeInfoOptions);
       case "skills.list":
         return { skills: BUILTIN_SPEC_SKILLS };
       case "workflow.run":

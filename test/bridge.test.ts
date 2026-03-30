@@ -847,3 +847,104 @@ test("request without apiVersion succeeds normally (opt-in)", async () => {
 
   assert.equal(response.result!.pong, true);
 });
+
+// ── bridge.info tests ─────────────────────────────────────────────────────────
+
+test("bridge.info returns runtime metadata with expected shape", async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "bridge-info-test-"));
+  try {
+    const server = new BridgeServer({ sessionsDir: tmpDir });
+    const response = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 900,
+      method: "bridge.info",
+    });
+
+    assert.equal(response.jsonrpc, "2.0");
+    assert.equal(response.id, 900);
+    assert.ok(!response.error, `unexpected error: ${JSON.stringify(response.error)}`);
+
+    const result = response.result as Record<string, unknown>;
+    assert.equal(typeof result["bridgeVersion"], "string");
+    assert.equal(typeof result["apiVersion"], "string");
+    assert.equal(typeof result["transport"], "string");
+    assert.equal(typeof result["authMode"], "string");
+    assert.equal(typeof result["logLevel"], "string");
+    assert.equal(typeof result["sessionsPath"], "string");
+    assert.equal(typeof result["keysPath"], "string");
+    assert.equal(typeof result["specDrivenScriptPath"], "string");
+    assert.equal(typeof result["nodeVersion"], "string");
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test("bridge.info transport field reflects stdio by default", async () => {
+  const server = new BridgeServer();
+  const response = await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 901,
+    method: "bridge.info",
+  });
+  const result = response.result as Record<string, unknown>;
+  assert.equal(result["transport"], "stdio");
+  assert.equal(result["http"], null);
+});
+
+test("bridge.info transport field reflects http when constructed with http transport", async () => {
+  const server = new BridgeServer({
+    transport: "http",
+    runtimeInfoOptions: { transport: "http", httpPort: 9999, authMode: "bearer" },
+  });
+  const response = await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 902,
+    method: "bridge.info",
+  });
+  const result = response.result as Record<string, unknown>;
+  assert.equal(result["transport"], "http");
+  const http = result["http"] as Record<string, unknown>;
+  assert.ok(http !== null);
+  assert.equal(http["port"], 9999);
+});
+
+test("bridge.info bridgeVersion and apiVersion match capabilities", async () => {
+  const server = new BridgeServer();
+  const [infoResp, capsResp] = await Promise.all([
+    server.handleMessage({ jsonrpc: "2.0", id: 903, method: "bridge.info" }),
+    server.handleMessage({ jsonrpc: "2.0", id: 904, method: "bridge.capabilities" }),
+  ]);
+
+  const info = infoResp.result as Record<string, unknown>;
+  const caps = capsResp.result as Record<string, unknown>;
+  assert.equal(info["bridgeVersion"], caps["bridgeVersion"]);
+  assert.equal(info["apiVersion"], caps["apiVersion"]);
+});
+
+// ── capabilities advertisement tests ─────────────────────────────────────────
+
+test("bridge.capabilities advertises bridge.info in methods", async () => {
+  const server = new BridgeServer();
+  const response = await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 910,
+    method: "bridge.capabilities",
+  });
+  const result = response.result as Record<string, unknown>;
+  const methods = result["methods"] as string[];
+  assert.ok(methods.includes("bridge.info"), "capabilities must advertise bridge.info");
+});
+
+test("bridge.capabilities advertises session.export in methods", async () => {
+  const server = new BridgeServer();
+  const response = await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 911,
+    method: "bridge.capabilities",
+  });
+  const result = response.result as Record<string, unknown>;
+  const methods = result["methods"] as string[];
+  assert.ok(methods.includes("session.export"), "capabilities must advertise session.export");
+  assert.ok(methods.includes("session.delete"), "capabilities must advertise session.delete");
+  assert.ok(methods.includes("session.cleanup"), "capabilities must advertise session.cleanup");
+});
