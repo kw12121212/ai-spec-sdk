@@ -9,9 +9,9 @@
 | 3 | Session Persistence | P0 | ✅ Done | Structured Logging |
 | 4 | HTTP/SSE Transport | P1 | ✅ Done | API Versioning |
 | 5 | Authentication & Authorization | P1 | ✅ Done | HTTP/SSE Transport |
-| 6 | **Mobile Web UI** | **P0** | Planned | HTTP/SSE Transport, Auth |
+| 6 | **Mobile Web UI** | **P0** | ✅ Done | HTTP/SSE Transport, Auth |
 | 7 | Java CLI Demo | P2 | Planned | — |
-| 8 | TypeScript Client SDK | P0 | Planned | Stable API |
+| 8 | TypeScript Client SDK | P0 | ✅ Done | Stable API |
 | 9 | Python Client SDK | P1 | Planned | Stable API |
 | 10 | Streaming Token Output | P0 | Planned | HTTP/SSE Transport |
 | 11 | WebSocket Transport | P1 | Planned | HTTP/SSE Transport |
@@ -267,29 +267,33 @@ Add a mobile-friendly web interface served by the bridge, so users can connect f
 - **Instant updates** — deploy by restarting bridge, no app store review
 
 ### Scope
-- **Static SPA** served by bridge at `GET /` (or `GET /ui/`)
-  - Built as a single HTML file with inline CSS/JS (no build step, no framework)
-  - Or a pre-built bundle in `src/ui/` served as static files
+- **Static SPA** served by bridge at `GET /`
+  - Single HTML file with inline CSS/JS (no build step, no framework)
 - **Login page**: API key input → stored in `localStorage` → auto-used as Bearer token
 - **Chat view** (primary screen):
-  - Start new session: workspace selector + prompt input
+  - Start new session: workspace input (free text + `workspace.list` picker) + prompt input
   - Real-time agent output via SSE (`GET /events`)
-  - Agent message rendering (text, tool_use summaries, results)
-  - Tool approval prompts with approve/reject buttons
-  - Session history scrollback
+  - Agent message rendering by `messageType` (assistant_text, tool_use, tool_result, result)
+  - Tool approval prompts with approve/reject buttons (`session.approveTool`/`session.rejectTool`)
+  - Follow-up prompts via `session.resume`
+  - Session history scrollback with auto-scroll
 - **Session list view**:
-  - Active and past sessions with status badges
-  - Resume or view completed sessions
+  - Active and past sessions with status badges (active=green, completed=blue, stopped=gray, interrupted=orange)
+  - Tap active session → open chat; tap interrupted → prompt resume; tap completed → read-only history
+  - Refresh button
 - **Mobile-first design**:
-  - Touch-friendly (large tap targets, swipe gestures)
-  - Dark mode support (`prefers-color-scheme`)
-  - Responsive: works on phones (375px+) and tablets
+  - Touch-friendly (44px min tap targets, 16px min font)
+  - Dark mode via `prefers-color-scheme`
+  - Responsive: 375px+ phones, 768px+ tablets, 1024px+ desktop
   - No horizontal scroll
 - **Bridge changes**:
-  - Serve static files from `src/ui/` via HTTP server
-  - New env `AI_SPEC_SDK_UI_ENABLED` (default: `true` when HTTP transport is active)
-  - SSE reconnection with `Last-Event-ID` for mobile network drops
-  - Session event buffering for brief disconnections
+  - `GET /` serves `src/ui/index.html` (no auth required)
+  - `AI_SPEC_SDK_UI_ENABLED` env var (default: enabled, set to `"false"` to disable)
+  - `bridge.capabilities` includes `ui` field
+- **SSE reconnection**:
+  - Exponential backoff (1s → 2s → 4s → ... → 30s cap)
+  - Replay missed events via `session.events` with `since` parameter
+  - Deduplication by event sequence number
 
 ### Out of Scope
 - Native iOS/Android app (web covers both)
@@ -300,24 +304,30 @@ Add a mobile-friendly web interface served by the bridge, so users can connect f
 
 ### Key Decisions
 - **No framework** — vanilla HTML/CSS/JS keeps it dependency-free and fast on mobile; the UI is a thin client (chat + list), not a complex app
-- **Served by bridge** — no separate web server; `GET /` serves the UI, `POST /rpc` and `GET /events` are the API
+- **Served at `GET /`** — simplest URL for mobile users; API endpoints unchanged
+- **Single HTML file** — `src/ui/index.html` with inline CSS and JS; no build step
 - **API key auth** — reuse existing auth; user enters key once, stored in browser
 - **Mobile-first CSS** — design for phone first, scale up for tablet/desktop
+- **`session.events` for reconnection** — uses existing bridge method instead of `Last-Event-ID` SSE headers
 
-### Estimated Spec Files
-- `specs/ui/mobile-web-ui.md` (new spec file)
+### Spec Files
+- `specs/ui/mobile-web-ui.md` (new)
+- `specs/bridge/http-sse-transport.md` (delta: static UI serving)
 
 ### Tasks
-1. [ ] Create `src/ui/index.html` with mobile-first layout (chat + session list)
-2. [ ] Implement API key login flow with `localStorage` persistence
-3. [ ] Implement chat view: prompt input, SSE event rendering, session lifecycle
-4. [ ] Implement tool approval UI (approve/reject buttons)
-5. [ ] Implement session list view with status filtering
-6. [ ] Add CSS: dark mode, responsive breakpoints, touch-friendly sizing
-7. [ ] Integrate static file serving into `src/http-server.ts` (`GET /` → `src/ui/`)
-8. [ ] Add `AI_SPEC_SDK_UI_ENABLED` env var
-9. [ ] Test on Chrome Mobile, Safari Mobile, Firefox Mobile
-10. [ ] Update `docs/bridge-contract.yaml`
+1. [x] Create `src/ui/index.html` with HTML structure for login, session list, and chat views
+2. [x] Implement CSS: mobile-first layout, dark mode, responsive breakpoints, touch-friendly sizing
+3. [x] Implement login view: API key input, `localStorage` persistence, `bridge.capabilities` validation
+4. [x] Implement `rpc()` helper: JSON-RPC 2.0 `POST /rpc` wrapper with Bearer token
+5. [x] Implement session list view: `session.list`, status badges, prompt preview, tap handlers
+6. [x] Implement chat view — new session form: workspace input + picker, prompt input, permission mode
+7. [x] Implement chat view — SSE event rendering by messageType (assistant_text, tool_use, tool_result, result)
+8. [x] Implement tool approval UI: approve/reject buttons calling `session.approveTool`/`session.rejectTool`
+9. [x] Implement SSE reconnection: exponential backoff, `session.events` replay, deduplication
+10. [x] Implement logout: clear `localStorage`, close SSE, return to login
+11. [x] Add `GET /` static file handler to `src/http-server.ts` with `AI_SPEC_SDK_UI_ENABLED` env var
+12. [x] Update `src/capabilities.ts` to advertise UI support
+13. [x] Unit tests: GET / serving, auth bypass, endpoint coexistence, capabilities ui field
 
 ---
 
@@ -420,15 +430,15 @@ Provide an official npm package (`@ai-spec-sdk/client`) so Node.js/Bun consumers
 - **Dual transport** — same client API works over stdio or HTTP
 
 ### Tasks
-1. [ ] Create `packages/client/` with `package.json`, `tsconfig.json`
-2. [ ] Implement `StdioTransport`: spawn bridge, JSON-RPC over stdin/stdout
-3. [ ] Implement `HttpTransport`: POST /rpc + GET /events SSE
-4. [ ] Define typed method interfaces for all 39+ bridge methods
-5. [ ] Implement `BridgeClient` class with method dispatch and event handling
-6. [ ] Add reconnection logic for HTTP transport
-7. [ ] Write unit tests with mock transport
-8. [ ] Write integration tests against real bridge
-9. [ ] Publish README with usage examples
+1. [x] Create `packages/client/` with `package.json`, `tsconfig.json`
+2. [x] Implement `StdioTransport`: spawn bridge, JSON-RPC over stdin/stdout
+3. [x] Implement `HttpTransport`: POST /rpc + GET /events SSE
+4. [x] Define typed method interfaces for all 39+ bridge methods
+5. [x] Implement `BridgeClient` class with method dispatch and event handling
+6. [x] Add reconnection logic for HTTP transport
+7. [x] Write unit tests with mock transport
+8. [x] Write integration tests against real bridge
+9. [x] Publish README with usage examples
 
 ---
 
@@ -792,11 +802,11 @@ Phase 3 (v0.4.0): ✅ HTTP/SSE Transport
 Phase 4 (v0.5.0): ✅ Authentication & Authorization
   └── ✅ API keys, scopes, method-level access control
 
-Phase 5 (v0.6.0): Mobile Web UI
-  └── Mobile-first chat interface, served by bridge, API key login
+Phase 5 (v0.6.0): ✅ Mobile Web UI
+  └── ✅ Mobile-first SPA at GET /, API key login, chat, session list, tool approval, SSE reconnection
 
-Phase 6 (v0.7.0): TS Client SDK + Streaming
-  ├── TS Client SDK: official npm client package
+Phase 6 (v0.7.0): ✅ TS Client SDK + Streaming
+  ├── ✅ TS Client SDK: official npm client package
   └── Streaming Token Output: real-time agent response
 
 Phase 7 (v0.8.0): Cross-Platform Release + Custom Tools + Rate Limiting
@@ -829,8 +839,8 @@ v1.0.0: All above stabilized
 | v0.3.0 | ✅ Session Persistence | `SessionStore` internal refactor (no API break) |
 | v0.4.0 | ✅ HTTP/SSE Transport | None (new transport, stdio unchanged) |
 | v0.5.0 | ✅ Auth | HTTP requests now require Bearer token by default |
-| v0.6.0 | **Mobile Web UI** | None (additive, static files served by bridge) |
-| v0.7.0 | TS Client SDK, Streaming | None (additive) |
+| v0.6.0 | ✅ Mobile Web UI | None (additive, static file served by bridge) |
+| v0.7.0 | ✅ TS Client SDK, Streaming | None (additive) |
 | v0.8.0 | Cross-Platform Release, Custom Tools, Rate Limiting | None (additive) |
 | v0.9.0 | WebSocket, Multi-Agent, Python Client | None (new transport, sub-agents opt-in) |
 | v0.10.0 | OpenTelemetry, Templates, Webhooks, Java CLI Demo | None (additive) |
@@ -849,7 +859,7 @@ Structured Logging ──┬──> ✅ Session Persistence
                                                                 ├──> Webhooks
                                                                 └──> OpenTelemetry Metrics
 
-Mobile Web UI (depends on HTTP/SSE Transport + Auth)
+✅ Mobile Web UI (depends on ✅ HTTP/SSE Transport + ✅ Auth)
 Java CLI Demo (independent, low priority)
 TS Client SDK (depends on stable API)
 Python Client SDK (depends on stable API + TS Client patterns)
