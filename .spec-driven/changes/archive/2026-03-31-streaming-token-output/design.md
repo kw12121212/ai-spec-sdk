@@ -1,0 +1,68 @@
+# Design: streaming-token-output
+
+## Approach
+
+### 1. SDK Partial Message Interception
+
+The Claude Agent SDK iterator by default yields complete messages (`AssistantMessage`, `ResultMessage`). To get streaming chunks, the bridge must:
+
+1. Pass a flag to the SDK query options to enable partial message delivery
+2. Filter the iterator output for `content_block_delta` events within partial assistant messages
+3. Forward each delta as a `stream_chunk` notification immediately
+
+The `onEvent` callback in `_runQuery` will be extended:
+- When `stream: false` (default): behavior identical to today — each iterator yield is classified and emitted as `assistant_text`, `tool_use`, etc.
+- When `stream: true`: the callback additionally checks for partial message events. `content_block_delta` events with `type: "text_delta"` are forwarded as `stream_chunk`. When the complete assistant message arrives (non-partial), it is still emitted as a full `assistant_text`.
+
+### 2. stream_chunk Event Format
+
+```
+{
+  "sessionId": "abc",
+  "type": "agent_message",
+  "messageType": "stream_chunk",
+  "content": "partial text fragment",
+  "index": 0
+}
+```
+
+- `index`: 0-based counter per assistant message turn, incremented for each chunk
+- `content`: the raw text delta from the SDK
+- After all chunks for a turn, the normal `assistant_text` event is emitted with the complete text
+
+### 3. Session Start/Resume Param
+
+`session.start` and `session.resume` accept an optional `stream` boolean in params. When present and `true`, the session's streaming flag is stored in `SessionStore` and passed to `runClaudeQuery`.
+
+### 4. Capabilities Advertisement
+
+`bridge.capabilities` response adds a `streaming: true` field.
+
+### 5. TS Client SDK Update
+
+The `BridgeClient` event listener API already handles `session_event` with various `messageType` values. `stream_chunk` is another message type — no new listener registration needed, just a new value in the union type.
+
+### 6. Web UI Update
+
+In the chat view's SSE event handler, when `messageType === "stream_chunk"`:
+- If the last rendered element is an `assistant_text` bubble being streamed, append the chunk content to it
+- Auto-scroll behavior remains the same (scroll to bottom on new content)
+- When the full `assistant_text` arrives, replace the streaming bubble with the final text
+
+## Key Decisions
+
+- **stream_chunk is a messageType, not a separate notification** — keeps the event model unified; all session-scoped events flow through `bridge/session_event`
+- **Full assistant_text still emitted** — clients that don't care about streaming get the same data; streaming clients can ignore the duplicate or use it as a completion signal
+- **index counter per turn** — allows clients to detect gaps or reorder if needed; resets on each new assistant message
+- **Opt-in via `stream: true`** — zero risk to existing clients
+
+## Alternatives Considered
+
+### Separate `bridge/stream_chunk` notification
+Would require a new notification channel. Rejected — adding a new `messageType` to the existing `bridge/session_event` is simpler and consistent with how `assistant_text`, `tool_use`, etc. work.
+
+### No final assistant_text when streaming
+Would break clients that only listen for `assistant_text`. Rejected — always emit the complete message for compatibility.
+
+### Chunk-level deduplication in event buffer
+Would require complex bookkeeping for marginal benefit. Rejected — `stream_chunk` events are stored in the event buffer like any other event; `session.events` replay returns them in order.

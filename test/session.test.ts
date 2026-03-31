@@ -1594,3 +1594,260 @@ test("session.stop auto-denies pending tool approvals", async () => {
     fs.rmSync(ws, { recursive: true, force: true });
   }
 });
+
+// ── Streaming tests ──────────────────────────────────────────────────────────
+
+test("session.start with stream: true emits stream_chunk events", async () => {
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-stream-"));
+  const notifications: unknown[] = [];
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* queryStub({ prompt, options }: {
+    prompt: string;
+    options: Record<string, unknown>;
+  }) {
+    yield { type: "system", subtype: "init", session_id: "sdk-stream-1" };
+    // When includePartialMessages is true, emit streaming events
+    if (options["includePartialMessages"]) {
+      yield {
+        type: "stream_event",
+        event: { type: "content_block_delta", delta: { type: "text_delta", text: "Hel" } },
+        parent_tool_use_id: null,
+        uuid: "u1",
+        session_id: "sdk-stream-1",
+      };
+      yield {
+        type: "stream_event",
+        event: { type: "content_block_delta", delta: { type: "text_delta", text: "lo!" } },
+        parent_tool_use_id: null,
+        uuid: "u2",
+        session_id: "sdk-stream-1",
+      };
+    }
+    // Then the complete assistant message
+    yield {
+      type: "assistant",
+      message: { role: "assistant", content: [{ type: "text", text: "Hello!" }] },
+    };
+    yield { result: "done" };
+  };
+
+  try {
+    const server = new BridgeServer({
+      notify: (message) => notifications.push(message),
+    });
+
+    const response = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "session.start",
+      params: {
+        workspace: ws,
+        prompt: "stream test",
+        stream: true,
+      },
+    });
+
+    const result = response.result as Record<string, unknown>;
+    assert.equal(result["status"], "completed");
+
+    // Find stream_chunk notifications
+    const streamChunks = notifications.filter((n) => {
+      const params = (n as Record<string, unknown>)["params"] as Record<string, unknown>;
+      return params?.["messageType"] === "stream_chunk";
+    });
+    assert.equal(streamChunks.length, 2, "should emit 2 stream_chunk events");
+
+    // Verify content and index
+    const chunk0 = (streamChunks[0] as Record<string, unknown>)["params"] as Record<string, unknown>;
+    assert.equal(chunk0["content"], "Hel");
+    assert.equal(chunk0["index"], 0);
+
+    const chunk1 = (streamChunks[1] as Record<string, unknown>)["params"] as Record<string, unknown>;
+    assert.equal(chunk1["content"], "lo!");
+    assert.equal(chunk1["index"], 1);
+
+    // Verify the full assistant_text was also emitted
+    const assistantTexts = notifications.filter((n) => {
+      const params = (n as Record<string, unknown>)["params"] as Record<string, unknown>;
+      return params?.["messageType"] === "assistant_text";
+    });
+    assert.equal(assistantTexts.length, 1, "should emit 1 complete assistant_text");
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    fs.rmSync(ws, { recursive: true, force: true });
+  }
+});
+
+test("session.start without stream (default) emits no stream_chunk events", async () => {
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-nostream-"));
+  const notifications: unknown[] = [];
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* queryStub() {
+    yield { type: "system", subtype: "init", session_id: "sdk-nostream-1" };
+    yield {
+      type: "assistant",
+      message: { role: "assistant", content: [{ type: "text", text: "Hello!" }] },
+    };
+    yield { result: "done" };
+  };
+
+  try {
+    const server = new BridgeServer({
+      notify: (message) => notifications.push(message),
+    });
+
+    await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "session.start",
+      params: {
+        workspace: ws,
+        prompt: "no stream test",
+      },
+    });
+
+    const streamChunks = notifications.filter((n) => {
+      const params = (n as Record<string, unknown>)["params"] as Record<string, unknown>;
+      return params?.["messageType"] === "stream_chunk";
+    });
+    assert.equal(streamChunks.length, 0, "should emit 0 stream_chunk events when stream is not set");
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    fs.rmSync(ws, { recursive: true, force: true });
+  }
+});
+
+test("stream_chunk index resets per turn", async () => {
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-stream-reset-"));
+  const notifications: unknown[] = [];
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* queryStub({ options }: {
+    options: Record<string, unknown>;
+  }) {
+    yield { type: "system", subtype: "init", session_id: "sdk-reset-1" };
+    if (options["includePartialMessages"]) {
+      // Turn 1 chunks
+      yield {
+        type: "stream_event",
+        event: { type: "content_block_delta", delta: { type: "text_delta", text: "A" } },
+        parent_tool_use_id: null, uuid: "u1", session_id: "sdk-reset-1",
+      };
+    }
+    // Turn 1 complete
+    yield {
+      type: "assistant",
+      message: { role: "assistant", content: [{ type: "text", text: "A" }] },
+    };
+    // Turn 2 chunks
+    if (options["includePartialMessages"]) {
+      yield {
+        type: "stream_event",
+        event: { type: "content_block_delta", delta: { type: "text_delta", text: "B" } },
+        parent_tool_use_id: null, uuid: "u3", session_id: "sdk-reset-1",
+      };
+    }
+    // Turn 2 complete
+    yield {
+      type: "assistant",
+      message: { role: "assistant", content: [{ type: "text", text: "B" }] },
+    };
+    yield { result: "done" };
+  };
+
+  try {
+    const server = new BridgeServer({
+      notify: (message) => notifications.push(message),
+    });
+
+    await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "session.start",
+      params: { workspace: ws, prompt: "multi-turn stream", stream: true },
+    });
+
+    const streamChunks = notifications.filter((n) => {
+      const params = (n as Record<string, unknown>)["params"] as Record<string, unknown>;
+      return params?.["messageType"] === "stream_chunk";
+    });
+    assert.equal(streamChunks.length, 2);
+
+    const chunk0 = (streamChunks[0] as Record<string, unknown>)["params"] as Record<string, unknown>;
+    assert.equal(chunk0["index"], 0, "first turn chunk should have index 0");
+
+    // After assistant_text resets the counter, the second turn's first chunk should be index 0
+    const chunk1 = (streamChunks[1] as Record<string, unknown>)["params"] as Record<string, unknown>;
+    assert.equal(chunk1["index"], 0, "second turn chunk should reset to index 0");
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    fs.rmSync(ws, { recursive: true, force: true });
+  }
+});
+
+test("bridge.capabilities includes streaming: true", async () => {
+  const server = new BridgeServer();
+  const response = await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 1,
+    method: "bridge.capabilities",
+  });
+  const result = response.result as Record<string, unknown>;
+  assert.equal(result["streaming"], true);
+});
+
+test("stream_chunk events stored in event buffer and replayable via session.events", async () => {
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-stream-replay-"));
+  const notifications: unknown[] = [];
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* queryStub({ options }: {
+    options: Record<string, unknown>;
+  }) {
+    yield { type: "system", subtype: "init", session_id: "sdk-replay-1" };
+    if (options["includePartialMessages"]) {
+      yield {
+        type: "stream_event",
+        event: { type: "content_block_delta", delta: { type: "text_delta", text: "X" } },
+        parent_tool_use_id: null, uuid: "u1", session_id: "sdk-replay-1",
+      };
+    }
+    yield {
+      type: "assistant",
+      message: { role: "assistant", content: [{ type: "text", text: "X" }] },
+    };
+    yield { result: "done" };
+  };
+
+  try {
+    const server = new BridgeServer({
+      notify: (message) => notifications.push(message),
+    });
+
+    const startResp = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "session.start",
+      params: { workspace: ws, prompt: "replay test", stream: true },
+    });
+    const sessionId = (startResp.result as Record<string, unknown>)["sessionId"] as string;
+
+    // Now get events from the buffer
+    const eventsResp = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 2,
+      method: "session.events",
+      params: { sessionId, limit: 100 },
+    });
+    const eventsResult = eventsResp.result as Record<string, unknown>;
+    const events = eventsResult["events"] as Array<Record<string, unknown>>;
+
+    // Should include the stream_chunk event in the buffer
+    const streamChunks = events.filter((e) => {
+      const payload = e["payload"] as Record<string, unknown>;
+      return payload?.["messageType"] === "stream_chunk";
+    });
+    assert.ok(streamChunks.length > 0, "event buffer should contain stream_chunk events");
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    fs.rmSync(ws, { recursive: true, force: true });
+  }
+});

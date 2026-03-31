@@ -18,6 +18,7 @@ export interface Session {
   updatedAt: string;
   status: "active" | "completed" | "stopped" | "interrupted";
   stopRequested: boolean;
+  stream: boolean;
   history: SessionHistoryEntry[];
   result: unknown;
 }
@@ -68,7 +69,7 @@ export class SessionStore {
     fs.renameSync(tmpPath, finalPath);
   }
 
-  create(workspace: string, prompt: string): Session {
+  create(workspace: string, prompt: string, stream: boolean = false): Session {
     const sessionId = crypto.randomUUID();
     const createdAt = nowIso();
 
@@ -80,6 +81,7 @@ export class SessionStore {
       updatedAt: createdAt,
       status: "active",
       stopRequested: false,
+      stream,
       history: [
         {
           type: "user_prompt",

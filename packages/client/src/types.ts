@@ -27,6 +27,7 @@ export interface CapabilitiesResult {
   transport: string;
   bridgeVersion: string;
   apiVersion: string;
+  streaming: boolean;
   notifications: { progress: boolean; sessionEvent: boolean };
   workflows: string[];
   skills: SkillInfo[];
@@ -114,6 +115,7 @@ export interface SessionStartParams {
   permissionMode?: PermissionMode;
   maxTurns?: number;
   systemPrompt?: string;
+  stream?: boolean;
   proxy?: ProxyParams;
   options?: Record<string, unknown>;
 }
@@ -134,6 +136,7 @@ export interface SessionResumeParams {
   permissionMode?: PermissionMode;
   maxTurns?: number;
   systemPrompt?: string;
+  stream?: boolean;
   proxy?: ProxyParams;
   options?: Record<string, unknown>;
 }

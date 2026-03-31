@@ -93,6 +93,7 @@ export interface Capabilities {
   transport: string;
   bridgeVersion: string;
   apiVersion: string;
+  streaming: boolean;
   notifications: { progress: boolean; sessionEvent: boolean };
   workflows: readonly string[];
   skills: readonly SkillInfo[];
@@ -111,6 +112,7 @@ export function getCapabilities(transport = "stdio"): Capabilities {
     transport,
     bridgeVersion: BRIDGE_VERSION,
     apiVersion: API_VERSION,
+    streaming: true,
     notifications: {
       progress: true,
       sessionEvent: true,

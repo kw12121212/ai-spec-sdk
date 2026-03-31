@@ -139,6 +139,34 @@ function classifyMessageType(message: unknown): string {
   return "other";
 }
 
+/**
+ * Check if a message is a streaming partial message (SDKPartialAssistantMessage)
+ * with type === 'stream_event' and event.type === 'content_block_delta'.
+ */
+function isStreamEvent(message: unknown): boolean {
+  if (message === null || typeof message !== "object") return false;
+  const msg = message as Record<string, unknown>;
+  if (msg["type"] !== "stream_event") return false;
+  const event = msg["event"] as Record<string, unknown> | undefined;
+  if (!event || typeof event !== "object") return false;
+  return event["type"] === "content_block_delta";
+}
+
+/**
+ * Extract the text delta from a streaming partial message.
+ * Returns null if the event is not a text_delta.
+ */
+function extractTextDelta(message: unknown): string | null {
+  if (message === null || typeof message !== "object") return null;
+  const msg = message as Record<string, unknown>;
+  const event = msg["event"] as Record<string, unknown> | undefined;
+  if (!event || typeof event !== "object") return null;
+  const delta = event["delta"] as Record<string, unknown> | undefined;
+  if (!delta || typeof delta !== "object") return null;
+  if (delta["type"] !== "text_delta") return null;
+  return typeof delta["text"] === "string" ? delta["text"] : null;
+}
+
 export interface ProxyParams {
   http?: string;
   https?: string;
@@ -471,7 +499,7 @@ export class BridgeServer {
     requestId: unknown,
   ): Promise<unknown> {
     const { workspace, prompt, options = {}, proxy } = params;
-    const { model, allowedTools, disallowedTools, permissionMode, maxTurns, systemPrompt } = params;
+    const { model, allowedTools, disallowedTools, permissionMode, maxTurns, systemPrompt, stream } = params;
 
     if (!workspace || typeof workspace !== "string") {
       throw new BridgeError(-32602, "'workspace' must be provided");
@@ -479,6 +507,10 @@ export class BridgeServer {
 
     if (!prompt || typeof prompt !== "string") {
       throw new BridgeError(-32602, "'prompt' must be provided");
+    }
+
+    if (stream !== undefined && typeof stream !== "boolean") {
+      throw new BridgeError(-32602, "'stream' must be a boolean");
     }
 
     const typedOptions = options as Record<string, unknown>;
@@ -506,7 +538,7 @@ export class BridgeServer {
       proxyEnv,
     );
 
-    const session = this.sessionStore.create(resolvedWorkspace, prompt);
+    const session = this.sessionStore.create(resolvedWorkspace, prompt, stream === true);
 
     this.emit(
       "bridge/session_event",
@@ -528,7 +560,7 @@ export class BridgeServer {
     requestId: unknown,
   ): Promise<unknown> {
     const { sessionId, prompt, options = {}, proxy } = params;
-    const { model, allowedTools, disallowedTools, permissionMode, maxTurns, systemPrompt } = params;
+    const { model, allowedTools, disallowedTools, permissionMode, maxTurns, systemPrompt, stream } = params;
 
     if (!sessionId || typeof sessionId !== "string") {
       throw new BridgeError(-32602, "'sessionId' must be provided");
@@ -541,6 +573,10 @@ export class BridgeServer {
 
     if (!prompt || typeof prompt !== "string") {
       throw new BridgeError(-32602, "'prompt' must be provided");
+    }
+
+    if (stream !== undefined && typeof stream !== "boolean") {
+      throw new BridgeError(-32602, "'stream' must be a boolean");
     }
 
     const typedOptions = options as Record<string, unknown>;
@@ -557,6 +593,11 @@ export class BridgeServer {
       throw new BridgeError(SDK_SESSION_ID_UNAVAILABLE, "Session SDK ID not available", {
         sessionId,
       });
+    }
+
+    // Update stream flag if specified, otherwise keep existing value
+    if (stream === true) {
+      session.stream = true;
     }
 
     const proxyParams = validateProxy(proxy);
@@ -585,7 +626,7 @@ export class BridgeServer {
   }
 
   private async _runQuery(
-    session: { id: string },
+    session: { id: string; stream?: boolean },
     prompt: string,
     options: Record<string, unknown>,
     context: AgentQueryContext,
@@ -600,6 +641,15 @@ export class BridgeServer {
       };
     }
 
+    const isStreaming = Boolean(session.stream);
+
+    if (isStreaming) {
+      resolvedOptions = { ...resolvedOptions, includePartialMessages: true };
+    }
+
+    // Track per-turn chunk index for streaming
+    let streamChunkIndex = 0;
+
     const queryResult = await runClaudeQuery({
       prompt,
       options: resolvedOptions,
@@ -613,6 +663,32 @@ export class BridgeServer {
         const current = this.sessionStore.get(session.id);
         if (current?.stopRequested) {
           return;
+        }
+
+        // Handle streaming partial messages (SDKPartialAssistantMessage with content_block_delta)
+        if (isStreaming && isStreamEvent(message)) {
+          const textDelta = extractTextDelta(message);
+          if (textDelta !== null) {
+            this.sessionStore.appendEvent(session.id, {
+              type: "stream_chunk",
+              message: { content: textDelta, index: streamChunkIndex },
+            });
+
+            this.emit(
+              "bridge/session_event",
+              {
+                sessionId: session.id,
+                type: "agent_message",
+                messageType: "stream_chunk",
+                content: textDelta,
+                index: streamChunkIndex,
+              },
+              requestId,
+            );
+
+            streamChunkIndex++;
+          }
+          return; // Don't emit agent_message for partial events
         }
 
         if (
@@ -634,6 +710,12 @@ export class BridgeServer {
         });
 
         const msgType = classifyMessageType(message);
+
+        // Reset chunk index when a complete assistant message arrives (new turn)
+        if (msgType === "assistant_text" || msgType === "tool_use") {
+          streamChunkIndex = 0;
+        }
+
         this.emit(
           "bridge/session_event",
           { sessionId: session.id, type: "agent_message", messageType: msgType, message },
