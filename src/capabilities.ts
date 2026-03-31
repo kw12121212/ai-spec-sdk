@@ -102,6 +102,7 @@ export interface Capabilities {
   models: readonly ModelInfo[];
   tools: readonly ToolInfo[];
   hookEvents: readonly string[];
+  ui: { enabled: boolean; path: string };
 }
 
 export function getCapabilities(transport = "stdio"): Capabilities {
@@ -175,5 +176,9 @@ export function getCapabilities(transport = "stdio"): Capabilities {
       "stop",
       "subagent_stop",
     ],
+    ui: {
+      enabled: transport === "http" && process.env["AI_SPEC_SDK_UI_ENABLED"] !== "false",
+      path: "/",
+    },
   };
 }

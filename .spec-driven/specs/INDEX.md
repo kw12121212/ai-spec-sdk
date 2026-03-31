@@ -1,15 +1,18 @@
 # Specs Index
 
-<!-- One entry per spec file. Updated by /spec-driven-archive after each change. -->
+ <!-- One entry per spec file. Updated by /spec-driven-archive after each change. -->
 
-- `build/native-executable.md` — Native executable build via bun compile: script, output path, self-contained binary, and unchanged tsc build
-- `bridge/json-rpc-stdio.md` — JSON-RPC 2.0 stdio transport, capability discovery (complete method surface including bridge.info), bridge.info runtime metadata method, streaming notifications, session event schema, agent message sub-type contract, session listing, MCP server lifecycle management (workspace-scoped), config management (project/user scope), hooks system (5 event types with blocking pre_tool_use), Go CLI integration example, bridge.setLogLevel runtime log level adjustment, and API versioning (bridge.negotiateVersion, per-request validation, error -32050)
-- `bridge/http-sse-transport.md` — HTTP/SSE transport: POST /rpc (JSON-RPC over HTTP), GET /events (session-scoped SSE fan-out), GET /health, CORS support, 10 MB body limit, graceful SIGTERM shutdown, transport field in capabilities
-- `network/proxy-forwarding.md` — Explicit proxy configuration for agent sessions (HTTP_PROXY / HTTPS_PROXY / NO_PROXY)
-- `session/agent-sessions.md` — Agent session start, resume, progress observation, stop, workspace alignment, SDK session ID retention, agent control parameters, disk persistence with crash recovery (interrupted status), session history retrieval (session.history with pagination), session list prompt field, session export, session delete, session cleanup, and Go CLI session management example
-- `skills/builtin-spec-skills.md` — Built-in spec-driven skill discovery and workflow-to-skill alignment
-- `workflow/spec-driven-workflows.md` — Workflow invocation, result reporting, capability mapping, workspace-scoped safety, and Go CLI workflow execution example
-- `observability/structured-logging.md` — Structured JSON logging to stderr with level filtering, child context propagation, and AI_SPEC_SDK_LOG_LEVEL env var
-- `observability/runtime-diagnostics.md` — CLI help output, doctor human-readable and --json diagnostic commands with runtime metadata and checks
-- `security/authentication.md` — HTTP transport API-key authentication, scope-based authorization, public unauthenticated discovery methods, key management CLI, no-auth development mode, and admin-only bridge.info authorization
-- `docs/integrator-onboarding.md` — README onboarding coverage, bridge contract completeness, and version consistency across user-facing surfaces
+- `build/native-executable.md` — Native executable build via bun compile: script, output path, self-contained binary+ and unchanged tsc build
+6
+ - `bridge/json-rpc-stdio.md` — JSON-RPC 2.0 stdio transport, capability discovery (complete method surface including bridge.info, bridge.info runtime metadata method, streaming notifications, session event schema, agent message sub-type contract; session listing, MCP server lifecycle management (workspace-scoped) config management (project/user scope) hooks system (5 event types with blocking pre_tool_use), Go CLI integration example, bridge.setLogLevel runtime log level adjustment; and API versioning (bridge.negotiateVersion, per-request validation, error -32050)
+7- `bridge/http-sse-transport.md` — HTTP/SSE transport: POST /rpc (JSON-RPC over http), GET /events (session-scoped SSE fan-out), GET /health` CORS support` 10 MB body limit` and graceful SIGTERM shutdown. transport field in capabilities` response includes `transport` field. `GET /` reports transport: `"http"` when running in HTTP mode. `GET /events` endpoint streams a `GET /events?sessionId=<id>` query parameter
+ Multiple clients MAY subscribe to the same `sessionId` (fan-out). Notifications that do not carry a `sessionId` field are not sent to any SSE connection. Multiple clients MAY subscribe to the same `sessionId` on the server-sent events. Notifications use `Close()` event to remove the subscription; SseManager removes(session`sessionId`, and `res` by the `close` event. HTTP requests to drain in-flight `POST /rpc` requests first. let current request drain (1). Existing endpoints remain unchanged. See graceful shutdown section. When the bridge process receives `SIGTERM` signal stops accepting new connections, drain in-flight requests complete before closing SSE connections. All new SSE connections.
+
+   `res.writeHead(204);
+  res.end();
+}
+```
+8- `observability/structured-logging.md` — Structured JSON logging to stderr with level filtering, child context propagation, and AI_spec_SDK_LOG_LEVEL env var
+13- `observability/runtime-diagnostics.md` — CLI help output: doctor human-readable and --json diagnostic commands with runtime metadata and checks
+14- `security/authentication.md` — HTTP transport API-key authentication, scope-based authorization, public unauthenticated discovery methods, key management CLI, no-auth development mode, and admin-only bridge.info authorization
+15- `ui/mobile-web-ui.md` — Mobile-first web UI: login, session list, chat, and tool approval/reject UI. SSE reconnection with event replay | offline mode

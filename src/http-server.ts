@@ -1,10 +1,17 @@
 import http from "node:http";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { URL } from "node:url";
 import { BridgeServer } from "./bridge.js";
 import { BridgeError } from "./errors.js";
 import { API_VERSION } from "./capabilities.js";
 import { loadKeys } from "./key-store.js";
 import { verifyKey, checkScope, METHOD_SCOPES } from "./auth.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const UI_HTML_PATH = path.join(__dirname, "ui", "index.html");
+const UI_ENABLED = process.env["AI_SPEC_SDK_UI_ENABLED"] !== "false";
 
 const MAX_BODY_BYTES = 10 * 1024 * 1024; // 10 MB
 
@@ -245,6 +252,24 @@ export function startHttpServer(options: HttpServerOptions = {}): Promise<HttpSe
     if (req.method === "GET" && pathname === "/health") {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ status: "ok", apiVersion: API_VERSION }));
+      return;
+    }
+
+    // GET / — serve mobile web UI (no auth required)
+    if (req.method === "GET" && pathname === "/") {
+      if (!UI_ENABLED) {
+        res.writeHead(404, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Not found" }));
+        return;
+      }
+      try {
+        const html = fs.readFileSync(UI_HTML_PATH, "utf8");
+        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+        res.end(html);
+      } catch {
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "UI file not found" }));
+      }
       return;
     }
 

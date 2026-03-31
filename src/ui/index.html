@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>AI Spec Bridge</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#fff;--bg-card:#f5f5f5;--bg-input:#fff;--bg-bubble:#e8e8e8;
+  --text:#1a1a1a;--text2:#666;--text-inv:#fff;
+  --border:#ddd;--accent:#4f46e5;--accent-hover:#4338ca;
+  --green:#16a34a;--blue:#2563eb;--gray:#9ca3af;--orange:#ea580c;
+  --red:#dc2626;--radius:12px;--radius-sm:8px;
+  --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+@media(prefers-color-scheme:dark){
+  :root{
+    --bg:#0f0f0f;--bg-card:#1a1a1a;--bg-input:#222;--bg-bubble:#262626;
+    --text:#e5e5e5;--text2:#999;--text-inv:#fff;
+    --border:#333;--accent:#6366f1;--accent-hover:#818cf8;
+    --green:#22c55e;--blue:#3b82f6;--gray:#6b7280;--orange:#f97316;
+    --red:#ef4444;
+  }
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--font);font-size:16px;line-height:1.5}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:none;border-radius:var(--radius-sm);min-height:44px;min-width:44px;padding:10px 18px;font-weight:600;transition:opacity .15s}
+button:active{opacity:.7}
+input,select{background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;min-height:44px;width:100%}
+
+/* Layout */
+#app{display:flex;flex-direction:column;height:100%;max-width:720px;margin:0 auto}
+.view{display:none;flex-direction:column;height:100%;overflow:hidden}
+.view.active{display:flex}
+
+/* Header */
+.header{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg)}
+.header h1{font-size:18px;font-weight:700;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.header button{padding:6px 12px;font-size:13px;background:transparent;color:var(--accent);font-weight:600}
+.header button:hover{background:var(--bg-card)}
+
+/* Login */
+#login-view{justify-content:center;align-items:center;padding:24px}
+#login-view .card{background:var(--bg-card);border-radius:var(--radius);padding:32px 24px;width:100%;max-width:360px}
+#login-view h2{text-align:center;margin-bottom:8px;font-size:22px}
+#login-view p{text-align:center;color:var(--text2);margin-bottom:24px;font-size:14px}
+#login-view input{margin-bottom:12px}
+#login-view .btn-primary{width:100%;background:var(--accent);color:var(--text-inv);margin-top:4px}
+#login-view .btn-primary:hover{background:var(--accent-hover)}
+#login-view .error{color:var(--red);font-size:14px;text-align:center;margin-top:12px;display:none}
+
+/* Session List */
+#sessions-view{overflow:hidden}
+.session-list{flex:1;overflow-y:auto;padding:12px 16px;-webkit-overflow-scrolling:touch}
+.session-card{background:var(--bg-card);border-radius:var(--radius);padding:14px 16px;margin-bottom:10px;cursor:pointer;transition:opacity .15s}
+.session-card:active{opacity:.7}
+.session-card .top{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-inv)}
+.badge-active{background:var(--green)}.badge-completed{background:var(--blue)}.badge-stopped{background:var(--gray)}.badge-interrupted{background:var(--orange)}
+.session-card .prompt{font-size:14px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.session-card .meta{font-size:12px;color:var(--text2);margin-top:4px}
+.session-card .meta span{margin-right:12px}
+.btn-new{background:var(--accent);color:var(--text-inv);margin:0 16px 12px;width:calc(100% - 32px)}
+.btn-new:hover{background:var(--accent-hover)}
+.refresh-btn{font-size:13px;background:transparent;color:var(--accent);padding:6px 10px}
+
+/* Chat */
+#chat-view{overflow:hidden}
+.chat-messages{flex:1;overflow-y:auto;padding:12px 16px;-webkit-overflow-scrolling:touch}
+.chat-input-bar{display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--border);flex-shrink:0;background:var(--bg)}
+.chat-input-bar input{flex:1}
+.chat-input-bar .send-btn{background:var(--accent);color:var(--text-inv);padding:10px 16px;flex-shrink:0}
+.chat-input-bar .send-btn:hover{background:var(--accent-hover)}
+
+/* New session form (shown inside chat view) */
+.new-session-form{padding:16px;max-width:480px;margin:0 auto}
+.new-session-form label{display:block;font-size:13px;font-weight:600;color:var(--text2);margin-bottom:4px;margin-top:12px}
+.new-session-form label:first-child{margin-top:0}
+.new-session-form input,.new-session-form select{margin-bottom:4px}
+.ws-row{display:flex;gap:8px}
+.ws-row input{flex:1}
+.ws-row button{background:var(--bg-card);border:1px solid var(--border);padding:10px 12px;font-size:13px;flex-shrink:0}
+.ws-picker{display:none;margin-top:4px}
+.ws-picker.visible{display:block}
+.ws-picker .ws-option{padding:10px 14px;border-radius:var(--radius-sm);cursor:pointer;font-size:14px}
+.ws-picker .ws-option:hover,.ws-picker .ws-option:active{background:var(--bg-card)}
+.new-session-form .start-btn{width:100%;background:var(--accent);color:var(--text-inv);margin-top:16px}
+.new-session-form .start-btn:hover{background:var(--accent-hover)}
+
+/* Chat messages */
+.msg{margin-bottom:10px;animation:fadeIn .2s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.msg-assistant{background:var(--bg-bubble);border-radius:var(--radius);padding:12px 14px;white-space:pre-wrap;word-break:break-word;font-size:15px}
+.msg-tool{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px}
+.msg-tool .tool-name{font-weight:700;font-size:13px;color:var(--accent);margin-bottom:4px}
+.msg-tool .tool-input{font-size:13px;color:var(--text2);white-space:pre-wrap;word-break:break-word;max-height:120px;overflow:hidden}
+.msg-result{background:var(--bg-card);border-left:3px solid var(--accent);border-radius:var(--radius);padding:12px 14px}
+.msg-result .result-type{font-weight:700;font-size:13px;margin-bottom:4px}
+.msg-result .result-text{white-space:pre-wrap;word-break:break-word;font-size:14px;max-height:200px;overflow:hidden}
+.msg-status{text-align:center;padding:8px;font-size:13px;color:var(--text2)}
+.msg-status .usage{font-size:12px;color:var(--text2);margin-top:4px}
+
+/* Tool approval */
+.msg-approval{background:var(--bg-card);border:2px solid var(--orange);border-radius:var(--radius);padding:14px}
+.msg-approval .approval-header{font-weight:700;font-size:14px;margin-bottom:8px;color:var(--orange)}
+.msg-approval .approval-body{font-size:13px;white-space:pre-wrap;word-break:break-word;max-height:120px;overflow:hidden;margin-bottom:12px}
+.msg-approval .approval-actions{display:flex;gap:8px}
+.msg-approval .btn-approve{background:var(--green);color:var(--text-inv);flex:1}
+.msg-approval .btn-reject{background:var(--red);color:var(--text-inv);flex:1}
+.msg-approval.resolved{border-color:var(--border);opacity:.6}
+.msg-approval.resolved .approval-actions{display:none}
+.msg-approval .resolution{font-size:12px;font-weight:600;margin-top:8px}
+
+/* Responsive: tablets+ */
+@media(min-width:768px){
+  .new-session-form{padding:24px 32px}
+  .chat-messages{padding:16px 24px}
+  .session-list{padding:16px 24px}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- Login View -->
+  <div id="login-view" class="view">
+    <div class="card">
+      <h2>AI Spec Bridge</h2>
+      <p>Enter your API key to connect</p>
+      <input type="password" id="key-input" placeholder="API key" autocomplete="off">
+      <button class="btn-primary" id="login-btn">Connect</button>
+      <div class="error" id="login-error"></div>
+    </div>
+  </div>
+
+  <!-- Session List View -->
+  <div id="sessions-view" class="view">
+    <div class="header">
+      <h1>Sessions</h1>
+      <button class="refresh-btn" id="refresh-btn">Refresh</button>
+      <button id="logout-btn">Logout</button>
+    </div>
+    <button class="btn-new" id="new-session-btn">+ New Session</button>
+    <div class="session-list" id="session-list"></div>
+  </div>
+
+  <!-- Chat View -->
+  <div id="chat-view" class="view">
+    <div class="header">
+      <button id="back-btn">Back</button>
+      <h1 id="chat-title">Chat</h1>
+    </div>
+    <div class="chat-messages" id="chat-messages"></div>
+    <div class="chat-input-bar" id="chat-input-bar" style="display:none">
+      <input type="text" id="prompt-input" placeholder="Type a message...">
+      <button class="send-btn" id="send-btn">Send</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+// ── State ──────────────────────────────────────────────────────────────────────
+var state = {
+  apiKey: localStorage.getItem("ai_spec_sdk_api_key") || null,
+  currentView: "login",
+  activeSessionId: null,
+  activeSessionStatus: null,
+  eventSeq: 0,
+  renderedSeqs: new Set(),
+  eventSource: null,
+  reconnectTimer: null,
+  reconnectDelay: 1000,
+  sseConnected: false
+};
+
+// ── DOM refs ───────────────────────────────────────────────────────────────────
+var $ = function(id){ return document.getElementById(id); };
+var loginView = $("login-view"), sessionsView = $("sessions-view"), chatView = $("chat-view");
+var keyInput = $("key-input"), loginBtn = $("login-btn"), loginError = $("login-error");
+var sessionListEl = $("session-list"), refreshBtn = $("refresh-btn"), logoutBtn = $("logout-btn"), newSessionBtn = $("new-session-btn");
+var chatMessages = $("chat-messages"), chatInputBar = $("chat-input-bar"), promptInput = $("prompt-input"), sendBtn = $("send-btn");
+var backBtn = $("back-btn"), chatTitle = $("chat-title");
+
+// ── View management ────────────────────────────────────────────────────────────
+function showView(name) {
+  state.currentView = name;
+  loginView.classList.toggle("active", name === "login");
+  sessionsView.classList.toggle("active", name === "sessions");
+  chatView.classList.toggle("active", name === "chat");
+}
+
+// ── RPC helper ─────────────────────────────────────────────────────────────────
+function rpc(method, params) {
+  var headers = { "Content-Type": "application/json" };
+  if (state.apiKey) headers["Authorization"] = "Bearer " + state.apiKey;
+  return fetch("/rpc", {
+    method: "POST",
+    headers: headers,
+    body: JSON.stringify({ jsonrpc: "2.0", id: Date.now(), method: method, params: params || {} })
+  }).then(function(r){ return r.json(); }).then(function(j){
+    if (j.error) throw j.error;
+    return j.result;
+  });
+}
+
+// ── Login ──────────────────────────────────────────────────────────────────────
+loginBtn.onclick = doLogin;
+keyInput.onkeydown = function(e){ if (e.key === "Enter") doLogin(); };
+
+function doLogin() {
+  var key = keyInput.value.trim();
+  if (!key) return;
+  loginError.style.display = "none";
+  state.apiKey = key;
+  rpc("bridge.capabilities").then(function(){
+    localStorage.setItem("ai_spec_sdk_api_key", key);
+    showView("sessions");
+    loadSessions();
+  }).catch(function(err){
+    state.apiKey = null;
+    loginError.textContent = (err && err.message) || "Invalid API key";
+    loginError.style.display = "block";
+  });
+}
+
+// ── Session list ───────────────────────────────────────────────────────────────
+refreshBtn.onclick = loadSessions;
+newSessionBtn.onclick = showNewSessionForm;
+
+function loadSessions() {
+  rpc("session.list").then(function(res){
+    var sessions = (res && res.sessions) || [];
+    sessionListEl.innerHTML = "";
+    if (sessions.length === 0) {
+      sessionListEl.innerHTML = '<div style="text-align:center;color:var(--text2);padding:40px 16px">No sessions yet</div>';
+      return;
+    }
+    sessions.forEach(function(s){
+      var card = document.createElement("div");
+      card.className = "session-card";
+      var badgeClass = "badge badge-" + s.status;
+      var prompt = s.prompt ? (s.prompt.length > 100 ? s.prompt.substring(0, 100) + "..." : s.prompt) : "No prompt";
+      var ws = s.workspace ? s.workspace.split("/").pop() || s.workspace : "";
+      card.innerHTML =
+        '<div class="top"><span class="' + badgeClass + '">' + esc(s.status) + '</span></div>' +
+        '<div class="prompt">' + esc(prompt) + '</div>' +
+        '<div class="meta"><span>' + esc(ws) + '</span><span>' + timeAgo(s.updatedAt || s.createdAt) + '</span></div>';
+      card.onclick = function(){ openSession(s); };
+      sessionListEl.appendChild(card);
+    });
+  }).catch(function(){});
+}
+
+// ── Open session ───────────────────────────────────────────────────────────────
+function openSession(s) {
+  if (s.status === "active") {
+    connectChat(s.sessionId, s.status);
+  } else if (s.status === "interrupted") {
+    if (confirm("Resume this interrupted session?")) {
+      resumeSession(s.sessionId);
+    }
+  } else {
+    // completed / stopped — show history read-only
+    showHistory(s.sessionId, s.status);
+  }
+}
+
+function showHistory(sessionId, status) {
+  state.activeSessionId = sessionId;
+  state.activeSessionStatus = status;
+  chatTitle.textContent = "Session";
+  chatMessages.innerHTML = "";
+  chatInputBar.style.display = "none";
+  showView("chat");
+  rpc("session.history", { sessionId: sessionId, limit: 200 }).then(function(res){
+    var entries = (res && res.entries) || [];
+    entries.forEach(function(e){ renderHistoryEntry(e); });
+    scrollBottom();
+  });
+}
+
+function renderHistoryEntry(entry) {
+  if (!entry || !entry.type) return;
+  if (entry.type === "agent_message" && entry.messageType) {
+    renderAgentMessage(entry.messageType, entry.message);
+  } else if (entry.type === "session_completed") {
+    appendStatus("Session completed" + usageStr(entry.result));
+  } else if (entry.type === "session_stopped") {
+    appendStatus("Session stopped");
+  }
+}
+
+// ── New session form ───────────────────────────────────────────────────────────
+function showNewSessionForm() {
+  state.activeSessionId = null;
+  state.activeSessionStatus = null;
+  chatTitle.textContent = "New Session";
+  chatMessages.innerHTML = "";
+  chatInputBar.style.display = "none";
+
+  var form = document.createElement("div");
+  form.className = "new-session-form";
+  form.innerHTML =
+    '<label>Workspace</label>' +
+    '<div class="ws-row"><input type="text" id="ws-input" placeholder="/path/to/project"><button id="ws-pick-btn">Pick</button></div>' +
+    '<div class="ws-picker" id="ws-picker"></div>' +
+    '<label>Permission Mode</label>' +
+    '<select id="perm-select"><option value="bypassPermissions" selected>Bypass Permissions</option><option value="default">Default</option><option value="acceptEdits">Accept Edits</option><option value="approve">Approve</option></select>' +
+    '<label>Prompt</label>' +
+    '<input type="text" id="ns-prompt" placeholder="What do you want to do?">' +
+    '<button class="start-btn" id="ns-start">Start Session</button>';
+  chatMessages.appendChild(form);
+  showView("chat");
+
+  var wsPickBtn = $("ws-pick-btn"), wsPicker = $("ws-picker"), wsInput = $("ws-input");
+  wsPickBtn.onclick = function(){
+    if (wsPicker.classList.contains("visible")) {
+      wsPicker.classList.remove("visible");
+      return;
+    }
+    rpc("workspace.list").then(function(res){
+      var ws = (res && res.workspaces) || [];
+      wsPicker.innerHTML = "";
+      if (ws.length === 0) {
+        wsPicker.innerHTML = '<div class="ws-option" style="color:var(--text2)">No workspaces registered</div>';
+      } else {
+        ws.forEach(function(w){
+          var opt = document.createElement("div");
+          opt.className = "ws-option";
+          opt.textContent = w.path || w;
+          opt.onclick = function(){ wsInput.value = w.path || w; wsPicker.classList.remove("visible"); };
+          wsPicker.appendChild(opt);
+        });
+      }
+      wsPicker.classList.add("visible");
+    });
+  };
+
+  var nsStart = $("ns-start"), nsPrompt = $("ns-prompt"), permSelect = $("perm-select");
+  nsStart.onclick = function(){
+    var workspace = wsInput.value.trim();
+    var prompt = nsPrompt.value.trim();
+    if (!prompt) return;
+    rpc("session.start", { workspace: workspace || ".", prompt: prompt, permissionMode: permSelect.value }).then(function(res){
+      state.activeSessionId = res.sessionId;
+      state.activeSessionStatus = "active";
+      connectChat(res.sessionId, "active");
+    }).catch(function(err){
+      alert(((err && err.message) || "Failed to start session"));
+    });
+  };
+  nsPrompt.onkeydown = function(e){ if (e.key === "Enter") nsStart.click(); };
+}
+
+// ── Chat view ──────────────────────────────────────────────────────────────────
+function connectChat(sessionId, status) {
+  state.activeSessionId = sessionId;
+  state.activeSessionStatus = status;
+  state.eventSeq = 0;
+  state.renderedSeqs = new Set();
+  state.reconnectDelay = 1000;
+  chatTitle.textContent = "Session";
+  chatMessages.innerHTML = "";
+  chatInputBar.style.display = "flex";
+  showView("chat");
+  openSSE(sessionId);
+}
+
+function openSSE(sessionId) {
+  closeSSE();
+  state.sseConnected = true;
+  var es = new EventSource("/events?sessionId=" + encodeURIComponent(sessionId));
+  state.eventSource = es;
+
+  es.addEventListener("session_event", function(e){
+    try {
+      var data = JSON.parse(e.data);
+      var params = data.params || data;
+      handleSessionEvent(params);
+    } catch(ex){}
+  });
+
+  es.addEventListener("tool_approval_requested", function(e){
+    try {
+      var data = JSON.parse(e.data);
+      var params = data.params || data;
+      renderToolApproval(params);
+    } catch(ex){}
+  });
+
+  es.addEventListener("message", function(e){
+    try {
+      var data = JSON.parse(e.data);
+      if (data.method === "bridge/session_event") {
+        handleSessionEvent(data.params);
+      } else if (data.method === "bridge/tool_approval_requested") {
+        renderToolApproval(data.params);
+      }
+    } catch(ex){}
+  });
+
+  es.onerror = function(){
+    state.sseConnected = false;
+    scheduleReconnect();
+  };
+}
+
+function closeSSE() {
+  if (state.reconnectTimer) { clearTimeout(state.reconnectTimer); state.reconnectTimer = null; }
+  if (state.eventSource) { state.eventSource.close(); state.eventSource = null; }
+  state.sseConnected = false;
+}
+
+function scheduleReconnect() {
+  if (state.currentView !== "chat" || !state.activeSessionId) return;
+  state.reconnectTimer = setTimeout(function(){
+    reconnectWithReplay();
+  }, state.reconnectDelay);
+  state.reconnectDelay = Math.min(state.reconnectDelay * 2, 30000);
+}
+
+function reconnectWithReplay() {
+  if (!state.activeSessionId) return;
+  rpc("session.events", { sessionId: state.activeSessionId, since: state.eventSeq }).then(function(res){
+    var events = (res && res.events) || [];
+    events.forEach(function(ev){
+      var seq = ev.seq || 0;
+      if (!state.renderedSeqs.has(seq)) {
+        handleSessionEvent(ev);
+      }
+    });
+    openSSE(state.activeSessionId);
+  }).catch(function(){
+    scheduleReconnect();
+  });
+}
+
+// ── Handle SSE events ──────────────────────────────────────────────────────────
+function handleSessionEvent(params) {
+  if (!params) return;
+  var seq = params.seq || 0;
+  if (seq > 0) {
+    if (state.renderedSeqs.has(seq)) return;
+    state.renderedSeqs.add(seq);
+    state.eventSeq = Math.max(state.eventSeq, seq);
+  }
+
+  var type = params.type;
+  if (type === "agent_message") {
+    renderAgentMessage(params.messageType, params.message);
+  } else if (type === "session_completed") {
+    appendStatus("Session completed" + usageStr(params.result));
+    state.activeSessionStatus = "completed";
+  } else if (type === "session_stopped") {
+    appendStatus("Session stopped");
+    state.activeSessionStatus = "stopped";
+  } else if (type === "session_started" || type === "session_resumed") {
+    appendStatus(type === "session_started" ? "Session started" : "Session resumed");
+  }
+  scrollBottom();
+}
+
+// ── Rendering ──────────────────────────────────────────────────────────────────
+function renderAgentMessage(messageType, message) {
+  if (!message) return;
+  var div = document.createElement("div");
+
+  if (messageType === "assistant_text") {
+    div.className = "msg msg-assistant";
+    var content = message.content || message;
+    if (Array.isArray(content)) {
+      div.textContent = content.map(function(b){ return b.text || ""; }).join("");
+    } else {
+      div.textContent = typeof content === "string" ? content : JSON.stringify(content, null, 2);
+    }
+  } else if (messageType === "tool_use") {
+    div.className = "msg msg-tool";
+    var blocks = message.content || [];
+    if (!Array.isArray(blocks)) blocks = [blocks];
+    var html = "";
+    blocks.forEach(function(b){
+      if (b.type === "tool_use") {
+        html += '<div class="tool-name">' + esc(b.name || "tool") + '</div>';
+        var input = b.input;
+        if (input) {
+          var s = typeof input === "string" ? input : JSON.stringify(input, null, 2);
+          if (s.length > 500) s = s.substring(0, 500) + "...";
+          html += '<div class="tool-input">' + esc(s) + '</div>';
+        }
+      }
+    });
+    div.innerHTML = html || '<div class="tool-name">tool_use</div>';
+  } else if (messageType === "tool_result") {
+    div.className = "msg msg-tool";
+    var content = message.content || [];
+    if (!Array.isArray(content)) content = [content];
+    var text = content.map(function(b){
+      if (typeof b === "string") return b;
+      return b.text || JSON.stringify(b);
+    }).join("\n");
+    if (text.length > 500) text = text.substring(0, 500) + "...";
+    div.innerHTML = '<div class="tool-name">Result</div><div class="tool-input">' + esc(text) + '</div>';
+  } else if (messageType === "result") {
+    div.className = "msg msg-result";
+    var subtype = message.subtype || "success";
+    var text = message.result ? (typeof message.result === "string" ? message.result : JSON.stringify(message.result, null, 2)) : "";
+    if (text.length > 500) text = text.substring(0, 500) + "...";
+    div.innerHTML = '<div class="result-type">' + esc(subtype) + '</div><div class="result-text">' + esc(text) + '</div>';
+  } else {
+    // system_init, other
+    div.className = "msg msg-status";
+    div.textContent = messageType || "event";
+  }
+
+  chatMessages.appendChild(div);
+}
+
+function renderToolApproval(params) {
+  var div = document.createElement("div");
+  div.className = "msg msg-approval";
+  div.id = "approval-" + params.requestId;
+  var inputStr = params.input ? JSON.stringify(params.input, null, 2) : "";
+  if (inputStr.length > 500) inputStr = inputStr.substring(0, 500) + "...";
+  div.innerHTML =
+    '<div class="approval-header">Tool Approval Requested</div>' +
+    '<div><strong>' + esc(params.toolName || "tool") + '</strong></div>' +
+    (inputStr ? '<div class="approval-body">' + esc(inputStr) + '</div>' : '') +
+    '<div class="approval-actions">' +
+    '<button class="btn-approve">Approve</button>' +
+    '<button class="btn-reject">Reject</button>' +
+    '</div>' +
+    '<div class="resolution" style="display:none"></div>';
+
+  var approveBtn = div.querySelector(".btn-approve");
+  var rejectBtn = div.querySelector(".btn-reject");
+  var resolution = div.querySelector(".resolution");
+
+  approveBtn.onclick = function(){
+    rpc("session.approveTool", { sessionId: params.sessionId, requestId: params.requestId }).then(function(){
+      div.classList.add("resolved");
+      resolution.textContent = "Approved";
+      resolution.style.display = "block";
+    }).catch(function(err){
+      resolution.textContent = "Error: " + ((err && err.message) || "failed");
+      resolution.style.display = "block";
+    });
+  };
+
+  rejectBtn.onclick = function(){
+    rpc("session.rejectTool", { sessionId: params.sessionId, requestId: params.requestId }).then(function(){
+      div.classList.add("resolved");
+      resolution.textContent = "Rejected";
+      resolution.style.display = "block";
+    }).catch(function(err){
+      resolution.textContent = "Error: " + ((err && err.message) || "failed");
+      resolution.style.display = "block";
+    });
+  };
+
+  chatMessages.appendChild(div);
+  scrollBottom();
+}
+
+function appendStatus(text) {
+  var div = document.createElement("div");
+  div.className = "msg msg-status";
+  div.textContent = text;
+  chatMessages.appendChild(div);
+}
+
+function usageStr(result) {
+  if (result && result.usage) {
+    return " (" + (result.usage.inputTokens || 0) + " in / " + (result.usage.outputTokens || 0) + " out tokens)";
+  }
+  return "";
+}
+
+// ── Chat input ─────────────────────────────────────────────────────────────────
+sendBtn.onclick = sendPrompt;
+promptInput.onkeydown = function(e){ if (e.key === "Enter" && !e.shiftKey) sendPrompt(); };
+
+function sendPrompt() {
+  var text = promptInput.value.trim();
+  if (!text || !state.activeSessionId) return;
+  promptInput.value = "";
+  // Show user message
+  var div = document.createElement("div");
+  div.className = "msg msg-assistant";
+  div.style.background = "var(--accent)";
+  div.style.color = "var(--text-inv)";
+  div.textContent = text;
+  chatMessages.appendChild(div);
+
+  rpc("session.resume", { sessionId: state.activeSessionId, prompt: text }).catch(function(err){
+    appendStatus("Error: " + ((err && err.message) || "failed"));
+  });
+}
+
+// ── Resume ─────────────────────────────────────────────────────────────────────
+function resumeSession(sessionId) {
+  rpc("session.resume", { sessionId: sessionId, prompt: "" }).then(function(res){
+    connectChat(sessionId, "active");
+  }).catch(function(err){
+    alert(((err && err.message) || "Failed to resume session"));
+  });
+}
+
+// ── Back ───────────────────────────────────────────────────────────────────────
+backBtn.onclick = function(){
+  closeSSE();
+  state.activeSessionId = null;
+  showView("sessions");
+  loadSessions();
+};
+
+// ── Logout ─────────────────────────────────────────────────────────────────────
+logoutBtn.onclick = function(){
+  closeSSE();
+  state.apiKey = null;
+  state.activeSessionId = null;
+  localStorage.removeItem("ai_spec_sdk_api_key");
+  keyInput.value = "";
+  showView("login");
+};
+
+// ── Auto-scroll ────────────────────────────────────────────────────────────────
+var userScrolled = false;
+chatMessages.addEventListener("scroll", function(){
+  var atBottom = chatMessages.scrollHeight - chatMessages.scrollTop - chatMessages.clientHeight < 60;
+  userScrolled = !atBottom;
+});
+
+function scrollBottom() {
+  if (!userScrolled) {
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+}
+
+// ── Utilities ──────────────────────────────────────────────────────────────────
+function esc(s) {
+  if (!s) return "";
+  var d = document.createElement("div");
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function timeAgo(iso) {
+  if (!iso) return "";
+  var d = new Date(iso), now = Date.now(), diff = Math.floor((now - d.getTime()) / 1000);
+  if (diff < 60) return "just now";
+  if (diff < 3600) return Math.floor(diff / 60) + "m ago";
+  if (diff < 86400) return Math.floor(diff / 3600) + "h ago";
+  return Math.floor(diff / 86400) + "d ago";
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────────
+if (state.apiKey) {
+  rpc("bridge.capabilities").then(function(){
+    showView("sessions");
+    loadSessions();
+  }).catch(function(){
+    state.apiKey = null;
+    localStorage.removeItem("ai_spec_sdk_api_key");
+    showView("login");
+  });
+} else {
+  showView("login");
+}
+
+})();
+</script>
+</body>
+</html>
