@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ai-spec-sdk"
+version = "0.1.0"
+description = "Python client SDK for ai-spec-sdk bridge"
+license = "Apache-2.0"
+requires-python = ">=3.10"
+dependencies = [
+    "claude-agent-sdk",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ai_spec_sdk"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
