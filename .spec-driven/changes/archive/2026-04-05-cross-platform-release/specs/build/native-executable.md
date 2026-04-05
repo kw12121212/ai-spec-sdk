@@ -1,20 +1,4 @@
-# Native Executable Build
-
-### Requirement: build:native script exists
-
-The project MUST expose a `build:native` script in `package.json`.
-
-### Requirement: build:native produces executable binary
-
-Running `build:native` MUST produce a self-contained executable at `dist/ai-spec-bridge-native` (or `dist/ai-spec-bridge-native.exe` on Windows, added automatically by bun).
-
-### Requirement: native binary is self-contained
-
-The produced executable MUST start the JSON-RPC stdio bridge when invoked directly, without requiring a separate Node.js or Bun runtime on the target machine.
-
-### Requirement: existing build script unchanged
-
-The `build` script (tsc) MUST remain unchanged and continue to emit JS to `dist/`.
+## ADDED Requirements
 
 ### Requirement: per-platform build scripts exist
 
@@ -31,3 +15,7 @@ The project MUST expose a `build:native:all` script that compiles all five platf
 ### Requirement: checksum files are generated for all native binaries
 
 Running `build:native:all` MUST produce one `.sha256` file per binary, named `<binary-filename>.sha256`, containing the hex digest of that binary.
+
+### Requirement: existing build:native script is unchanged
+
+The existing `build:native` script (no target flag, output at `dist/ai-spec-bridge-native`) MUST remain present and unchanged.

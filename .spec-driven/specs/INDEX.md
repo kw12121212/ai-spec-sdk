@@ -2,7 +2,8 @@
 
  <!-- One entry per spec file. Updated by /spec-driven-archive after each change. -->
 
-- `build/native-executable.md` — Native executable build via bun compile: script, output path, self-contained binary+ and unchanged tsc build
+- `build/native-executable.md` — Native executable build: single-platform and per-platform (linux-x64, linux-arm64, macos-x64, macos-arm64, windows-x64) bun compile scripts, SHA-256 checksums via build:native:all, and unchanged tsc build
+- `build/sdk-packaging.md` — SDK packaging via build:pack: npm pack for @ai-spec-sdk/client (.tgz) and python -m build --wheel for ai-spec-sdk (.whl), locally installable without registry access
 6
  - `bridge/json-rpc-stdio.md` — JSON-RPC 2.0 stdio transport, capability discovery (complete method surface including bridge.info, bridge.info runtime metadata method, streaming notifications, session event schema, agent message sub-type contract; session listing, MCP server lifecycle management (workspace-scoped) config management (project/user scope) hooks system (5 event types with blocking pre_tool_use), Go CLI integration example, bridge.setLogLevel runtime log level adjustment; streaming token output (stream_chunk messageType); and API versioning (bridge.negotiateVersion, per-request validation, error -32050)
 7- `bridge/http-sse-transport.md` — HTTP/SSE transport: POST /rpc (JSON-RPC over http), GET /events (session-scoped SSE fan-out), GET /health` CORS support` 10 MB body limit` and graceful SIGTERM shutdown. transport field in capabilities` response includes `transport` field. `GET /` reports transport: `"http"` when running in HTTP mode. `GET /events` endpoint streams a `GET /events?sessionId=<id>` query parameter
