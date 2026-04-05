@@ -23,6 +23,7 @@ Make the bridge distributable and production-safe: native binaries for all platf
 - `cross-platform-release` - native binaries for all platforms via CI
 - `rate-limiting` - per-key token bucket rate limiting for HTTP transport
 - `custom-tool-registration` - workspace-scoped shell-command custom tools
+- `sdk-publish-workflow` - automated npm and PyPI publish for client SDKs
 
 ## Dependencies
 - 02-production-ready — rate-limiting requires auth-and-authorization; custom-tool-registration requires session persistence
