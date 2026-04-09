@@ -146,6 +146,8 @@ export function getCapabilities(transport = "stdio"): Capabilities {
       "workspace.register",
       "workspace.list",
       "tools.list",
+      "tools.register",
+      "tools.unregister",
       "mcp.add",
       "mcp.remove",
       "mcp.start",

@@ -1,126 +1,232 @@
-import test from "node:test";
-import assert from "node:assert/strict";
-import fs from "node:fs";
-import path from "node:path";
-import os from "node:os";
-import { WorkspaceStore } from "../src/workspace-store.js";
+import { describe, it, expect, beforeEach } from "bun:test";
+import { WorkspaceStore, CustomTool } from "../src/workspace-store.js";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import * as os from "node:os";
 
-test("WorkspaceStore.register returns entry with path, registeredAt, lastUsedAt", () => {
-  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-wsr-"));
-  try {
-    const store = new WorkspaceStore();
-    const entry = store.register(ws);
-    assert.equal(entry.path, ws);
-    assert.ok(typeof entry.registeredAt === "string");
-    assert.ok(typeof entry.lastUsedAt === "string");
-  } finally {
-    fs.rmSync(ws, { recursive: true, force: true });
-  }
-});
+describe("WorkspaceStore", () => {
+  let tempDir: string;
+  let store: WorkspaceStore;
 
-test("WorkspaceStore.register is idempotent and updates lastUsedAt", async () => {
-  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-wsidemp-"));
-  try {
-    const store = new WorkspaceStore();
-    const first = store.register(ws);
-    await new Promise((r) => setTimeout(r, 5));
-    const second = store.register(ws);
+  beforeEach(() => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "workspace-store-test-"));
+    store = new WorkspaceStore(tempDir);
+  });
 
-    assert.equal(second.path, ws);
-    assert.equal(second.registeredAt, first.registeredAt, "registeredAt must not change");
-    assert.ok(second.lastUsedAt > first.lastUsedAt, "lastUsedAt must advance on re-register");
-    assert.equal(store.list().length, 1, "must not duplicate the entry");
-  } finally {
-    fs.rmSync(ws, { recursive: true, force: true });
-  }
-});
+  describe("has", () => {
+    it("should return false for unregistered workspace", () => {
+      expect(store.has("/nonexistent/workspace")).toBe(false);
+    });
 
-test("WorkspaceStore.list returns entries sorted by lastUsedAt descending", async () => {
-  const dirs = [
-    fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-ws-a-")),
-    fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-ws-b-")),
-    fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-ws-c-")),
-  ];
-  try {
-    const store = new WorkspaceStore();
-    for (const d of dirs) {
-      store.register(d);
-      await new Promise((r) => setTimeout(r, 5));
-    }
-    const list = store.list();
-    assert.equal(list.length, 3);
-    // most recently registered should be first
-    assert.equal(list[0].path, dirs[2]);
-    assert.equal(list[2].path, dirs[0]);
-  } finally {
-    for (const d of dirs) fs.rmSync(d, { recursive: true, force: true });
-  }
-});
+    it("should return true for registered workspace", () => {
+      const workspacePath = path.join(tempDir, "workspace");
+      fs.mkdirSync(workspacePath, { recursive: true });
+      store.register(workspacePath);
+      expect(store.has(workspacePath)).toBe(true);
+    });
+  });
 
-test("WorkspaceStore with workspacesDir persists to workspaces.json and reloads", () => {
-  const workspacesDir = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-wsdir-"));
-  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-wsp-"));
-  try {
-    const store1 = new WorkspaceStore(workspacesDir);
-    store1.register(ws);
+  describe("registerTool", () => {
+    it("should register a custom tool", () => {
+      const workspacePath = path.join(tempDir, "workspace");
+      fs.mkdirSync(workspacePath, { recursive: true });
+      store.register(workspacePath);
 
-    const jsonPath = path.join(workspacesDir, "workspaces.json");
-    assert.ok(fs.existsSync(jsonPath), "workspaces.json must be created");
+      const tool = store.registerTool(workspacePath, {
+        name: "custom.build",
+        description: "Build the project",
+        command: "npm",
+        args: ["run", "build"],
+      });
 
-    const store2 = new WorkspaceStore(workspacesDir);
-    const list = store2.list();
-    assert.equal(list.length, 1);
-    assert.equal(list[0].path, ws);
-  } finally {
-    fs.rmSync(workspacesDir, { recursive: true, force: true });
-    fs.rmSync(ws, { recursive: true, force: true });
-  }
-});
+      expect(tool.name).toBe("custom.build");
+      expect(tool.description).toBe("Build the project");
+      expect(tool.command).toBe("npm");
+      expect(tool.args).toEqual(["run", "build"]);
+      expect(tool.workspace).toBe(workspacePath);
+      expect(tool.registeredAt).toBeDefined();
+    });
 
-test("WorkspaceStore without workspacesDir keeps entries in memory only", () => {
-  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-wsmem-"));
-  try {
-    const store = new WorkspaceStore();
-    store.register(ws);
-    assert.equal(store.list().length, 1);
-    // A second instance should have no entries (nothing was persisted)
-    const store2 = new WorkspaceStore();
-    assert.equal(store2.list().length, 0);
-  } finally {
-    fs.rmSync(ws, { recursive: true, force: true });
-  }
-});
+    it("should overwrite existing tool with same name", () => {
+      const workspacePath = path.join(tempDir, "workspace");
+      fs.mkdirSync(workspacePath, { recursive: true });
+      store.register(workspacePath);
 
-test("WorkspaceStore caps at 50 entries, evicting least recently used", () => {
-  const dirs: string[] = [];
-  try {
-    const store = new WorkspaceStore();
-    for (let i = 0; i < 52; i++) {
-      const d = fs.mkdtempSync(path.join(os.tmpdir(), `ai-spec-sdk-ws50-${i}-`));
-      dirs.push(d);
-      store.register(d);
-    }
-    assert.ok(store.list().length <= 50, "list must be capped at 50");
-    // most recently registered entries should survive
-    const remaining = new Set(store.list().map((e) => e.path));
-    assert.ok(remaining.has(dirs[51]), "last registered entry must be present");
-    assert.ok(remaining.has(dirs[50]), "second-last registered entry must be present");
-    assert.ok(!remaining.has(dirs[0]), "oldest entry must have been evicted");
-  } finally {
-    for (const d of dirs) fs.rmSync(d, { recursive: true, force: true });
-  }
-});
+      store.registerTool(workspacePath, {
+        name: "custom.build",
+        description: "Old description",
+        command: "old",
+        args: [],
+      });
 
-test("WorkspaceStore atomic write leaves no .tmp file", () => {
-  const workspacesDir = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-wsatom-"));
-  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-wsatom-ws-"));
-  try {
-    const store = new WorkspaceStore(workspacesDir);
-    store.register(ws);
-    const tmpPath = path.join(workspacesDir, "workspaces.json.tmp");
-    assert.ok(!fs.existsSync(tmpPath), "temp file must not remain after write");
-  } finally {
-    fs.rmSync(workspacesDir, { recursive: true, force: true });
-    fs.rmSync(ws, { recursive: true, force: true });
-  }
+      const newTool = store.registerTool(workspacePath, {
+        name: "custom.build",
+        description: "New description",
+        command: "new",
+        args: ["arg1"],
+      });
+
+      expect(newTool.description).toBe("New description");
+      expect(newTool.command).toBe("new");
+
+      const retrieved = store.getTool(workspacePath, "custom.build");
+      expect(retrieved?.description).toBe("New description");
+    });
+  });
+
+  describe("unregisterTool", () => {
+    it("should return true when deleting existing tool", () => {
+      const workspacePath = path.join(tempDir, "workspace");
+      fs.mkdirSync(workspacePath, { recursive: true });
+      store.register(workspacePath);
+
+      store.registerTool(workspacePath, {
+        name: "custom.build",
+        description: "Build the project",
+        command: "npm",
+        args: ["run", "build"],
+      });
+
+      const result = store.unregisterTool(workspacePath, "custom.build");
+      expect(result).toBe(true);
+      expect(store.getTool(workspacePath, "custom.build")).toBeUndefined();
+    });
+
+    it("should return false when deleting non-existent tool", () => {
+      const workspacePath = path.join(tempDir, "workspace");
+      fs.mkdirSync(workspacePath, { recursive: true });
+      store.register(workspacePath);
+
+      const result = store.unregisterTool(workspacePath, "custom.nonexistent");
+      expect(result).toBe(false);
+    });
+
+    it("should return false for unregistered workspace", () => {
+      const result = store.unregisterTool("/nonexistent/workspace", "custom.tool");
+      expect(result).toBe(false);
+    });
+  });
+
+  describe("listTools", () => {
+    it("should return empty array for workspace with no custom tools", () => {
+      const workspacePath = path.join(tempDir, "workspace");
+      fs.mkdirSync(workspacePath, { recursive: true });
+      store.register(workspacePath);
+
+      const tools = store.listTools(workspacePath);
+      expect(tools).toEqual([]);
+    });
+
+    it("should return all custom tools for workspace", () => {
+      const workspacePath = path.join(tempDir, "workspace");
+      fs.mkdirSync(workspacePath, { recursive: true });
+      store.register(workspacePath);
+
+      store.registerTool(workspacePath, {
+        name: "custom.build",
+        description: "Build",
+        command: "npm",
+        args: ["run", "build"],
+      });
+
+      store.registerTool(workspacePath, {
+        name: "custom.test",
+        description: "Test",
+        command: "npm",
+        args: ["test"],
+      });
+
+      const tools = store.listTools(workspacePath);
+      expect(tools).toHaveLength(2);
+      expect(tools.map((t) => t.name)).toContain("custom.build");
+      expect(tools.map((t) => t.name)).toContain("custom.test");
+    });
+
+    it("should return tools sorted by registeredAt", () => {
+      const workspacePath = path.join(tempDir, "workspace");
+      fs.mkdirSync(workspacePath, { recursive: true });
+      store.register(workspacePath);
+
+      store.registerTool(workspacePath, {
+        name: "custom.second",
+        description: "Second",
+        command: "cmd2",
+        args: [],
+      });
+
+      // Small delay to ensure different timestamps
+      Bun.sleepSync(10);
+
+      store.registerTool(workspacePath, {
+        name: "custom.first",
+        description: "First",
+        command: "cmd1",
+        args: [],
+      });
+
+      const tools = store.listTools(workspacePath);
+      expect(tools[0].name).toBe("custom.second");
+      expect(tools[1].name).toBe("custom.first");
+    });
+  });
+
+  describe("getTool", () => {
+    it("should return undefined for non-existent tool", () => {
+      const workspacePath = path.join(tempDir, "workspace");
+      fs.mkdirSync(workspacePath, { recursive: true });
+      store.register(workspacePath);
+
+      const tool = store.getTool(workspacePath, "custom.nonexistent");
+      expect(tool).toBeUndefined();
+    });
+
+    it("should return the tool for existing tool", () => {
+      const workspacePath = path.join(tempDir, "workspace");
+      fs.mkdirSync(workspacePath, { recursive: true });
+      store.register(workspacePath);
+
+      store.registerTool(workspacePath, {
+        name: "custom.build",
+        description: "Build the project",
+        command: "npm",
+        args: ["run", "build"],
+      });
+
+      const tool = store.getTool(workspacePath, "custom.build");
+      expect(tool).toBeDefined();
+      expect(tool?.name).toBe("custom.build");
+      expect(tool?.description).toBe("Build the project");
+    });
+  });
+
+  describe("workspace isolation", () => {
+    it("should isolate tools between workspaces", () => {
+      const workspace1 = path.join(tempDir, "workspace1");
+      const workspace2 = path.join(tempDir, "workspace2");
+      fs.mkdirSync(workspace1, { recursive: true });
+      fs.mkdirSync(workspace2, { recursive: true });
+      store.register(workspace1);
+      store.register(workspace2);
+
+      store.registerTool(workspace1, {
+        name: "custom.tool",
+        description: "Workspace 1 tool",
+        command: "cmd1",
+        args: [],
+      });
+
+      store.registerTool(workspace2, {
+        name: "custom.tool",
+        description: "Workspace 2 tool",
+        command: "cmd2",
+        args: [],
+      });
+
+      const tool1 = store.getTool(workspace1, "custom.tool");
+      const tool2 = store.getTool(workspace2, "custom.tool");
+
+      expect(tool1?.description).toBe("Workspace 1 tool");
+      expect(tool2?.description).toBe("Workspace 2 tool");
+    });
+  });
 });

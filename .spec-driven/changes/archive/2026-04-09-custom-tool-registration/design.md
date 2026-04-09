@@ -1,0 +1,165 @@
+# Design: custom-tool-registration
+
+## Approach
+
+### 1. 数据模型
+
+新增 `CustomTool` 接口表示自定义工具定义：
+
+```typescript
+interface CustomTool {
+  name: string;           // 必须以 "custom." 开头
+  description: string;    // 工具描述，用于 Agent 决策
+  command: string;        // 要执行的 shell 命令（如 "npm"）
+  args: string[];         // 默认参数（如 ["run", "test"]）
+  workspace: string;      // 所属工作区路径
+  registeredAt: string;   // ISO 8601 时间戳
+}
+```
+
+### 2. 存储层扩展
+
+扩展 `WorkspaceStore` 类，为每个工作区维护自定义工具映射：
+
+- 新增 `private customTools: Map<string, Map<string, CustomTool>>` 
+  - 外键：工作区路径
+  - 内键：工具名称（含 `custom.` 前缀）
+- 新增方法：
+  - `registerTool(workspace: string, tool: Omit<CustomTool, 'workspace' | 'registeredAt'>): CustomTool`
+  - `unregisterTool(workspace: string, name: string): boolean`
+  - `listTools(workspace: string): CustomTool[]`
+  - `getTool(workspace: string, name: string): CustomTool | undefined`
+
+存储保持内存化（非持久化），与现有 WorkspaceEntry 一致。
+
+### 3. Bridge 方法实现
+
+在 `BridgeServer` 类中新增/修改方法处理：
+
+**`tools.register`**
+1. 校验参数类型和必填字段
+2. 校验工具名称以 `custom.` 开头
+3. 校验工作区已注册（`workspaceStore.list()` 包含）
+4. 创建 CustomTool 并存储
+5. 返回完整工具定义
+
+**`tools.unregister`**
+1. 校验参数
+2. 从 workspaceStore 中删除
+3. 返回 `{ success: boolean }`
+
+**`tools.list`（修改）**
+1. 如无 `workspace` 参数，返回 `BUILTIN_TOOLS`
+2. 如有 `workspace` 参数，返回 `BUILTIN_TOOLS` + 该工作区的自定义工具
+3. 自定义工具格式与内置工具一致：`{ name, description }`
+
+### 4. 自定义工具执行（方案 B）
+
+由于 `@anthropic-ai/claude-agent-sdk` 的 `query` 函数不接受自定义工具定义，我们采用**通过 Bash 工具模拟**的方案：
+
+**核心机制：**
+1. 自定义工具在 `tools.list` 中可见，Agent 可以"看到"这些工具
+2. 当 Agent 决定调用自定义工具（如 `custom.build`）时，它会使用 `Bash` 工具执行一个特殊格式的命令
+3. Bridge 拦截 `Bash` 工具的调用，识别自定义工具命令模式，将其转换为实际的自定义工具执行
+
+**具体实现：**
+1. 在 `session.start`/`session.resume` 时，将可用的自定义工具信息注入到系统提示词（system prompt）中
+2. 系统提示词指导 Agent：当需要调用自定义工具时，使用 `Bash` 工具执行 `__custom_tool__:<name> [args...]` 格式的命令
+3. Bridge 的 `_extractToolName` 和工具调用处理逻辑识别 `__custom_tool__:` 前缀
+4. 匹配到自定义工具后，执行该工具定义的 `command` + `args`，并返回结果
+
+**示例流程：**
+1. 用户注册自定义工具：`custom.build` = `npm run build`
+2. Agent 在工具列表中看到 `custom.build`
+3. Agent 想调用 `custom.build`，根据系统提示词指导，执行 `Bash` 命令 `__custom_tool__:custom.build`
+4. Bridge 识别前缀，查找 `custom.build` 定义，执行 `npm run build`
+5. 执行结果返回给 Agent
+
+### 5. 与现有系统的集成
+
+**Hooks 系统**
+- 自定义工具调用前触发 `pre_tool_use` hook
+- Hook 可以阻止或修改工具调用（与内置工具一致）
+
+**权限系统**
+- 自定义工具受 `allowedTools`/`disallowedTools` 控制
+- 不在允许列表中的自定义工具不会被传递给 Agent
+
+**Session 管理**
+- 会话启动时，根据 `allowedTools` 和当前工作区，动态构建工具列表
+- 自定义工具定义在会话生命周期内保持不变（即使中途被注销也不影响运行中会话）
+
+## Key Decisions
+
+### 1. 工具名称强制前缀 `custom.`
+
+**决策：** 所有自定义工具名称必须以 `custom.` 开头。
+
+**理由：**
+- 明确区分内置工具和自定义工具
+- 避免未来内置工具新增时与现有自定义工具冲突
+- 便于客户端 UI 分组显示
+
+### 2. 内存存储而非持久化
+
+**决策：** 自定义工具定义仅保存在进程内存中，重启后丢失。
+
+**理由：**
+- 与当前 rate-limiting 实现一致（内存状态）
+- 简化第一阶段实现，避免存储格式设计
+- 后续里程碑可添加持久化（如 `.spec-driven/tools.json` 文件）
+
+### 3. 仅支持 shell-command 类型
+
+**决策：** 第一阶段仅支持执行 shell 命令的自定义工具。
+
+**理由：**
+- 覆盖最常见的使用场景（构建、测试、检查）
+- 实现简单，复用现有 Bash 工具的执行逻辑
+- HTTP 回调工具等复杂类型留待后续评估
+
+### 4. 工作区必须预先注册
+
+**决策：** 注册自定义工具前，工作区必须通过 `workspace.register` 注册。
+
+**理由：**
+- 与现有会话管理工作流保持一致
+- 确保工作区路径有效且可访问
+- 复用 WorkspaceStore 的生命周期管理
+
+## Alternatives Considered
+
+### 方案 A：独立 CustomToolStore 类
+
+考虑创建独立的 `CustomToolStore` 类管理自定义工具，而非扩展 `WorkspaceStore`。
+
+**拒绝理由：**
+- 自定义工具天然与工作区关联，分离存储增加复杂性
+- WorkspaceStore 已有工作区生命周期管理，复用更简单
+
+### 方案 B：持久化到文件系统
+
+考虑将自定义工具定义保存到 `.spec-driven/custom-tools.json` 或类似文件。
+
+**拒绝理由：**
+- 增加实现复杂度（文件格式、并发写入、迁移）
+- 当前阶段需求明确为"进程内临时工具"
+- 可在后续里程碑中作为增强功能添加
+
+### 方案 C：通过 Bash 工具动态解析（已采纳）
+
+由于 Agent SDK 的限制，我们采用此方案：
+
+**实现方式：**
+- 自定义工具在 `tools.list` 中可见，Agent 可以看到这些工具
+- 系统提示词指导 Agent 使用特定格式的 Bash 命令调用自定义工具
+- Bridge 拦截并解析 Bash 命令，执行实际的自定义工具
+
+**优势：**
+- 兼容现有 Agent SDK，无需修改底层工具机制
+- 自定义工具对 Agent 可见，可以被 `allowedTools`/`disallowedTools` 控制
+- 与 hooks 系统集成（通过 `pre_tool_use` 事件）
+
+**权衡：**
+- 依赖 Agent 遵循系统提示词的指导
+- 工具调用实际上是 Bash 工具的调用，增加了间接层

@@ -5,7 +5,7 @@ import { BridgeError, isJsonRpcRequest } from "./errors.js";
 import { getCapabilities, BUILTIN_SPEC_SKILLS, SUPPORTED_MODELS, BUILTIN_TOOLS, API_VERSION } from "./capabilities.js";
 import { runWorkflow } from "./workflow.js";
 import { SessionStore } from "./session-store.js";
-import { WorkspaceStore } from "./workspace-store.js";
+import { WorkspaceStore, type CustomTool } from "./workspace-store.js";
 import { McpStore } from "./mcp-store.js";
 import type { McpServerConfig } from "./mcp-store.js";
 import { ConfigStore } from "./config-store.js";
@@ -423,7 +423,11 @@ export class BridgeServer {
       case "models.list":
         return { models: SUPPORTED_MODELS };
       case "tools.list":
-        return { tools: BUILTIN_TOOLS };
+        return this.listTools(params);
+      case "tools.register":
+        return this.registerTool(params);
+      case "tools.unregister":
+        return this.unregisterTool(params);
       case "workspace.register":
         return this.registerWorkspace(params);
       case "workspace.list":
@@ -540,6 +544,9 @@ export class BridgeServer {
 
     const session = this.sessionStore.create(resolvedWorkspace, prompt, stream === true);
 
+    // Collect custom tools for this workspace
+    const customTools = this._getAvailableCustomTools(resolvedWorkspace, controlParams.allowedTools, controlParams.disallowedTools);
+
     this.emit(
       "bridge/session_event",
       { sessionId: session.id, type: "session_started" },
@@ -552,6 +559,7 @@ export class BridgeServer {
       { ...passthroughOptions, ...buildControlOptions(controlParams) },
       { cwd: resolvedWorkspace, env: resolvedEnv },
       requestId,
+      customTools,
     );
   }
 
@@ -610,6 +618,9 @@ export class BridgeServer {
 
     this.sessionStore.appendEvent(session.id, { type: "resume_prompt", prompt });
 
+    // Collect custom tools for this workspace
+    const customTools = this._getAvailableCustomTools(session.workspace, controlParams.allowedTools, controlParams.disallowedTools);
+
     this.emit(
       "bridge/session_event",
       { sessionId: session.id, type: "session_resumed" },
@@ -622,6 +633,7 @@ export class BridgeServer {
       { ...passthroughOptions, resume: session.sdkSessionId, ...buildControlOptions(controlParams) },
       { cwd: session.workspace, env: resolvedEnv },
       requestId,
+      customTools,
     );
   }
 
@@ -631,6 +643,7 @@ export class BridgeServer {
     options: Record<string, unknown>,
     context: AgentQueryContext,
     requestId: unknown,
+    customTools: CustomTool[] = [],
   ): Promise<unknown> {
     let resolvedOptions = options;
     if (options["permissionMode"] === "approve") {
@@ -645,6 +658,18 @@ export class BridgeServer {
 
     if (isStreaming) {
       resolvedOptions = { ...resolvedOptions, includePartialMessages: true };
+    }
+
+    // Inject custom tools into system prompt if available
+    if (customTools.length > 0) {
+      const customToolInstructions = this._buildCustomToolInstructions(customTools);
+      const existingSystemPrompt = resolvedOptions["systemPrompt"] as string | undefined;
+      resolvedOptions = {
+        ...resolvedOptions,
+        systemPrompt: existingSystemPrompt
+          ? `${existingSystemPrompt}\n\n${customToolInstructions}`
+          : customToolInstructions,
+      };
     }
 
     // Track per-turn chunk index for streaming
@@ -1532,5 +1557,126 @@ export class BridgeServer {
     const days = Math.min(typeof olderThanDays === "number" ? olderThanDays : 30, 365);
     const removedCount = this.sessionStore.cleanup(days);
     return { removedCount };
+  }
+
+  // --- Custom Tool methods ---
+
+  private registerTool(params: Record<string, unknown>): unknown {
+    const { workspace, name, description, command, args } = params;
+
+    if (!workspace || typeof workspace !== "string") {
+      throw new BridgeError(-32602, "'workspace' must be provided");
+    }
+    if (!name || typeof name !== "string") {
+      throw new BridgeError(-32602, "'name' must be provided");
+    }
+    if (!description || typeof description !== "string") {
+      throw new BridgeError(-32602, "'description' must be provided");
+    }
+    if (!command || typeof command !== "string") {
+      throw new BridgeError(-32602, "'command' must be provided");
+    }
+
+    // Validate tool name prefix
+    if (!name.startsWith("custom.")) {
+      throw new BridgeError(-32602, "Tool name must start with 'custom.'");
+    }
+
+    const resolvedWorkspace = path.resolve(workspace);
+
+    // Check workspace is registered
+    if (!this.workspaceStore.has(resolvedWorkspace)) {
+      throw new BridgeError(-32602, "Workspace must be registered first");
+    }
+
+    // Validate args if provided
+    const validatedArgs = Array.isArray(args) && args.every((a) => typeof a === "string")
+      ? (args as string[])
+      : [];
+
+    const tool = this.workspaceStore.registerTool(resolvedWorkspace, {
+      name,
+      description,
+      command,
+      args: validatedArgs,
+    });
+
+    return { tool };
+  }
+
+  private unregisterTool(params: Record<string, unknown>): unknown {
+    const { workspace, name } = params;
+
+    if (!workspace || typeof workspace !== "string") {
+      throw new BridgeError(-32602, "'workspace' must be provided");
+    }
+    if (!name || typeof name !== "string") {
+      throw new BridgeError(-32602, "'name' must be provided");
+    }
+
+    const resolvedWorkspace = path.resolve(workspace);
+    const success = this.workspaceStore.unregisterTool(resolvedWorkspace, name);
+
+    return { success };
+  }
+
+  private listTools(params: Record<string, unknown>): unknown {
+    const { workspace } = params;
+
+    // If no workspace specified, return only built-in tools (backward compatible)
+    if (!workspace) {
+      return { tools: BUILTIN_TOOLS };
+    }
+
+    if (typeof workspace !== "string") {
+      throw new BridgeError(-32602, "'workspace' must be a string");
+    }
+
+    const resolvedWorkspace = path.resolve(workspace);
+    const customTools = this.workspaceStore.listTools(resolvedWorkspace);
+
+    // Merge built-in tools with custom tools
+    const allTools = [
+      ...BUILTIN_TOOLS,
+      ...customTools.map((t) => ({ name: t.name, description: t.description })),
+    ];
+
+    return { tools: allTools };
+  }
+
+  // --- Custom Tool Helper methods ---
+
+  private _getAvailableCustomTools(
+    workspace: string,
+    allowedTools: string[] | undefined,
+    disallowedTools: string[] | undefined,
+  ): CustomTool[] {
+    const allCustomTools = this.workspaceStore.listTools(workspace);
+
+    return allCustomTools.filter((tool) => {
+      // If allowedTools is specified, tool must be in the list
+      if (allowedTools !== undefined && !allowedTools.includes(tool.name)) {
+        return false;
+      }
+      // If disallowedTools is specified, tool must not be in the list
+      if (disallowedTools !== undefined && disallowedTools.includes(tool.name)) {
+        return false;
+      }
+      return true;
+    });
+  }
+
+  private _buildCustomToolInstructions(customTools: CustomTool[]): string {
+    const toolDescriptions = customTools
+      .map((t) => `- ${t.name}: ${t.description} (command: ${t.command}${t.args.length > 0 ? ' ' + t.args.join(' ') : ''})`)
+      .join('\n');
+
+    return `You have access to the following custom tools that are specific to this workspace:
+${toolDescriptions}
+
+To use a custom tool, invoke the Bash tool with the following command format:
+__custom_tool__:<tool_name> [additional_args...]
+
+For example: __custom_tool__:custom.build --verbose`;
   }
 }

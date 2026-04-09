@@ -19,3 +19,5 @@
 15- `ui/mobile-web-ui.md` — Mobile-first web UI: login, session list, chat, and tool approval/reject UI. SSE reconnection with event replay | offline mode
 - `client/client-sdk.md` — TypeScript Client SDK: `@ai-spec-sdk/client` npm package with StdioTransport, HttpTransport, typed methods for all bridge methods, notification API, streaming support, zero deps
 - `client/python-client-sdk.md` — Python Client SDK: `ai-spec-sdk` PyPI package wrapping `claude-agent-sdk` (stdio) + bridge HTTP/SSE, unified async BridgeClient, camelCase methods, UnsupportedInStdioError guard, SSE reconnection, zero HTTP deps
+- `skills/builtin-spec-skills.md` — Built-in spec-driven skills discovery, workflow alignment, and custom tool registration (workspace-scoped shell commands with `custom.` prefix)
+- `session/agent-sessions.md` — Agent session lifecycle (start, resume, stop), workspace alignment, control parameters (model, allowedTools, disallowedTools, permissionMode, maxTurns, systemPrompt), session persistence, history retrieval, and custom tool execution context
