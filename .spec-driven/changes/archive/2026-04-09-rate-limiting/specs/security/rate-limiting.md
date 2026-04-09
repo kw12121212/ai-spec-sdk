@@ -3,7 +3,7 @@
 ## ADDED Requirements
 
 ### Requirement: Per-Key Token Bucket Rate Limiting
-When the bridge is running in HTTP mode with auth enabled, every `POST /rpc` request MUST be subject to per-API-key rate limiting using a token bucket algorithm. The default limit is 120 requests per minute per key. Keys with scope `admin` MUST bypass all rate limit checks. When the bridge is started with `--no-auth`, rate limiting MUST be disabled entirely.
+When the bridge is running in HTTP mode with auth enabled, each `POST /rpc` request authenticated with a non-`admin` API key MUST be subject to per-key rate limiting using a token bucket algorithm. The default limit is 120 requests per minute per key. Keys with scope `admin` MUST bypass all rate limit checks. When the bridge is started with `--no-auth`, rate limiting MUST be disabled entirely. Public methods that remain callable without credentials MUST continue to work without requiring a key.
 
 #### Scenario: Request within rate limit is allowed
 - GIVEN a key has sent fewer than 120 requests in the current minute window
@@ -30,6 +30,8 @@ When a `POST /rpc` request is rejected due to rate limiting, the response MUST i
 - `X-RateLimit-Limit`: the maximum number of requests allowed per minute (120)
 - `X-RateLimit-Remaining`: the number of requests remaining in the current window (0 when rejected)
 - `X-RateLimit-Reset`: the Unix timestamp (seconds) when the next token becomes available
+
+Successful `POST /rpc` requests that were checked against the rate limiter MUST include `X-RateLimit-Limit` and `X-RateLimit-Remaining` response headers.
 
 ### Requirement: SSE and Non-RPC Endpoints Exempt
 `GET /events`, `GET /health`, `GET /`, and `OPTIONS` preflight requests MUST NOT be subject to rate limiting.

@@ -5,8 +5,10 @@ import { URL } from "node:url";
 import { BridgeServer } from "./bridge.js";
 import { BridgeError } from "./errors.js";
 import { API_VERSION } from "./capabilities.js";
+import { RateLimiter, RATE_LIMIT_REQUESTS_PER_MINUTE } from "./rate-limiter.js";
 import { loadKeys } from "./key-store.js";
 import { verifyKey, checkScope, METHOD_SCOPES } from "./auth.js";
+import type { StoredKey } from "./key-store.js";
 
 declare const Bun: any;
 
@@ -150,6 +152,7 @@ export function startHttpServer(options: HttpServerOptions = {}): Promise<HttpSe
 
   const sseManager = new SseManager();
   const wsManager = new WsManager();
+  const rateLimiter = new RateLimiter();
 
   const bridge = new BridgeServer({
     notify: (msg) => {
@@ -228,6 +231,7 @@ export function startHttpServer(options: HttpServerOptions = {}): Promise<HttpSe
           if (!noAuth) {
             const method = payload !== null && typeof payload === "object" ? ((payload as Record<string, unknown>)["method"] as string | undefined) ?? "" : "";
             const id = payload !== null && typeof payload === "object" && "id" in (payload as object) ? (payload as Record<string, unknown>)["id"] : null;
+            let verifiedKey: StoredKey | null = null;
 
             const requiredScope = method in METHOD_SCOPES ? METHOD_SCOPES[method] : "admin";
             if (requiredScope !== null) {
@@ -243,9 +247,22 @@ export function startHttpServer(options: HttpServerOptions = {}): Promise<HttpSe
                 headers.set("Content-Type", "application/json");
                 return new Response(JSON.stringify({ jsonrpc: "2.0", id, error: { code: -32061, message: "Invalid or expired API key" } }), { status: 200, headers });
               }
+              verifiedKey = key;
               if (!checkScope(key, method)) {
                 headers.set("Content-Type", "application/json");
                 return new Response(JSON.stringify({ jsonrpc: "2.0", id, error: { code: -32060, message: `Insufficient scope: requires ${requiredScope}` } }), { status: 200, headers });
+              }
+            }
+
+            if (verifiedKey && !verifiedKey.scopes.includes("admin")) {
+              const rateLimit = rateLimiter.consume(verifiedKey.id);
+              headers.set("X-RateLimit-Limit", String(RATE_LIMIT_REQUESTS_PER_MINUTE));
+              headers.set("X-RateLimit-Remaining", String(rateLimit.remaining));
+
+              if (!rateLimit.allowed) {
+                headers.set("X-RateLimit-Reset", String(rateLimit.resetAt));
+                headers.set("Content-Type", "application/json");
+                return new Response(JSON.stringify({ jsonrpc: "2.0", id, error: { code: -32029, message: "Rate limit exceeded" } }), { status: 429, headers });
               }
             }
           }

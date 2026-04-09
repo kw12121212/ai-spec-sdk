@@ -23,7 +23,7 @@ Make the bridge distributable and production-safe: native binaries for all platf
 
 ## Planned Changes
 - `cross-platform-release` - Declared: complete - native binaries for all platforms plus local SDK pack scripts
-- `rate-limiting` - Declared: planned - per-key token bucket rate limiting for HTTP transport
+- `rate-limiting` - Declared: complete - per-key token bucket rate limiting for HTTP transport
 - `custom-tool-registration` - Declared: complete - workspace-scoped shell-command custom tools
 
 ## Dependencies
@@ -33,8 +33,10 @@ Make the bridge distributable and production-safe: native binaries for all platf
 - Cross-platform bun compile requires platform-specific CI runners; Windows support may need extra validation.
 
 ## Status
-- Declared: active
+- Declared: complete
 
 ## Notes
 SDK 分发方式：本地打包，人工复制。TypeScript 用 `npm pack` 生成 `.tgz`，Python 用 `python -m build` 生成 `.whl`，消费方通过 `npm install ./file.tgz` 或 `pip install ./file.whl` 安装。不使用任何注册中心。
+
+
 

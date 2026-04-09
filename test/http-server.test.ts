@@ -16,7 +16,7 @@ async function rpc(
   port: number,
   body: unknown,
   overrideHeaders?: Record<string, string>,
-): Promise<{ status: number; body: unknown }> {
+): Promise<{ status: number; body: unknown; headers: http.IncomingHttpHeaders }> {
   return new Promise((resolve, reject) => {
     const data = JSON.stringify(body);
     const req = http.request(
@@ -42,7 +42,7 @@ async function rpc(
           } catch {
             parsed = text;
           }
-          resolve({ status: res.statusCode ?? 0, body: parsed });
+          resolve({ status: res.statusCode ?? 0, body: parsed, headers: res.headers });
         });
       },
     );
@@ -113,6 +113,31 @@ function sseCollect(
   });
 
   return { events, destroy: () => destroyFn() };
+}
+
+async function openSseConnection(
+  port: number,
+  sessionId: string,
+): Promise<{ status: number; headers: http.IncomingHttpHeaders; close: () => void }> {
+  return new Promise((resolve, reject) => {
+    const req = http.request(
+      {
+        hostname: "localhost",
+        port,
+        path: `/events?sessionId=${encodeURIComponent(sessionId)}`,
+        method: "GET",
+      },
+      (res) => {
+        resolve({
+          status: res.statusCode ?? 0,
+          headers: res.headers,
+          close: () => req.destroy(),
+        });
+      },
+    );
+    req.on("error", reject);
+    req.end();
+  });
 }
 
 function queryStub() {
@@ -622,6 +647,134 @@ test("auth: bridge.info accessible in noAuth mode without credentials", async ()
     assert.equal(result["authMode"], "none");
   } finally {
     await shutdown();
+  }
+});
+
+// ── rate limiting tests ──────────────────────────────────────────────────────
+
+test("rate limiting: same key receives 429 on the 121st POST /rpc request", async () => {
+  const { keysFile, cleanup } = makeTempKeysFile();
+  const { token } = makeKey(["session:read"], keysFile);
+  const { shutdown, port } = await startHttpServer({ port: 0, keysFile });
+  try {
+    for (let attempt = 1; attempt <= 120; attempt++) {
+      const response = await rpc(
+        port,
+        { jsonrpc: "2.0", id: attempt, method: "session.list" },
+        { Authorization: `Bearer ${token}` },
+      );
+      assert.equal(response.status, 200, `request ${attempt} should be allowed`);
+      assert.equal(response.headers["x-ratelimit-limit"], "120");
+      assert.ok(response.headers["x-ratelimit-remaining"] !== undefined);
+    }
+
+    const rejected = await rpc(
+      port,
+      { jsonrpc: "2.0", id: 121, method: "session.list" },
+      { Authorization: `Bearer ${token}` },
+    );
+
+    assert.equal(rejected.status, 429);
+    assert.equal(rejected.headers["x-ratelimit-limit"], "120");
+    assert.equal(rejected.headers["x-ratelimit-remaining"], "0");
+    assert.ok(rejected.headers["x-ratelimit-reset"] !== undefined);
+    const error = (rejected.body as Record<string, unknown>)["error"] as Record<string, unknown>;
+    assert.equal(error["code"], -32029);
+    assert.equal(error["message"], "Rate limit exceeded");
+  } finally {
+    await shutdown();
+    cleanup();
+  }
+});
+
+test("rate limiting: admin key bypasses the per-key limit", async () => {
+  const { keysFile, cleanup } = makeTempKeysFile();
+  const { token } = makeKey(["admin"], keysFile);
+  const { shutdown, port } = await startHttpServer({ port: 0, keysFile });
+  try {
+    let finalResponse: Awaited<ReturnType<typeof rpc>> | null = null;
+
+    for (let attempt = 1; attempt <= 130; attempt++) {
+      finalResponse = await rpc(
+        port,
+        { jsonrpc: "2.0", id: attempt, method: "session.list" },
+        { Authorization: `Bearer ${token}` },
+      );
+    }
+
+    assert.ok(finalResponse);
+    assert.equal(finalResponse.status, 200);
+    assert.ok("result" in (finalResponse.body as Record<string, unknown>));
+    assert.equal(finalResponse.headers["x-ratelimit-limit"], undefined);
+  } finally {
+    await shutdown();
+    cleanup();
+  }
+});
+
+test("rate limiting: --no-auth mode never returns 429", async () => {
+  const { shutdown, port } = await startHttpServer({ port: 0, noAuth: true });
+  try {
+    let finalResponse: Awaited<ReturnType<typeof rpc>> | null = null;
+
+    for (let attempt = 1; attempt <= 130; attempt++) {
+      finalResponse = await rpc(port, { jsonrpc: "2.0", id: attempt, method: "session.list" });
+    }
+
+    assert.ok(finalResponse);
+    assert.equal(finalResponse.status, 200);
+    assert.ok("result" in (finalResponse.body as Record<string, unknown>));
+  } finally {
+    await shutdown();
+  }
+});
+
+test("rate limiting: GET /events remains available after the key exhausts POST /rpc quota", async () => {
+  const { keysFile, cleanup } = makeTempKeysFile();
+  const { token } = makeKey(["session:read", "session:write"], keysFile);
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-rate-limit-"));
+  globalThis.__AI_SPEC_SDK_QUERY__ = queryStub();
+
+  const { shutdown, port } = await startHttpServer({ port: 0, keysFile });
+  try {
+    const started = await rpc(
+      port,
+      {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "session.start",
+        params: { workspace, prompt: "hello" },
+      },
+      { Authorization: `Bearer ${token}` },
+    );
+    assert.equal(started.status, 200);
+    const sessionId = ((started.body as Record<string, unknown>)["result"] as Record<string, unknown>)["sessionId"] as string;
+
+    for (let attempt = 2; attempt <= 120; attempt++) {
+      const response = await rpc(
+        port,
+        { jsonrpc: "2.0", id: attempt, method: "session.list" },
+        { Authorization: `Bearer ${token}` },
+      );
+      assert.equal(response.status, 200);
+    }
+
+    const rejected = await rpc(
+      port,
+      { jsonrpc: "2.0", id: 121, method: "session.list" },
+      { Authorization: `Bearer ${token}` },
+    );
+    assert.equal(rejected.status, 429);
+
+    const sse = await openSseConnection(port, sessionId);
+    assert.equal(sse.status, 200);
+    assert.ok(sse.headers["content-type"]?.includes("text/event-stream"));
+    sse.close();
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    await shutdown();
+    cleanup();
+    fs.rmSync(workspace, { recursive: true, force: true });
   }
 });
 
