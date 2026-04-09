@@ -23,11 +23,11 @@ Establish the polyglot JSON-RPC 2.0 bridge with full session management, Claude 
 - Go CLI demo compiles and connects to bridge subprocess
 
 ## Planned Changes
-- `add-polyglot-agent-spec-bridge` - polyglot stdio bridge with JSON-RPC 2.0
-- `agent-session-sdk-wiring` - Claude Agent SDK session wiring with proxy support
-- `bridge-extensibility` - MCP server management, config management, and hooks
-- `session-depth` - session history, persistence, and listing
-- `tool-approval-flow` - permissionMode approve and approveTool/rejectTool
+- `add-polyglot-agent-spec-bridge` - Declared: complete - polyglot stdio bridge with JSON-RPC 2.0
+- `agent-session-sdk-wiring` - Declared: complete - Claude Agent SDK session wiring with proxy support
+- `bridge-extensibility` - Declared: complete - MCP server management, config management, and hooks
+- `session-depth` - Declared: complete - session history, persistence, and listing
+- `tool-approval-flow` - Declared: complete - permissionMode approve and approveTool/rejectTool
 
 ## Dependencies
 None — this is the foundation milestone.

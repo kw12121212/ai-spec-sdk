@@ -19,8 +19,8 @@ Establish the first stable API guarantee by auto-generating SDK types from the b
 - All milestones 01–05 are complete
 
 ## Planned Changes
-- `contract-type-generation` - auto-generate TypeScript and Python types from bridge-contract.yaml
-- `java-cli-demo` - Java CLI REPL reference implementation
+- `contract-type-generation` - Declared: planned - auto-generate TypeScript and Python types from bridge-contract.yaml
+- `java-cli-demo` - Declared: planned - Java CLI REPL reference implementation
 
 ## Dependencies
 - 03-platform-reach — stable published artifacts needed before java-cli-demo

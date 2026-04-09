@@ -23,11 +23,11 @@ Add production-grade infrastructure — structured logging, HTTP/SSE transport, 
 - TypeScript client package installable and tested against real bridge
 
 ## Planned Changes
-- `structured-logging` - structured JSON logging with level filtering
-- `http-sse-transport` - POST /rpc, GET /events, and GET /health endpoints
-- `auth-and-authorization` - API key auth with scope-based authorization
-- `mobile-web-ui` - mobile-first web UI served at GET /
-- `ts-client-sdk` - @ai-spec-sdk/client TypeScript npm package
+- `structured-logging` - Declared: complete - structured JSON logging with level filtering
+- `http-sse-transport` - Declared: complete - POST /rpc, GET /events, and GET /health endpoints
+- `auth-and-authorization` - Declared: complete - API key auth with scope-based authorization
+- `mobile-web-ui` - Declared: complete - mobile-first web UI served at GET /
+- `ts-client-sdk` - Declared: complete - @ai-spec-sdk/client TypeScript npm package
 
 ## Dependencies
 - 01-bridge-foundation — HTTP/SSE and auth build on the core bridge
