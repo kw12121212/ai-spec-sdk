@@ -69,9 +69,9 @@ class BridgeClient:
 
     def __init__(
         self,
-        transport: Literal["stdio", "http"] = "stdio",
+        transport: Literal["stdio", "http", "ws"] = "stdio",
         *,
-        # HTTP options
+        # HTTP/WS options
         host: str = "localhost",
         port: int = 8765,
         api_key: str | None = None,
@@ -303,5 +303,9 @@ class BridgeClient:
         return await self._rpc("workflow.run", params)
 
     async def skillsList(self) -> Any:
+        self._require_http("skillsList")
+        return await self._rpc("skills.list")
+eturn await self._rpc("skills.list")
+) -> Any:
         self._require_http("skillsList")
         return await self._rpc("skills.list")

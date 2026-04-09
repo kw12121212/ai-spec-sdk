@@ -3,6 +3,8 @@ export { StdioTransport } from "./stdio-transport.js";
 export type { StdioTransportOptions } from "./stdio-transport.js";
 export { HttpTransport } from "./http-transport.js";
 export type { HttpTransportOptions } from "./http-transport.js";
+export { WebSocketTransport } from "./ws-transport.js";
+export type { WebSocketTransportOptions } from "./ws-transport.js";
 export type { Transport } from "./transport.js";
 export { BridgeClientError } from "./errors.js";
 export type {

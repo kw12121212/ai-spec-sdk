@@ -206,8 +206,8 @@ if (isNaN(portParsed)) {
 const port = portParsed;
 const noAuth = process.argv.includes("--no-auth");
 
-if (transport === "http") {
-  const { shutdown } = await startHttpServer({ port, sessionsDir, noAuth, keysFile });
+if (transport === "http" || transport === "ws") {
+  const { shutdown } = await startHttpServer({ port, sessionsDir, noAuth, keysFile, transport });
   process.on("SIGTERM", async () => {
     await shutdown();
     process.exit(0);
