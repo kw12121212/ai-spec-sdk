@@ -11,6 +11,10 @@ coverage/
 packages/client/*.tgz
 clients/python/dist/
 
+# Python cache artifacts
+__pycache__/
+*.pyc
+
 # Runtime logs
 *.log
 logs/
