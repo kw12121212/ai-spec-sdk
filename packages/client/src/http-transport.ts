@@ -95,6 +95,7 @@ export class HttpTransport implements Transport {
 
     const eventTypes = [
       "session_event",
+      "subagent_event",
       "progress",
       "tool_approval_requested",
       "hook_triggered",

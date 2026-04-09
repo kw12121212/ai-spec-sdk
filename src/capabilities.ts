@@ -129,6 +129,7 @@ export function getCapabilities(transport = "stdio"): Capabilities {
       "workflow.run",
       "skills.list",
       "session.start",
+      "session.spawn",
       "session.resume",
       "session.stop",
       "session.status",

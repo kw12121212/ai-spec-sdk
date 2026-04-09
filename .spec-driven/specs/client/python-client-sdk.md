@@ -165,3 +165,31 @@ The Python transport MUST handle sending requests and routing asynchronous respo
 
 ### Requirement: Update `BridgeClient` to support instantiating `WebSocketTransport` using `ws://` URIs.
 The Python `BridgeClient` initialization logic MUST be updated to recognize `ws://` and `wss://` URI schemes and instantiate the `WebSocketTransport` accordingly.
+
+### Requirement: Python Client Session Spawn Support
+In HTTP mode, the Python `BridgeClient` MUST expose `sessionSpawn(parentSessionId=..., prompt=..., ...)` and send the `session.spawn` JSON-RPC request.
+
+In stdio mode, `sessionSpawn` MUST raise `UnsupportedInStdioError`.
+
+#### Scenario: Spawn a child session through the Python client
+- GIVEN a Python client is connected to the bridge over HTTP
+- WHEN the caller invokes `await client.sessionSpawn(parentSessionId="parent-1", prompt="Delegate")`
+- THEN the client sends a `session.spawn` request with those params
+
+### Requirement: Python Parent Session Filtering
+The Python client helper types and method surface MUST support passing `parentSessionId` to `sessionList`.
+
+#### Scenario: Filter child sessions by parent from Python
+- GIVEN a Python client calls `await client.sessionList(parentSessionId="parent-1")`
+- WHEN the request is sent to the bridge
+- THEN the JSON-RPC params include `parentSessionId`
+
+### Requirement: Python Subagent Notification Handlers
+The Python client event system MUST allow handlers to subscribe to `bridge/subagent_event`.
+
+Method-specific handlers MUST receive the notification params, including `sessionId`, `subagentId`, and `type`.
+
+#### Scenario: Subscribe to child notifications from Python
+- GIVEN a Python client registers `client.on("bridge/subagent_event", handler)`
+- WHEN the bridge emits a subagent notification
+- THEN the handler receives the notification params

@@ -120,6 +120,20 @@ export interface SessionStartParams {
   options?: Record<string, unknown>;
 }
 
+export interface SessionSpawnParams {
+  parentSessionId: string;
+  prompt: string;
+  model?: string;
+  allowedTools?: string[];
+  disallowedTools?: string[];
+  permissionMode?: PermissionMode;
+  maxTurns?: number;
+  systemPrompt?: string;
+  stream?: boolean;
+  proxy?: ProxyParams;
+  options?: Record<string, unknown>;
+}
+
 export interface SessionResult {
   sessionId: string;
   status: "completed" | "stopped";
@@ -156,6 +170,7 @@ export interface SessionStatusParams {
 
 export interface SessionStatusResult {
   sessionId: string;
+  parentSessionId: string | null;
   status: "active" | "completed" | "stopped" | "interrupted";
   createdAt: string;
   updatedAt: string;
@@ -165,12 +180,14 @@ export interface SessionStatusResult {
 
 export interface SessionListParams {
   status?: "active" | "all";
+  parentSessionId?: string;
 }
 
 export interface SessionListItem {
   sessionId: string;
   status: string;
   workspace: string;
+  parentSessionId: string | null;
   createdAt: string;
   updatedAt: string;
   prompt: string | null;
@@ -222,6 +239,7 @@ export interface SessionExportParams {
 export interface SessionExportResult {
   id: string;
   workspace: string;
+  parentSessionId: string | null;
   sdkSessionId: string | null;
   status: string;
   createdAt: string;
@@ -461,6 +479,7 @@ export interface ContextListResult {
 export type NotificationMethod =
   | "bridge/progress"
   | "bridge/session_event"
+  | "bridge/subagent_event"
   | "bridge/hook_triggered"
   | "bridge/file_changed"
   | "bridge/tool_approval_requested";
@@ -475,6 +494,18 @@ export type SessionEventType =
 export interface SessionEventNotification {
   sessionId: string;
   type: SessionEventType;
+  requestId?: string | number | null;
+  messageType?: string;
+  message?: unknown;
+  result?: unknown;
+  usage?: unknown;
+  status?: string;
+}
+
+export interface SubagentEventNotification {
+  sessionId: string;
+  subagentId: string;
+  type: "agent_message" | "session_completed" | "session_stopped";
   requestId?: string | number | null;
   messageType?: string;
   message?: unknown;

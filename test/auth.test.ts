@@ -89,6 +89,7 @@ test("METHOD_SCOPES covers every bridge dispatch method", () => {
     "skills.list",
     "workflow.run",
     "session.start",
+    "session.spawn",
     "session.resume",
     "session.stop",
     "session.status",

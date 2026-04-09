@@ -59,6 +59,13 @@ describe("BridgeClient", () => {
     expect((result as { params: unknown }).params).toEqual(params);
   });
 
+  test("sessionSpawn() sends correct method and params", async () => {
+    const params = { parentSessionId: "parent-1", prompt: "hello child" };
+    const result = await client.sessionSpawn(params);
+    expect((result as { method: string }).method).toBe("session.spawn");
+    expect((result as { params: unknown }).params).toEqual(params);
+  });
+
   test("sessionList() works without params", async () => {
     const result = await client.sessionList();
     expect((result as { method: string }).method).toBe("session.list");
@@ -89,6 +96,20 @@ describe("BridgeClient", () => {
 
     expect(received.length).toBe(1);
     expect(received[0]!.method).toBe("bridge/session_event");
+  });
+
+  test("on() receives notifications for bridge/subagent_event", () => {
+    const received: JsonRpcNotification[] = [];
+    client.on("bridge/subagent_event", (n) => received.push(n));
+
+    (transport as unknown as { _notify: (n: JsonRpcNotification) => void })._notify({
+      jsonrpc: "2.0",
+      method: "bridge/subagent_event",
+      params: { sessionId: "parent", subagentId: "child", type: "session_completed" },
+    });
+
+    expect(received.length).toBe(1);
+    expect(received[0]!.method).toBe("bridge/subagent_event");
   });
 
   test("on('*') receives all notifications", () => {

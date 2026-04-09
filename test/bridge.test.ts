@@ -598,7 +598,7 @@ test("session.search caps limit at 100", async () => {
   assert.ok(!response.error);
 });
 
-test("bridge.capabilities advertises context.*, session.branch, session.search", async () => {
+test("bridge.capabilities advertises context.*, session.spawn, session.branch, session.search", async () => {
   const server = new BridgeServer();
   const response = await server.handleMessage({
     jsonrpc: "2.0",
@@ -610,6 +610,7 @@ test("bridge.capabilities advertises context.*, session.branch, session.search",
   assert.ok(methods.includes("context.read"), "must advertise context.read");
   assert.ok(methods.includes("context.write"), "must advertise context.write");
   assert.ok(methods.includes("context.list"), "must advertise context.list");
+  assert.ok(methods.includes("session.spawn"), "must advertise session.spawn");
   assert.ok(methods.includes("session.branch"), "must advertise session.branch");
   assert.ok(methods.includes("session.search"), "must advertise session.search");
 });

@@ -296,6 +296,63 @@ If `fromIndex` is out of range, the bridge MUST return a `-32602` error.
 - WHEN a client calls `session.branch`
 - THEN the bridge returns a `-32011` error
 
+### Requirement: Child Session Spawning
+The bridge MUST support creating a child session from an existing parent session via `session.spawn`.
+
+The child session MUST:
+- be linked to the parent via `parentSessionId`
+- inherit the parent workspace boundary
+- return its own bridge session identifier to the caller
+
+#### Scenario: Spawn child session from parent
+- GIVEN a parent session exists in the bridge
+- WHEN a client calls `session.spawn` with that parent session ID and a prompt
+- THEN the bridge creates a new child session linked to the parent
+- AND the child session uses the same workspace as the parent
+
+### Requirement: Parent Stop Cascades to Active Descendants
+When a parent session is stopped, the bridge MUST recursively stop all active descendant sessions linked through `parentSessionId`.
+
+#### Scenario: Stop parent session tree
+- GIVEN a parent session has one or more active child sessions
+- WHEN the client stops the parent session
+- THEN the bridge marks the parent and all active descendants as stopped
+
+### Requirement: Parent Session Receives Child Notifications
+When a child session emits parent-relevant activity, the bridge MUST emit a `bridge/subagent_event` notification on the parent session stream.
+
+The notification MUST include:
+- `sessionId` (parent session ID)
+- `subagentId` (child session ID)
+- `type` (propagated child event type)
+
+Terminal child notifications MUST also include `status`.
+
+#### Scenario: Parent receives child completion notification
+- GIVEN a child session belongs to a parent session
+- WHEN the child completes or stops
+- THEN the parent session stream includes a `bridge/subagent_event` notification for that child
+
+### Requirement: Parent Linkage in Session Metadata
+The bridge MUST expose `parentSessionId` in session metadata responses.
+
+`session.status`, `session.list`, and `session.export` MUST include `parentSessionId`.
+Root sessions MUST report `parentSessionId: null`.
+
+#### Scenario: Session metadata reports parent linkage
+- GIVEN the bridge has both root sessions and child sessions
+- WHEN a client requests session metadata
+- THEN child sessions include their parent session ID
+- AND root sessions include `parentSessionId: null`
+
+### Requirement: Session List Parent Filter
+The `session.list` method MUST accept an optional `parentSessionId` filter that returns only the child sessions for that parent.
+
+#### Scenario: List only children of a parent session
+- GIVEN a bridge has multiple root sessions and child sessions
+- WHEN a client calls `session.list` with `parentSessionId`
+- THEN the response contains only sessions linked to that parent
+
 ### Requirement: Cross-Session Search
 The bridge MUST expose a `session.search` method that searches across session histories for matching text.
 

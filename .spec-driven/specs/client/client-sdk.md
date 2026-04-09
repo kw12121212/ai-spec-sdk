@@ -33,3 +33,39 @@ A single WebSocket connection MUST be used for both issuing RPC requests and rec
 
 ### Requirement: Update `createClient` to support instantiating `WebSocketTransport`.
 The `createClient` factory function MUST be extended to accept WebSocket URIs (ws:// or wss://) or specific configuration options that trigger the instantiation of the `WebSocketTransport`.
+
+### Requirement: TypeScript Client Session Spawn Support
+The `@ai-spec-sdk/client` package MUST expose a `sessionSpawn` method that sends the `session.spawn` JSON-RPC request.
+
+The method MUST:
+- require `parentSessionId`
+- accept the same agent control parameters as `sessionStart`, except for `workspace`
+- return the same response shape used by other session creation methods
+
+#### Scenario: Spawn a child session through the TypeScript client
+- GIVEN a TypeScript client is connected to the bridge
+- WHEN the caller invokes `client.sessionSpawn({ parentSessionId, prompt })`
+- THEN the client sends a `session.spawn` request with those params
+
+### Requirement: TypeScript Client Parent Metadata Types
+The TypeScript client session metadata types MUST expose `parentSessionId`.
+
+Session list entries and session status/export result types MUST include `parentSessionId: string | null`.
+
+#### Scenario: Read parent linkage from typed session metadata
+- GIVEN the bridge returns session metadata for a child session
+- WHEN the TypeScript client consumes that response
+- THEN the typed result exposes the child session's `parentSessionId`
+
+### Requirement: TypeScript Client Subagent Notification Typing
+The TypeScript client event API MUST support `bridge/subagent_event` notifications.
+
+The typed notification payload MUST include:
+- `sessionId`
+- `subagentId`
+- `type`
+
+#### Scenario: Subscribe to child notifications from a parent session
+- GIVEN a TypeScript client registers `on("bridge/subagent_event", handler)`
+- WHEN the bridge emits a subagent notification
+- THEN the handler receives the parsed notification

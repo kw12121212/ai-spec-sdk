@@ -20,7 +20,7 @@ Enable real-time bidirectional communication via WebSocket and multi-agent coord
 
 ## Planned Changes
 - `websocket-transport` - Declared: complete - bidirectional WebSocket transport with ping/pong keepalive
-- `multi-agent-orchestration` - Declared: planned - parent-child agent sessions via session.spawn
+- `multi-agent-orchestration` - Declared: complete - parent-child agent sessions via session.spawn
 
 ## Dependencies
 - 02-production-ready — WebSocket builds on HTTP/SSE transport patterns; multi-agent requires session persistence
@@ -30,8 +30,10 @@ Enable real-time bidirectional communication via WebSocket and multi-agent coord
 - The two changes are independent and can ship separately if needed.
 
 ## Status
-- Declared: proposed
+- Declared: complete
 
 ## Notes
 Intentionally limited to two changes; both are architecturally significant and warrant focused implementation. websocket-transport can ship independently of multi-agent-orchestration if sequencing is needed.
+
+
 

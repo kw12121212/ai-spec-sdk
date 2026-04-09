@@ -12,6 +12,7 @@ from .transports.http import HttpTransport
 
 
 _BRIDGE_ONLY_METHODS: set[str] = {
+    "sessionSpawn",
     "sessionStatus",
     "sessionList",
     "sessionHistory",
@@ -85,8 +86,7 @@ class BridgeClient:
             transport, host=host, port=port, api_key=api_key,
             bridge_path=bridge_path, workspace=workspace,
         )
-        # Wire transport events to emitter once
-        self._transport.on_event(lambda data: self._emitter.emit("session_event", data))
+        self._transport.on_event(self._handle_transport_event)
 
     @staticmethod
     def _create_transport(
@@ -104,6 +104,15 @@ class BridgeClient:
             return HttpTransport(host=host, port=port, api_key=api_key)
         raise ValueError(f"Unknown transport: {transport!r}")
 
+    def _handle_transport_event(self, data: Any) -> None:
+        if isinstance(data, dict) and isinstance(data.get("method"), str):
+            params = data.get("params", {})
+            self._emitter.emit(data["method"], params)
+            self._emitter.emit("session_event", params if isinstance(params, dict) else data)
+            return
+
+        self._emitter.emit("session_event", data)
+
     # ── Context manager ──────────────────────────────────────────────────
 
     async def __aenter__(self) -> BridgeClient:
@@ -118,7 +127,8 @@ class BridgeClient:
     def on(self, event: str, callback: Callable[..., Any]) -> None:
         """Register a handler for session events.
 
-        Use ``event="session_event"`` to receive bridge session notifications.
+        Use ``event="session_event"`` for all session notifications or a bridge
+        notification method such as ``"bridge/subagent_event"`` for specific handlers.
         """
         self._emitter.on(event, callback)
 
@@ -139,6 +149,10 @@ class BridgeClient:
 
     async def sessionStart(self, **params: Any) -> Any:
         return await self._rpc("session.start", params)
+
+    async def sessionSpawn(self, **params: Any) -> Any:
+        self._require_http("sessionSpawn")
+        return await self._rpc("session.spawn", params)
 
     async def sessionResume(self, **params: Any) -> Any:
         return await self._rpc("session.resume", params)
@@ -303,9 +317,5 @@ class BridgeClient:
         return await self._rpc("workflow.run", params)
 
     async def skillsList(self) -> Any:
-        self._require_http("skillsList")
-        return await self._rpc("skills.list")
-eturn await self._rpc("skills.list")
-) -> Any:
         self._require_http("skillsList")
         return await self._rpc("skills.list")

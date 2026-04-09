@@ -13,6 +13,7 @@ export interface SessionHistoryEntry {
 export interface Session {
   id: string;
   workspace: string;
+  parentSessionId?: string;
   sdkSessionId: string | null;
   createdAt: string;
   updatedAt: string;
@@ -69,13 +70,19 @@ export class SessionStore {
     fs.renameSync(tmpPath, finalPath);
   }
 
-  create(workspace: string, prompt: string, stream: boolean = false): Session {
+  create(
+    workspace: string,
+    prompt: string,
+    stream: boolean = false,
+    parentSessionId?: string,
+  ): Session {
     const sessionId = crypto.randomUUID();
     const createdAt = nowIso();
 
     const session: Session = {
       id: sessionId,
       workspace,
+      ...(parentSessionId !== undefined ? { parentSessionId } : {}),
       sdkSessionId: null,
       createdAt,
       updatedAt: createdAt,
@@ -151,6 +158,14 @@ export class SessionStore {
       return null;
     }
 
+    for (const child of this.getActiveDescendants(sessionId)) {
+      child.stopRequested = true;
+      child.status = "stopped";
+      child.updatedAt = nowIso();
+      this._persist(child);
+      logger.info("session stopped", { sessionId: child.id, parentSessionId: sessionId });
+    }
+
     session.stopRequested = true;
     session.status = "stopped";
     session.updatedAt = nowIso();
@@ -159,10 +174,47 @@ export class SessionStore {
     return session;
   }
 
-  list(filter?: "active" | "all"): Session[] {
+  list(options: { status?: "active" | "all"; parentSessionId?: string } = {}): Session[] {
     const all = Array.from(this.sessions.values());
-    const filtered = filter === "active" ? all.filter((s) => s.status === "active") : all;
+    const filtered = all.filter((session) => {
+      if (options.status === "active" && session.status !== "active") {
+        return false;
+      }
+      if (
+        options.parentSessionId !== undefined &&
+        session.parentSessionId !== options.parentSessionId
+      ) {
+        return false;
+      }
+      return true;
+    });
     return filtered.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)).slice(0, 100);
+  }
+
+  getActiveDescendants(sessionId: string): Session[] {
+    const descendants: Session[] = [];
+    const queue = [sessionId];
+    const visited = new Set<string>();
+
+    while (queue.length > 0) {
+      const parentId = queue.shift();
+      if (!parentId || visited.has(parentId)) {
+        continue;
+      }
+      visited.add(parentId);
+
+      for (const session of this.sessions.values()) {
+        if (session.parentSessionId !== parentId) {
+          continue;
+        }
+        queue.push(session.id);
+        if (session.status === "active") {
+          descendants.push(session);
+        }
+      }
+    }
+
+    return descendants;
   }
 
   export(sessionId: string): Session | null {

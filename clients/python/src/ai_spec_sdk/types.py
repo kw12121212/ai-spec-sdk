@@ -23,6 +23,19 @@ class SessionStartParams:
 
 
 @dataclass
+class SessionSpawnParams:
+    parentSessionId: str
+    prompt: str
+    model: str | None = None
+    allowedTools: list[str] | None = None
+    disallowedTools: list[str] | None = None
+    permissionMode: str | None = None
+    maxTurns: int | None = None
+    systemPrompt: str | None = None
+    stream: bool = False
+
+
+@dataclass
 class SessionResumeParams:
     sessionId: str
     prompt: str
@@ -48,6 +61,7 @@ class SessionStatusParams:
 @dataclass
 class SessionListParams:
     status: str | None = None
+    parentSessionId: str | None = None
 
 
 @dataclass
@@ -247,6 +261,7 @@ class NegotiateVersionParams:
 class EventPayload:
     type: str
     sessionId: str | None = None
+    subagentId: str | None = None
     messageType: str | None = None
     message: Any = None
     content: str | None = None

@@ -8,6 +8,7 @@ import type {
   SetLogLevelResult,
   RuntimeInfo,
   SessionStartParams,
+  SessionSpawnParams,
   SessionResult,
   SessionResumeParams,
   SessionStopParams,
@@ -144,6 +145,10 @@ export class BridgeClient {
 
   async sessionStart(params: SessionStartParams): Promise<SessionResult> {
     return this.transport.request("session.start", params) as Promise<SessionResult>;
+  }
+
+  async sessionSpawn(params: SessionSpawnParams): Promise<SessionResult> {
+    return this.transport.request("session.spawn", params) as Promise<SessionResult>;
   }
 
   async sessionResume(params: SessionResumeParams): Promise<SessionResult> {

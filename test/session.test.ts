@@ -134,6 +134,216 @@ test("session.stop transitions active session to stopped", async () => {
   }
 });
 
+test("session.spawn inherits the parent workspace and emits bridge/subagent_event", async () => {
+  const fixtureWorkspace = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-session-spawn-"));
+  const notifications: unknown[] = [];
+  const invocations: Array<{ prompt: string; options: Record<string, unknown> }> = [];
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* ({ prompt, options }: {
+    prompt: string;
+    options: Record<string, unknown>;
+  }) {
+    invocations.push({ prompt, options });
+    yield { type: "system", subtype: "init", session_id: `sdk-${prompt}` };
+    yield { type: "assistant", message: { content: [{ type: "text", text: `reply:${prompt}` }] } };
+    yield { result: `done:${prompt}` };
+  };
+
+  try {
+    const server = new BridgeServer({
+      notify: (message) => notifications.push(message),
+    });
+
+    const parentResponse = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 21,
+      method: "session.start",
+      params: {
+        workspace: fixtureWorkspace,
+        prompt: "parent",
+      },
+    });
+    const parentSessionId = (parentResponse.result as Record<string, unknown>)["sessionId"] as string;
+
+    const spawnResponse = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 22,
+      method: "session.spawn",
+      params: {
+        parentSessionId,
+        prompt: "child",
+        allowedTools: ["Read"],
+      },
+    });
+
+    const childResult = spawnResponse.result as Record<string, unknown>;
+    const childSessionId = childResult["sessionId"] as string;
+    assert.equal(childResult["status"], "completed");
+    assert.equal(childResult["result"], "done:child");
+    assert.equal(invocations[1]?.options["cwd"], fixtureWorkspace);
+    assert.deepEqual(invocations[1]?.options["allowedTools"], ["Read"]);
+
+    const statusResponse = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 23,
+      method: "session.status",
+      params: { sessionId: childSessionId },
+    });
+    assert.equal(
+      (statusResponse.result as Record<string, unknown>)["parentSessionId"],
+      parentSessionId,
+    );
+
+    const subagentEvents = (notifications as Array<Record<string, unknown>>)
+      .filter((item) => item["method"] === "bridge/subagent_event")
+      .map((item) => item["params"] as Record<string, unknown>);
+
+    assert.ok(
+      subagentEvents.some(
+        (event) =>
+          event["sessionId"] === parentSessionId &&
+          event["subagentId"] === childSessionId &&
+          event["type"] === "agent_message",
+      ),
+      "parent session should receive child message events",
+    );
+    assert.ok(
+      subagentEvents.some(
+        (event) =>
+          event["sessionId"] === parentSessionId &&
+          event["subagentId"] === childSessionId &&
+          event["type"] === "session_completed" &&
+          event["status"] === "completed",
+      ),
+      "parent session should receive child completion events",
+    );
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+  }
+});
+
+test("session.stop cascades to active child sessions", async () => {
+  const fixtureWorkspace = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-session-stop-tree-"));
+  const notifications: Array<Record<string, unknown>> = [];
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* ({ prompt }: {
+    prompt: string;
+    options: Record<string, unknown>;
+  }) {
+    yield { type: "system", subtype: "init", session_id: `sdk-${prompt}` };
+    await new Promise<void>((resolve) => setTimeout(resolve, 20));
+    yield { type: "assistant", message: { content: [{ type: "text", text: `${prompt} working` }] } };
+    await new Promise<void>((resolve) => setTimeout(resolve, 20));
+    yield { result: `done:${prompt}` };
+  };
+
+  try {
+    const server = new BridgeServer({
+      notify: (message) => notifications.push(message as Record<string, unknown>),
+    });
+
+    const parentPromise = server.handleMessage({
+      jsonrpc: "2.0",
+      id: 31,
+      method: "session.start",
+      params: {
+        workspace: fixtureWorkspace,
+        prompt: "parent",
+      },
+    });
+    const [parentSessionId] = await waitForSessionStartedCount(notifications, 1);
+
+    const childPromise = server.handleMessage({
+      jsonrpc: "2.0",
+      id: 32,
+      method: "session.spawn",
+      params: {
+        parentSessionId,
+        prompt: "child",
+      },
+    });
+
+    const startedSessionIds = await waitForSessionStartedCount(notifications, 2);
+    const childSessionId = startedSessionIds.find((sessionId) => sessionId !== parentSessionId);
+    assert.ok(childSessionId, "child session should start before stop is requested");
+
+    const stopResponse = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 33,
+      method: "session.stop",
+      params: { sessionId: parentSessionId },
+    });
+    assert.equal((stopResponse.result as Record<string, unknown>)["status"], "stopped");
+
+    const parentFinal = await parentPromise;
+    const childFinal = await childPromise;
+    assert.equal((parentFinal.result as Record<string, unknown>)["status"], "stopped");
+    assert.equal((childFinal.result as Record<string, unknown>)["status"], "stopped");
+
+    const childStatus = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 34,
+      method: "session.status",
+      params: { sessionId: childSessionId },
+    });
+    assert.equal((childStatus.result as Record<string, unknown>)["status"], "stopped");
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+  }
+});
+
+test("session.list filters by parentSessionId", async () => {
+  const fixtureWorkspace = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-session-list-parent-"));
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* ({ prompt }: {
+    prompt: string;
+    options: Record<string, unknown>;
+  }) {
+    yield { type: "system", subtype: "init", session_id: `sdk-${prompt}` };
+    yield { result: `done:${prompt}` };
+  };
+
+  try {
+    const server = new BridgeServer();
+    const parentResponse = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 41,
+      method: "session.start",
+      params: { workspace: fixtureWorkspace, prompt: "parent" },
+    });
+    const parentSessionId = (parentResponse.result as Record<string, unknown>)["sessionId"] as string;
+
+    const childResponse = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 42,
+      method: "session.spawn",
+      params: { parentSessionId, prompt: "child" },
+    });
+    const childSessionId = (childResponse.result as Record<string, unknown>)["sessionId"] as string;
+
+    await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 43,
+      method: "session.start",
+      params: { workspace: fixtureWorkspace, prompt: "unrelated" },
+    });
+
+    const listResponse = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 44,
+      method: "session.list",
+      params: { parentSessionId },
+    });
+    const sessions = (listResponse.result as Record<string, unknown>)["sessions"] as Array<Record<string, unknown>>;
+
+    assert.equal(sessions.length, 1);
+    assert.equal(sessions[0]?.["sessionId"], childSessionId);
+    assert.equal(sessions[0]?.["parentSessionId"], parentSessionId);
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+  }
+});
+
 test("session.start passes cwd equal to fixture workspace", async () => {
   const fixtureWorkspace = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-cwd-"));
   let capturedCwd: unknown;
@@ -1146,6 +1356,31 @@ async function waitForSessionStarted(
   }
 
   return (started()!["params"] as Record<string, unknown>)["sessionId"] as string;
+}
+
+async function waitForSessionStartedCount(
+  notifications: Array<Record<string, unknown>>,
+  count: number,
+): Promise<string[]> {
+  const started = () =>
+    notifications
+      .filter(
+        (item) =>
+          item["method"] === "bridge/session_event" &&
+          (item["params"] as Record<string, unknown>)?.["type"] === "session_started",
+      )
+      .map((item) => (item["params"] as Record<string, unknown>)["sessionId"] as string);
+
+  const timeoutMs = 1000;
+  const start = Date.now();
+  while (started().length < count) {
+    if (Date.now() - start > timeoutMs) {
+      throw new Error(`Timed out waiting for ${count} session_started events`);
+    }
+    await new Promise<void>((resolve) => setTimeout(resolve, 5));
+  }
+
+  return started();
 }
 
 // ─── session.events tests ────────────────────────────────────────────────────

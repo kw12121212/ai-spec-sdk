@@ -152,6 +152,49 @@ The bridge MUST expose a `session.list` method that returns summaries of session
 - WHEN the bridge validates the request
 - THEN the bridge returns a `-32602` error
 
+#### Scenario: Filter by parent session
+- GIVEN a bridge has parent and child sessions
+- WHEN a client calls `session.list` with `{ "parentSessionId": "<parent-id>" }`
+- THEN the response contains only sessions whose `parentSessionId` matches that parent
+
+#### Scenario: Session list exposes parent linkage
+- GIVEN a bridge has both root sessions and child sessions
+- WHEN a client calls `session.list`
+- THEN each returned session entry includes `parentSessionId`
+- AND root sessions report `parentSessionId: null`
+
+### Requirement: Child Session Spawning
+The bridge MUST expose a `session.spawn` method that creates a child session linked to an existing parent session.
+
+The method MUST accept:
+- `parentSessionId` (string, required)
+- `prompt` (string, required)
+- the same agent control parameters accepted by `session.start`
+
+The child session MUST inherit the parent session workspace boundary.
+
+#### Scenario: Spawn a child session
+- GIVEN a bridge has an existing parent session
+- WHEN a client calls `session.spawn` with that `parentSessionId` and a prompt
+- THEN the bridge creates a new child session in the same workspace
+- AND the response includes the child `sessionId`
+
+### Requirement: Subagent Event Notification
+The bridge MUST emit `bridge/subagent_event` notifications on the parent session stream for child session activity that is relevant to the parent.
+
+Each notification MUST include:
+- `sessionId` (the parent session ID)
+- `subagentId` (the child session ID)
+- `type` (the propagated child event type)
+
+When the child event is terminal, the notification MUST also include `status`.
+
+#### Scenario: Parent receives child completion notification
+- GIVEN a parent session has a spawned child session
+- WHEN the child session completes or stops
+- THEN the bridge emits a `bridge/subagent_event` notification on the parent session stream
+- AND the notification includes `sessionId`, `subagentId`, `type`, and `status`
+
 ### Requirement: Session History Method in Capabilities
 The bridge capability response MUST advertise `session.history` as a supported method so clients can discover it without trial and error.
 

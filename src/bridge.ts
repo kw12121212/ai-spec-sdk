@@ -408,6 +408,8 @@ export class BridgeServer {
         );
       case "session.start":
         return this.startSession(params, requestId);
+      case "session.spawn":
+        return this.spawnSession(params, requestId);
       case "session.resume":
         return this.resumeSession(params, requestId);
       case "session.stop":
@@ -486,7 +488,10 @@ export class BridgeServer {
     const payload = { ...params, requestId };
     this.notify({ jsonrpc: "2.0", method, params: payload });
 
-    if (method === "bridge/session_event" && typeof params["sessionId"] === "string") {
+    if (
+      (method === "bridge/session_event" || method === "bridge/subagent_event") &&
+      typeof params["sessionId"] === "string"
+    ) {
       const sid = params["sessionId"] as string;
       const seq = this.eventSeq.get(sid) ?? 0;
       this.eventSeq.set(sid, seq + 1);
@@ -496,6 +501,50 @@ export class BridgeServer {
       if (buf.length > EVENT_BUFFER_CAP) buf.shift();
       this.eventLog.set(sid, buf);
     }
+
+    if (method === "bridge/session_event") {
+      this.emitSubagentEvent(params, requestId);
+    }
+  }
+
+  private emitSubagentEvent(params: Record<string, unknown>, requestId: unknown): void {
+    const childSessionId = params["sessionId"];
+    if (typeof childSessionId !== "string") {
+      return;
+    }
+
+    const childSession = this.sessionStore.get(childSessionId);
+    if (!childSession?.parentSessionId) {
+      return;
+    }
+
+    const eventType = params["type"];
+    if (
+      eventType !== "agent_message" &&
+      eventType !== "session_completed" &&
+      eventType !== "session_stopped"
+    ) {
+      return;
+    }
+
+    this.emit(
+      "bridge/subagent_event",
+      {
+        sessionId: childSession.parentSessionId,
+        subagentId: childSessionId,
+        type: eventType,
+        ...(typeof params["messageType"] === "string" ? { messageType: params["messageType"] } : {}),
+        ...(params["message"] !== undefined ? { message: params["message"] } : {}),
+        ...(params["result"] !== undefined ? { result: params["result"] } : {}),
+        ...(params["usage"] !== undefined ? { usage: params["usage"] } : {}),
+        ...(
+          eventType === "session_completed" || eventType === "session_stopped"
+            ? { status: childSession.status }
+            : {}
+        ),
+      },
+      requestId,
+    );
   }
 
   private async startSession(
@@ -558,6 +607,98 @@ export class BridgeServer {
       prompt,
       { ...passthroughOptions, ...buildControlOptions(controlParams) },
       { cwd: resolvedWorkspace, env: resolvedEnv },
+      requestId,
+      customTools,
+    );
+  }
+
+  private async spawnSession(
+    params: Record<string, unknown>,
+    requestId: unknown,
+  ): Promise<unknown> {
+    const { parentSessionId, prompt, options = {}, proxy, workspace } = params;
+    const { model, allowedTools, disallowedTools, permissionMode, maxTurns, systemPrompt, stream } = params;
+
+    if (!parentSessionId || typeof parentSessionId !== "string") {
+      throw new BridgeError(-32602, "'parentSessionId' must be provided");
+    }
+
+    const parentSession = this.sessionStore.get(parentSessionId);
+    if (!parentSession) {
+      throw new BridgeError(-32011, "Session not found", { sessionId: parentSessionId });
+    }
+
+    if (!prompt || typeof prompt !== "string") {
+      throw new BridgeError(-32602, "'prompt' must be provided");
+    }
+
+    if (stream !== undefined && typeof stream !== "boolean") {
+      throw new BridgeError(-32602, "'stream' must be a boolean");
+    }
+
+    if (workspace !== undefined) {
+      if (typeof workspace !== "string") {
+        throw new BridgeError(-32602, "'workspace' must be a string when provided");
+      }
+
+      const resolvedWorkspace = path.resolve(workspace);
+      if (resolvedWorkspace !== parentSession.workspace) {
+        throw new BridgeError(
+          -32602,
+          "'workspace' must match the parent session workspace when spawning",
+        );
+      }
+    }
+
+    const typedOptions = options as Record<string, unknown>;
+    if (Object.prototype.hasOwnProperty.call(typedOptions, "cwd")) {
+      throw new BridgeError(
+        -32602,
+        "'cwd' must not be set in options; it is bridge-managed via the parent session workspace",
+      );
+    }
+
+    const controlParams = validateAgentControlParams({
+      model,
+      allowedTools,
+      disallowedTools,
+      permissionMode,
+      maxTurns,
+      systemPrompt,
+    });
+
+    const proxyParams = validateProxy(proxy);
+    const proxyEnv = buildProxyEnv(proxyParams);
+    const { env: callerEnv, ...passthroughOptions } = typedOptions;
+    const resolvedEnv = mergeEnv(
+      callerEnv as Record<string, string | undefined> | undefined,
+      proxyEnv,
+    );
+
+    const session = this.sessionStore.create(
+      parentSession.workspace,
+      prompt,
+      stream === true,
+      parentSessionId,
+    );
+
+    const customTools = this._getAvailableCustomTools(
+      parentSession.workspace,
+      controlParams.allowedTools,
+      controlParams.disallowedTools,
+    );
+
+    this.emit(
+      "bridge/session_event",
+      { sessionId: session.id, type: "session_started" },
+      requestId,
+    );
+
+    return this._runQuery(
+      session,
+      prompt,
+      { ...passthroughOptions, ...buildControlOptions(controlParams) },
+      { cwd: parentSession.workspace, env: resolvedEnv },
       requestId,
       customTools,
     );
@@ -799,6 +940,9 @@ export class BridgeServer {
       throw new BridgeError(-32602, "'sessionId' must be provided");
     }
 
+    const cascadedSessionIds = this.sessionStore
+      .getActiveDescendants(sessionId)
+      .map((session) => session.id);
     const session = this.sessionStore.stop(sessionId);
     if (!session) {
       throw new BridgeError(-32011, "Session not found", { sessionId });
@@ -812,6 +956,12 @@ export class BridgeServer {
     }
 
     this._fireHooks("stop", sessionId, session.workspace);
+    for (const childSessionId of cascadedSessionIds) {
+      const childSession = this.sessionStore.get(childSessionId);
+      if (childSession) {
+        this._fireHooks("subagent_stop", childSessionId, childSession.workspace);
+      }
+    }
 
     return { sessionId, status: session.status };
   }
@@ -829,6 +979,7 @@ export class BridgeServer {
 
     return {
       sessionId,
+      parentSessionId: session.parentSessionId ?? null,
       status: session.status,
       createdAt: session.createdAt,
       updatedAt: session.updatedAt,
@@ -935,13 +1086,20 @@ export class BridgeServer {
   }
 
   private listSessions(params: Record<string, unknown>): unknown {
-    const { status } = params;
+    const { status, parentSessionId } = params;
 
     if (status !== undefined && status !== "active" && status !== "all") {
       throw new BridgeError(-32602, "'status' must be 'active' or 'all'");
     }
 
-    const sessions = this.sessionStore.list(status as "active" | "all" | undefined);
+    if (parentSessionId !== undefined && typeof parentSessionId !== "string") {
+      throw new BridgeError(-32602, "'parentSessionId' must be a string");
+    }
+
+    const sessions = this.sessionStore.list({
+      status: status as "active" | "all" | undefined,
+      ...(typeof parentSessionId === "string" ? { parentSessionId } : {}),
+    });
 
     return {
       sessions: sessions.map((s) => {
@@ -953,6 +1111,7 @@ export class BridgeServer {
           sessionId: s.id,
           status: s.status,
           workspace: s.workspace,
+          parentSessionId: s.parentSessionId ?? null,
           createdAt: s.createdAt,
           updatedAt: s.updatedAt,
           prompt,
@@ -1452,7 +1611,7 @@ export class BridgeServer {
     const resolvedLimit = Math.min(typeof limit === "number" ? limit : 20, 100);
     const resolvedWorkspace = typeof workspace === "string" ? path.resolve(workspace) : undefined;
 
-    const allSessions = this.sessionStore.list("all" as "active" | "all" | undefined);
+    const allSessions = this.sessionStore.list({ status: "all" });
 
     const results: Array<{
       sessionId: string;
@@ -1517,6 +1676,7 @@ export class BridgeServer {
     return {
       id: session.id,
       workspace: session.workspace,
+      parentSessionId: session.parentSessionId ?? null,
       sdkSessionId: session.sdkSessionId,
       status: session.status,
       createdAt: session.createdAt,

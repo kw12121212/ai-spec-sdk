@@ -358,7 +358,15 @@ export function startHttpServer(options: HttpServerOptions = {}): Promise<HttpSe
           try {
             response = await bridge.handleMessage(payload);
             const method = payload?.method;
-            if ((method === "session.start" || method === "session.resume" || method === "session.status") && response.result?.sessionId) {
+            if (
+              (
+                method === "session.start" ||
+                method === "session.spawn" ||
+                method === "session.resume" ||
+                method === "session.status"
+              ) &&
+              response.result?.sessionId
+            ) {
               wsManager.add(response.result.sessionId, ws);
             }
           } catch (error) {

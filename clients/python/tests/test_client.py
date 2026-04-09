@@ -52,6 +52,9 @@ async def test_context_manager_lifecycle():
 @pytest.mark.asyncio
 async def test_stdio_raises_for_bridge_only_method():
     client = BridgeClient(transport="stdio")
+    with pytest.raises(UnsupportedInStdioError, match="sessionSpawn"):
+        await client.sessionSpawn(parentSessionId="parent", prompt="child")
+
     with pytest.raises(UnsupportedInStdioError, match="sessionList"):
         await client.sessionList()
 
@@ -84,6 +87,22 @@ async def test_http_session_start():
     mock_transport.request.assert_called_once_with("session.start", {
         "workspace": "/project",
         "prompt": "Hello",
+    })
+
+
+@pytest.mark.asyncio
+async def test_http_session_spawn():
+    client = BridgeClient(transport="http", port=8765)
+
+    mock_transport = AsyncMock()
+    mock_transport.request = AsyncMock(return_value={"sessionId": "child-123", "status": "active"})
+    client._transport = mock_transport
+
+    result = await client.sessionSpawn(parentSessionId="parent-123", prompt="Delegate")
+    assert result["sessionId"] == "child-123"
+    mock_transport.request.assert_called_once_with("session.spawn", {
+        "parentSessionId": "parent-123",
+        "prompt": "Delegate",
     })
 
 
@@ -131,3 +150,27 @@ async def test_off_removes_handler():
     client.on("session_event", handler)
     client.off("session_event", handler)
     assert handler not in client._emitter._handlers.get("session_event", set())
+
+
+def test_bridge_subagent_event_handlers_receive_notification_params():
+    client = BridgeClient(transport="http")
+    handler = MagicMock()
+    client.on("bridge/subagent_event", handler)
+
+    client._handle_transport_event({
+        "jsonrpc": "2.0",
+        "method": "bridge/subagent_event",
+        "params": {
+            "sessionId": "parent",
+            "subagentId": "child",
+            "type": "session_completed",
+            "status": "completed",
+        },
+    })
+
+    handler.assert_called_once_with({
+        "sessionId": "parent",
+        "subagentId": "child",
+        "type": "session_completed",
+        "status": "completed",
+    })

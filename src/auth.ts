@@ -30,6 +30,7 @@ export const METHOD_SCOPES: Record<string, string | null> = {
   "skills.list": null,
   // Session write
   "session.start": "session:write",
+  "session.spawn": "session:write",
   "session.resume": "session:write",
   "session.stop": "session:write",
   "session.delete": "session:write",
