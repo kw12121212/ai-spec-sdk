@@ -33,3 +33,4 @@ Thumbs.db
 # Test temp files
 tmp/
 .tmp/
+.ai-spec-sessions/

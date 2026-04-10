@@ -68,6 +68,8 @@ export const METHOD_SCOPES: Record<string, string | null> = {
   "hooks.list": "admin",
   "bridge.setLogLevel": "admin",
   "bridge.info": "admin",
+  "webhook.subscribe": "admin",
+  "webhook.unsubscribe": "admin",
 };
 
 /**

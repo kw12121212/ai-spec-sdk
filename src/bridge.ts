@@ -15,6 +15,7 @@ import { ContextStore } from "./context-store.js";
 import { runClaudeQuery } from "./claude-agent-runner.js";
 import { defaultLogger, VALID_LOG_LEVELS, type Logger, type LogLevel } from "./logger.js";
 import { buildRuntimeInfo, type RuntimeInfoOptions } from "./runtime-info.js";
+import { WebhookManager } from "./webhooks.js";
 
 const METHOD_NOT_FOUND = -32601;
 const INTERNAL_ERROR = -32603;
@@ -268,6 +269,7 @@ export class BridgeServer {
   private eventLog: Map<string, BufferedEvent[]>;
   private eventSeq: Map<string, number>;
   private pendingApprovals: Map<string, PendingApproval>;
+  private webhookManager: WebhookManager;
 
   constructor({ notify = () => {}, sessionsDir, workspacesDir, logger, transport = "stdio", runtimeInfoOptions }: BridgeServerOptions = {}) {
     this.notify = notify;
@@ -285,6 +287,7 @@ export class BridgeServer {
     this.eventLog = new Map();
     this.eventSeq = new Map();
     this.pendingApprovals = new Map();
+    this.webhookManager = new WebhookManager(sessionsDir);
   }
 
   private _buildApprovalCallback(sessionId: string): (
@@ -479,6 +482,10 @@ export class BridgeServer {
         return this.deleteSession(params);
       case "session.cleanup":
         return this.cleanupSessions(params);
+      case "webhook.subscribe":
+        return this.webhookSubscribe(params);
+      case "webhook.unsubscribe":
+        return this.webhookUnsubscribe(params);
       default:
         throw new BridgeError(METHOD_NOT_FOUND, `Method not found: ${method}`);
     }
@@ -486,7 +493,9 @@ export class BridgeServer {
 
   private emit(method: string, params: Record<string, unknown>, requestId: unknown = null): void {
     const payload = { ...params, requestId };
-    this.notify({ jsonrpc: "2.0", method, params: payload });
+    const notification = { jsonrpc: "2.0" as const, method, params: payload };
+    this.notify(notification);
+    this.webhookManager.notify(notification);
 
     if (
       (method === "bridge/session_event" || method === "bridge/subagent_event") &&
@@ -1838,5 +1847,34 @@ To use a custom tool, invoke the Bash tool with the following command format:
 __custom_tool__:<tool_name> [additional_args...]
 
 For example: __custom_tool__:custom.build --verbose`;
+  }
+
+  // --- Webhook methods ---
+
+  private webhookSubscribe(params: Record<string, unknown>): unknown {
+    const { url } = params;
+    if (typeof url !== "string") {
+      throw new BridgeError(-32602, "'url' must be a string");
+    }
+    try {
+      new URL(url);
+    } catch {
+      throw new BridgeError(-32602, "'url' must be a valid URL");
+    }
+
+    const reg = this.webhookManager.subscribe(url);
+    return { id: reg.id, url: reg.url, secret: this.webhookManager.getSecret() };
+  }
+
+  private webhookUnsubscribe(params: Record<string, unknown>): unknown {
+    const { id } = params;
+    if (typeof id !== "string") {
+      throw new BridgeError(-32602, "'id' must be a string");
+    }
+    const removed = this.webhookManager.unsubscribe(id);
+    if (!removed) {
+      throw new BridgeError(-32011, "Webhook not found");
+    }
+    return { removed: true };
   }
 }
