@@ -949,3 +949,187 @@ test("bridge.capabilities advertises session.export in methods", async () => {
   assert.ok(methods.includes("session.delete"), "capabilities must advertise session.delete");
   assert.ok(methods.includes("session.cleanup"), "capabilities must advertise session.cleanup");
 });
+
+// --- Template tests ---
+
+test("template.create creates a template with session parameters", async () => {
+  const server = new BridgeServer();
+  const response = await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 1000,
+    method: "template.create",
+    params: {
+      name: "test-template",
+      model: "claude-3-opus",
+      maxTurns: 10,
+      systemPrompt: "You are a helpful assistant",
+    },
+  });
+
+  assert.ok(!response.error, "template.create should not return an error");
+  const result = response.result as Record<string, unknown>;
+  assert.equal(result["name"], "test-template");
+  assert.equal(result["model"], "claude-3-opus");
+  assert.equal(result["maxTurns"], 10);
+  assert.equal(result["systemPrompt"], "You are a helpful assistant");
+  assert.ok(typeof result["createdAt"] === "string");
+  assert.ok(typeof result["updatedAt"] === "string");
+});
+
+test("template.create returns -32602 when name is missing", async () => {
+  const server = new BridgeServer();
+  const response = await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 1001,
+    method: "template.create",
+    params: {
+      model: "claude-3-opus",
+    },
+  });
+
+  assert.ok(response.error);
+  assert.equal(response.error!.code, -32602);
+});
+
+test("template.create validates model parameter type", async () => {
+  const server = new BridgeServer();
+  const response = await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 1002,
+    method: "template.create",
+    params: {
+      name: "bad-template",
+      model: 123,
+    },
+  });
+
+  assert.ok(response.error);
+  assert.equal(response.error!.code, -32602);
+});
+
+test("template.get returns existing template", async () => {
+  const server = new BridgeServer();
+
+  // Create template first
+  await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 1,
+    method: "template.create",
+    params: { name: "get-test", model: "claude-3-sonnet" },
+  });
+
+  const response = await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 1003,
+    method: "template.get",
+    params: { name: "get-test" },
+  });
+
+  assert.ok(!response.error);
+  const result = response.result as Record<string, unknown>;
+  assert.equal(result["name"], "get-test");
+  assert.equal(result["model"], "claude-3-sonnet");
+});
+
+test("template.get returns null for non-existent template", async () => {
+  const server = new BridgeServer();
+  const response = await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 1004,
+    method: "template.get",
+    params: { name: "does-not-exist" },
+  });
+
+  assert.ok(!response.error);
+  assert.equal(response.result, null);
+});
+
+test("template.list returns all templates", async () => {
+  const server = new BridgeServer();
+
+  await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 1,
+    method: "template.create",
+    params: { name: "template-a", model: "claude-3-opus" },
+  });
+
+  await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 2,
+    method: "template.create",
+    params: { name: "template-b", model: "claude-3-sonnet" },
+  });
+
+  const response = await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 1005,
+    method: "template.list",
+  });
+
+  assert.ok(!response.error);
+  const result = response.result as Record<string, unknown>;
+  const templates = result["templates"] as Array<Record<string, unknown>>;
+  assert.ok(templates.length >= 2);
+  assert.ok(templates.some((t) => t["name"] === "template-a"));
+  assert.ok(templates.some((t) => t["name"] === "template-b"));
+});
+
+test("template.delete removes template", async () => {
+  const server = new BridgeServer();
+
+  await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 1,
+    method: "template.create",
+    params: { name: "to-delete", model: "claude-3-opus" },
+  });
+
+  const deleteResponse = await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 1006,
+    method: "template.delete",
+    params: { name: "to-delete" },
+  });
+
+  assert.ok(!deleteResponse.error);
+  assert.equal((deleteResponse.result as Record<string, unknown>)["removed"], true);
+
+  const getResponse = await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 1007,
+    method: "template.get",
+    params: { name: "to-delete" },
+  });
+
+  assert.equal(getResponse.result, null);
+});
+
+test("template.delete returns removed:false for non-existent template", async () => {
+  const server = new BridgeServer();
+  const response = await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 1008,
+    method: "template.delete",
+    params: { name: "never-existed" },
+  });
+
+  assert.ok(!response.error);
+  assert.equal((response.result as Record<string, unknown>)["removed"], false);
+});
+
+test("bridge.capabilities advertises template.* methods", async () => {
+  const server = new BridgeServer();
+  const response = await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 1009,
+    method: "bridge.capabilities",
+  });
+
+  const result = response.result as Record<string, unknown>;
+  const methods = result["methods"] as string[];
+  assert.ok(methods.includes("template.create"), "capabilities must advertise template.create");
+  assert.ok(methods.includes("template.get"), "capabilities must advertise template.get");
+  assert.ok(methods.includes("template.list"), "capabilities must advertise template.list");
+  assert.ok(methods.includes("template.delete"), "capabilities must advertise template.delete");
+});

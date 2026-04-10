@@ -30,6 +30,7 @@
 
 ## session
 - [agent-sessions.md](session/agent-sessions.md) - agent-sessions
+- [session-templates.md](session/session-templates.md) - Session Templates
 
 ## skills
 - [builtin-spec-skills.md](skills/builtin-spec-skills.md) - builtin-spec-skills

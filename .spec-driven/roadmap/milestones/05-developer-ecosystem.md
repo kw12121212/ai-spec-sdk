@@ -19,7 +19,7 @@ Complete the production observability story, enable external integrations via we
 ## Planned Changes
 - `opentelemetry-metrics` - Declared: complete - Prometheus metrics at GET /metrics
 - `event-webhooks` - Declared: complete - HMAC-signed HTTP webhook delivery with retry
-- `session-templates` - Declared: planned - save and reuse session configurations
+- `session-templates` - Declared: complete - save and reuse session configurations
 
 ## Dependencies
 - 02-production-ready — metrics and webhooks require HTTP transport and auth; session-templates requires session persistence
@@ -28,7 +28,9 @@ Complete the production observability story, enable external integrations via we
 - Prometheus format is hand-rolled (no external dep); correctness must be validated against a real scraper.
 
 ## Status
-- Declared: proposed
+- Declared: complete
 
 ## Notes
 java-cli-demo moved to 06-v1-stable.
+
+

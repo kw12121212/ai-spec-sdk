@@ -165,6 +165,10 @@ export function getCapabilities(transport = "stdio"): Capabilities {
       "context.list",
       "webhook.subscribe",
       "webhook.unsubscribe",
+      "template.create",
+      "template.get",
+      "template.list",
+      "template.delete",
     ],
     agentControlParams: [
       "model",

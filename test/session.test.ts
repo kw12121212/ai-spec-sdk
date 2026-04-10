@@ -2086,3 +2086,159 @@ test("stream_chunk events stored in event buffer and replayable via session.even
     fs.rmSync(ws, { recursive: true, force: true });
   }
 });
+
+// --- Template integration tests ---
+
+test("session.start with template applies template parameters", async () => {
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-template-session-"));
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* queryStub({ options }: {
+    options: Record<string, unknown>;
+  }) {
+    // Verify that template parameters were passed
+    assert.equal(options["model"], "claude-3-opus");
+    assert.deepEqual(options["allowedTools"], ["Read", "Glob"]);
+    assert.equal(options["maxTurns"], 5);
+    yield { type: "system", subtype: "init" };
+    yield { result: "success" };
+  };
+
+  try {
+    const server = new BridgeServer();
+
+    // Create template first
+    await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "template.create",
+      params: {
+        name: "test-session-template",
+        model: "claude-3-opus",
+        allowedTools: ["Read", "Glob"],
+        maxTurns: 5,
+      },
+    });
+
+    const response = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 2,
+      method: "session.start",
+      params: {
+        workspace: ws,
+        prompt: "hello with template",
+        template: "test-session-template",
+      },
+    });
+
+    assert.ok(!response.error, "session.start with template should not error");
+    const result = response.result as Record<string, unknown>;
+    assert.equal(result["status"], "completed");
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    fs.rmSync(ws, { recursive: true, force: true });
+  }
+});
+
+test("session.start explicit parameters override template", async () => {
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-template-override-"));
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* queryStub({ options }: {
+    options: Record<string, unknown>;
+  }) {
+    // Verify that explicit parameter overrides template
+    assert.equal(options["model"], "claude-3-sonnet"); // explicit value, not template value
+    assert.equal(options["maxTurns"], 10); // template value (not overridden)
+    yield { type: "system", subtype: "init" };
+    yield { result: "success" };
+  };
+
+  try {
+    const server = new BridgeServer();
+
+    // Create template
+    await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "template.create",
+      params: {
+        name: "override-test-template",
+        model: "claude-3-opus",
+        maxTurns: 10,
+      },
+    });
+
+    const response = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 2,
+      method: "session.start",
+      params: {
+        workspace: ws,
+        prompt: "hello with override",
+        template: "override-test-template",
+        model: "claude-3-sonnet", // explicit override
+      },
+    });
+
+    assert.ok(!response.error);
+    const result = response.result as Record<string, unknown>;
+    assert.equal(result["status"], "completed");
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    fs.rmSync(ws, { recursive: true, force: true });
+  }
+});
+
+test("session.start with non-existent template returns -32021", async () => {
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-template-missing-"));
+
+  try {
+    const server = new BridgeServer();
+
+    const response = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "session.start",
+      params: {
+        workspace: ws,
+        prompt: "hello",
+        template: "non-existent-template",
+      },
+    });
+
+    assert.ok(response.error, "should return error for missing template");
+    assert.equal(response.error!.code, -32021);
+    assert.ok((response.error!.message as string).includes("Template not found"));
+  } finally {
+    fs.rmSync(ws, { recursive: true, force: true });
+  }
+});
+
+test("session.start without template works as before", async () => {
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-no-template-"));
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* queryStub() {
+    yield { type: "system", subtype: "init" };
+    yield { result: "success" };
+  };
+
+  try {
+    const server = new BridgeServer();
+
+    const response = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "session.start",
+      params: {
+        workspace: ws,
+        prompt: "hello without template",
+      },
+    });
+
+    assert.ok(!response.error);
+    const result = response.result as Record<string, unknown>;
+    assert.equal(result["status"], "completed");
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    fs.rmSync(ws, { recursive: true, force: true });
+  }
+});

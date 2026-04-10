@@ -16,12 +16,14 @@ import { runClaudeQuery } from "./claude-agent-runner.js";
 import { defaultLogger, VALID_LOG_LEVELS, type Logger, type LogLevel } from "./logger.js";
 import { buildRuntimeInfo, type RuntimeInfoOptions } from "./runtime-info.js";
 import { WebhookManager } from "./webhooks.js";
+import { TemplateStore } from "./template-store.js";
 
 const METHOD_NOT_FOUND = -32601;
 const INTERNAL_ERROR = -32603;
 const SDK_SESSION_ID_UNAVAILABLE = -32012;
 const VERSION_MISMATCH = -32050;
 const SESSION_ACTIVE = -32070;
+const TEMPLATE_NOT_FOUND = -32021;
 
 const EVENT_BUFFER_CAP = 500;
 
@@ -270,6 +272,7 @@ export class BridgeServer {
   private eventSeq: Map<string, number>;
   private pendingApprovals: Map<string, PendingApproval>;
   private webhookManager: WebhookManager;
+  private templateStore: TemplateStore;
 
   constructor({ notify = () => {}, sessionsDir, workspacesDir, logger, transport = "stdio", runtimeInfoOptions }: BridgeServerOptions = {}) {
     this.notify = notify;
@@ -288,6 +291,7 @@ export class BridgeServer {
     this.eventSeq = new Map();
     this.pendingApprovals = new Map();
     this.webhookManager = new WebhookManager(sessionsDir);
+    this.templateStore = new TemplateStore(sessionsDir ? path.join(sessionsDir, "templates") : undefined);
   }
 
   private _buildApprovalCallback(sessionId: string): (
@@ -486,6 +490,14 @@ export class BridgeServer {
         return this.webhookSubscribe(params);
       case "webhook.unsubscribe":
         return this.webhookUnsubscribe(params);
+      case "template.create":
+        return this.templateCreate(params);
+      case "template.get":
+        return this.templateGet(params);
+      case "template.list":
+        return this.templateList();
+      case "template.delete":
+        return this.templateDelete(params);
       default:
         throw new BridgeError(METHOD_NOT_FOUND, `Method not found: ${method}`);
     }
@@ -560,7 +572,7 @@ export class BridgeServer {
     params: Record<string, unknown>,
     requestId: unknown,
   ): Promise<unknown> {
-    const { workspace, prompt, options = {}, proxy } = params;
+    const { workspace, prompt, options = {}, proxy, template } = params;
     const { model, allowedTools, disallowedTools, permissionMode, maxTurns, systemPrompt, stream } = params;
 
     if (!workspace || typeof workspace !== "string") {
@@ -575,6 +587,10 @@ export class BridgeServer {
       throw new BridgeError(-32602, "'stream' must be a boolean");
     }
 
+    if (template !== undefined && typeof template !== "string") {
+      throw new BridgeError(-32602, "'template' must be a string");
+    }
+
     const typedOptions = options as Record<string, unknown>;
     if (Object.prototype.hasOwnProperty.call(typedOptions, "cwd")) {
       throw new BridgeError(
@@ -583,7 +599,35 @@ export class BridgeServer {
       );
     }
 
-    const controlParams = validateAgentControlParams({ model, allowedTools, disallowedTools, permissionMode, maxTurns, systemPrompt });
+    // Load template if specified
+    let templateParams: Partial<AgentControlParams> = {};
+    if (template) {
+      const tmpl = this.templateStore.get(template);
+      if (!tmpl) {
+        throw new BridgeError(TEMPLATE_NOT_FOUND, `Template not found: ${template}`);
+      }
+      templateParams = {
+        model: tmpl.model,
+        allowedTools: tmpl.allowedTools,
+        disallowedTools: tmpl.disallowedTools,
+        permissionMode: tmpl.permissionMode,
+        maxTurns: tmpl.maxTurns,
+        systemPrompt: tmpl.systemPrompt,
+      };
+    }
+
+    // Merge template params with explicit params (explicit takes precedence)
+    const mergedParams = {
+      ...templateParams,
+      ...(model !== undefined && { model }),
+      ...(allowedTools !== undefined && { allowedTools }),
+      ...(disallowedTools !== undefined && { disallowedTools }),
+      ...(permissionMode !== undefined && { permissionMode }),
+      ...(maxTurns !== undefined && { maxTurns }),
+      ...(systemPrompt !== undefined && { systemPrompt }),
+    };
+
+    const controlParams = validateAgentControlParams(mergedParams);
 
     const resolvedWorkspace = path.resolve(workspace);
     if (!fs.existsSync(resolvedWorkspace) || !fs.statSync(resolvedWorkspace).isDirectory()) {
@@ -1876,5 +1920,51 @@ For example: __custom_tool__:custom.build --verbose`;
       throw new BridgeError(-32011, "Webhook not found");
     }
     return { removed: true };
+  }
+
+  // --- Template methods ---
+
+  private templateCreate(params: Record<string, unknown>): unknown {
+    const { name, model, allowedTools, disallowedTools, permissionMode, maxTurns, systemPrompt } = params;
+
+    if (!name || typeof name !== "string") {
+      throw new BridgeError(-32602, "'name' must be a string");
+    }
+
+    // Validate parameters using same logic as session.start
+    const controlParams = validateAgentControlParams({ model, allowedTools, disallowedTools, permissionMode, maxTurns, systemPrompt });
+
+    const template = this.templateStore.create({
+      name,
+      model: controlParams.model,
+      allowedTools: controlParams.allowedTools,
+      disallowedTools: controlParams.disallowedTools,
+      permissionMode: controlParams.permissionMode,
+      maxTurns: controlParams.maxTurns,
+      systemPrompt: controlParams.systemPrompt,
+    });
+
+    return template;
+  }
+
+  private templateGet(params: Record<string, unknown>): unknown {
+    const { name } = params;
+    if (!name || typeof name !== "string") {
+      throw new BridgeError(-32602, "'name' must be a string");
+    }
+    return this.templateStore.get(name);
+  }
+
+  private templateList(): unknown {
+    return { templates: this.templateStore.list() };
+  }
+
+  private templateDelete(params: Record<string, unknown>): unknown {
+    const { name } = params;
+    if (!name || typeof name !== "string") {
+      throw new BridgeError(-32602, "'name' must be a string");
+    }
+    const removed = this.templateStore.delete(name);
+    return { removed };
   }
 }
