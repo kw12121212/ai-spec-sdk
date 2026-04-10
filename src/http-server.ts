@@ -8,6 +8,7 @@ import { API_VERSION } from "./capabilities.js";
 import { RateLimiter, RATE_LIMIT_REQUESTS_PER_MINUTE } from "./rate-limiter.js";
 import { loadKeys } from "./key-store.js";
 import { verifyKey, checkScope, METHOD_SCOPES } from "./auth.js";
+import { MetricsCollector } from "./metrics.js";
 import type { StoredKey } from "./key-store.js";
 
 declare const Bun: any;
@@ -153,11 +154,46 @@ export function startHttpServer(options: HttpServerOptions = {}): Promise<HttpSe
   const sseManager = new SseManager();
   const wsManager = new WsManager();
   const rateLimiter = new RateLimiter();
+  const metrics = new MetricsCollector();
 
   const bridge = new BridgeServer({
     notify: (msg) => {
       sseManager.notify(msg);
       wsManager.notify(msg);
+
+      // Track session metrics from bridge events
+      if (msg && typeof msg === "object") {
+        const m = msg as Record<string, unknown>;
+        const method = m["method"];
+        if (method === "bridge/session_event" || method === "bridge/subagent_event") {
+          const params = m["params"] as Record<string, unknown> | undefined;
+          if (params) {
+            const type = params["type"];
+            if (type === "session_started" || type === "session_resumed") {
+              metrics.activeSessions += 1;
+            } else if (type === "session_completed" || type === "session_stopped") {
+              metrics.activeSessions = Math.max(0, metrics.activeSessions - 1);
+
+              // Track token consumption on session completion
+              if (type === "session_completed") {
+                const usage = params["usage"] as Record<string, unknown> | undefined;
+                if (usage) {
+                  const totalTokens = typeof usage["total_tokens"] === "number"
+                    ? usage["total_tokens"]
+                    : typeof usage["inputTokens"] === "number" && typeof usage["outputTokens"] === "number"
+                      ? (usage["inputTokens"] as number) + (usage["outputTokens"] as number)
+                      : typeof usage["input_tokens"] === "number" && typeof usage["output_tokens"] === "number"
+                        ? (usage["input_tokens"] as number) + (usage["output_tokens"] as number)
+                        : 0;
+                  if (totalTokens > 0) {
+                    metrics.incTokens(totalTokens);
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     },
     sessionsDir,
     workspacesDir,
@@ -260,6 +296,7 @@ export function startHttpServer(options: HttpServerOptions = {}): Promise<HttpSe
               headers.set("X-RateLimit-Remaining", String(rateLimit.remaining));
 
               if (!rateLimit.allowed) {
+                metrics.incRateLimitRejections();
                 headers.set("X-RateLimit-Reset", String(rateLimit.resetAt));
                 headers.set("Content-Type", "application/json");
                 return new Response(JSON.stringify({ jsonrpc: "2.0", id, error: { code: -32029, message: "Rate limit exceeded" } }), { status: 429, headers });
@@ -268,13 +305,20 @@ export function startHttpServer(options: HttpServerOptions = {}): Promise<HttpSe
           }
 
           let response: unknown;
+          const rpcMethod = payload !== null && typeof payload === "object" ? ((payload as Record<string, unknown>)["method"] as string | undefined) ?? "" : "";
+          const rpcStart = Date.now();
           try {
             response = await bridge.handleMessage(payload);
+            metrics.incRequests(rpcMethod, 200);
           } catch (error) {
             const bridgeError = error instanceof BridgeError ? error : new BridgeError(-32603, "Internal bridge error", { message: error instanceof Error ? error.message : String(error) });
             const id = payload !== null && typeof payload === "object" && "id" in (payload as object) ? (payload as Record<string, unknown>)["id"] : null;
             response = { jsonrpc: "2.0", id, error: bridgeError.toJsonRpcError() };
+            metrics.incRequests(rpcMethod, 200);
           }
+
+          const rpcDurationSec = (Date.now() - rpcStart) / 1000;
+          metrics.observeDuration(rpcMethod, rpcDurationSec);
 
           headers.set("Content-Type", "application/json");
           return new Response(JSON.stringify(response), { status: 200, headers });
@@ -322,6 +366,27 @@ export function startHttpServer(options: HttpServerOptions = {}): Promise<HttpSe
       if (req.method === "GET" && pathname === "/health") {
         headers.set("Content-Type", "application/json");
         return new Response(JSON.stringify({ status: "ok", apiVersion: API_VERSION }), { status: 200, headers });
+      }
+
+      if (req.method === "GET" && pathname === "/metrics") {
+        if (!noAuth) {
+          const authHeader = req.headers.get("authorization");
+          if (!authHeader || !authHeader.startsWith("Bearer ")) {
+            return new Response("Unauthorized", { status: 401, headers });
+          }
+          const token = authHeader.slice(7);
+          const keys = loadKeys(keysFile);
+          const key = verifyKey(token, keys);
+          if (!key) {
+            return new Response("Unauthorized", { status: 401, headers });
+          }
+          if (!key.scopes.includes("admin") && !key.scopes.includes("session:read")) {
+            return new Response("Forbidden", { status: 403, headers });
+          }
+        }
+
+        headers.set("Content-Type", "text/plain; version=0.0.4; charset=utf-8");
+        return new Response(metrics.render(), { status: 200, headers });
       }
 
       if (req.method === "GET" && pathname === "/") {

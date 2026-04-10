@@ -54,10 +54,11 @@ async function rpc(
 async function httpGet(
   port: number,
   urlPath: string,
+  overrideHeaders?: Record<string, string>,
 ): Promise<{ status: number; body: unknown; headers: http.IncomingHttpHeaders }> {
   return new Promise((resolve, reject) => {
     const req = http.request(
-      { hostname: "localhost", port, path: urlPath, method: "GET" },
+      { hostname: "localhost", port, path: urlPath, method: "GET", headers: overrideHeaders },
       (res) => {
         const chunks: Buffer[] = [];
         res.on("data", (c: Buffer) => chunks.push(c));
@@ -862,5 +863,189 @@ test("bridge.capabilities includes ui field for HTTP transport", async () => {
     assert.equal(ui["path"], "/");
   } finally {
     await shutdown();
+  }
+});
+
+// ── /metrics endpoint tests ────────────────────────────────────────────────────
+
+test("GET /metrics returns 200 with Prometheus text in no-auth mode", async () => {
+  const { shutdown, port } = await startHttpServer({ port: 0, noAuth: true });
+  try {
+    const { status, body, headers } = await httpGet(port, "/metrics");
+    assert.equal(status, 200);
+    assert.equal(headers["content-type"], "text/plain; version=0.0.4; charset=utf-8");
+    const text = body as string;
+    assert.ok(text.includes("# HELP bridge_requests_total"));
+    assert.ok(text.includes("# TYPE bridge_requests_total counter"));
+    assert.ok(text.includes("# HELP bridge_sessions_active"));
+    assert.ok(text.includes("# TYPE bridge_sessions_active gauge"));
+    assert.ok(text.includes("# HELP bridge_rate_limit_rejections_total"));
+    assert.ok(text.includes("# HELP bridge_tokens_consumed_total"));
+    assert.ok(text.includes("# HELP bridge_rpc_duration_seconds"));
+  } finally {
+    await shutdown();
+  }
+});
+
+test("GET /metrics returns 401 when auth enabled and no token provided", async () => {
+  const { keysFile, cleanup } = makeTempKeysFile();
+  const { shutdown, port } = await startHttpServer({ port: 0, keysFile });
+  try {
+    const { status } = await httpGet(port, "/metrics");
+    assert.equal(status, 401);
+  } finally {
+    await shutdown();
+    cleanup();
+  }
+});
+
+test("GET /metrics returns 200 with session:read scope key", async () => {
+  const { keysFile, cleanup } = makeTempKeysFile();
+  const { token } = makeKey(["session:read"], keysFile);
+  const { shutdown, port } = await startHttpServer({ port: 0, keysFile });
+  try {
+    const { status } = await httpGet(port, "/metrics", { Authorization: `Bearer ${token}` });
+    assert.equal(status, 200);
+  } finally {
+    await shutdown();
+    cleanup();
+  }
+});
+
+test("GET /metrics returns 403 with insufficient scope", async () => {
+  const { keysFile, cleanup } = makeTempKeysFile();
+  const { token } = makeKey(["config:read"], keysFile);
+  const { shutdown, port } = await startHttpServer({ port: 0, keysFile });
+  try {
+    const { status } = await httpGet(port, "/metrics", { Authorization: `Bearer ${token}` });
+    assert.equal(status, 403);
+  } finally {
+    await shutdown();
+    cleanup();
+  }
+});
+
+test("bridge_requests_total increments per RPC call", async () => {
+  const { shutdown, port } = await startHttpServer({ port: 0, noAuth: true });
+  try {
+    await rpc(port, { jsonrpc: "2.0", id: 1, method: "bridge.ping" });
+    await rpc(port, { jsonrpc: "2.0", id: 2, method: "bridge.ping" });
+    await rpc(port, { jsonrpc: "2.0", id: 3, method: "bridge.ping" });
+
+    const { body } = await httpGet(port, "/metrics");
+    const text = body as string;
+    assert.match(text, /bridge_requests_total\{method="bridge\.ping",status="200"\} 3/);
+  } finally {
+    await shutdown();
+  }
+});
+
+test("bridge_rpc_duration_seconds includes count and sum after RPC calls", async () => {
+  const { shutdown, port } = await startHttpServer({ port: 0, noAuth: true });
+  try {
+    await rpc(port, { jsonrpc: "2.0", id: 1, method: "bridge.ping" });
+
+    const { body } = await httpGet(port, "/metrics");
+    const text = body as string;
+    assert.match(text, /bridge_rpc_duration_seconds_count\{method="bridge\.ping"\} 1/);
+    assert.match(text, /bridge_rpc_duration_seconds_sum\{method="bridge\.ping"\} [\d.]+/);
+  } finally {
+    await shutdown();
+  }
+});
+
+test("bridge_sessions_active reflects active sessions", async () => {
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* () {
+    yield { type: "system", subtype: "init", session_id: "stub-active" };
+    await new Promise(r => setTimeout(r, 500));
+    yield { type: "result", result: "done" };
+  };
+  try {
+    const { shutdown, port } = await startHttpServer({ port: 0, noAuth: true });
+    try {
+      const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-metrics-"));
+      // Don't await — session stays active while stub is sleeping
+      const sessionPromise = rpc(port, { jsonrpc: "2.0", id: 1, method: "session.start", params: { workspace: ws, prompt: "test" } });
+
+      // Wait for the session to start (init event)
+      await new Promise(r => setTimeout(r, 50));
+
+      const { body } = await httpGet(port, "/metrics");
+      const text = body as string;
+      assert.match(text, /bridge_sessions_active 1/);
+
+      await sessionPromise;
+
+      // After completion, gauge should be 0
+      const { body: body2 } = await httpGet(port, "/metrics");
+      assert.match(body2 as string, /bridge_sessions_active 0/);
+    } finally {
+      await shutdown();
+    }
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+  }
+});
+
+test("bridge_rate_limit_rejections_total increments on 429", async () => {
+  const { keysFile, cleanup } = makeTempKeysFile();
+  const { token } = makeKey(["session:read"], keysFile);
+  const { shutdown, port } = await startHttpServer({
+    port: 0,
+    keysFile,
+  });
+  try {
+    // Exhaust rate limit (120 req/min default) then trigger a rejection
+    for (let i = 0; i < 125; i++) {
+      await rpc(port, { jsonrpc: "2.0", id: i, method: "session.list" }, { Authorization: `Bearer ${token}` });
+    }
+
+    const { body } = await httpGet(port, "/metrics", { Authorization: `Bearer ${token}` });
+    const text = body as string;
+    assert.match(text, /bridge_rate_limit_rejections_total [1-9]\d*/);
+  } finally {
+    await shutdown();
+    cleanup();
+  }
+});
+
+test("GET /metrics is exempt from rate limiting", async () => {
+  const { keysFile, cleanup } = makeTempKeysFile();
+  const { token } = makeKey(["session:read"], keysFile);
+  const { shutdown, port } = await startHttpServer({ port: 0, keysFile });
+  try {
+    // Exhaust rate limit
+    for (let i = 0; i < 125; i++) {
+      await rpc(port, { jsonrpc: "2.0", id: i, method: "session.list" }, { Authorization: `Bearer ${token}` });
+    }
+
+    // /metrics should still work even after rate limit is exceeded
+    const { status } = await httpGet(port, "/metrics", { Authorization: `Bearer ${token}` });
+    assert.equal(status, 200);
+  } finally {
+    await shutdown();
+    cleanup();
+  }
+});
+
+test("bridge_tokens_consumed_total increments on session completion with usage data", async () => {
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* () {
+    yield { type: "system", subtype: "init", session_id: "stub-tokens" };
+    yield { type: "result", result: "done", usage: { input_tokens: 100, output_tokens: 50 } };
+  };
+  try {
+    const { shutdown, port } = await startHttpServer({ port: 0, noAuth: true });
+    try {
+      const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-tokens-"));
+      await rpc(port, { jsonrpc: "2.0", id: 1, method: "session.start", params: { workspace: ws, prompt: "test" } });
+
+      const { body } = await httpGet(port, "/metrics");
+      const text = body as string;
+      assert.match(text, /bridge_tokens_consumed_total 150/);
+    } finally {
+      await shutdown();
+    }
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
   }
 });

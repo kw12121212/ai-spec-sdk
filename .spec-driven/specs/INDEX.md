@@ -21,6 +21,7 @@
 
 ## observability
 - [runtime-diagnostics.md](observability/runtime-diagnostics.md) - runtime-diagnostics
+- [prometheus-metrics.md](observability/prometheus-metrics.md) - prometheus-metrics
 - [structured-logging.md](observability/structured-logging.md) - structured-logging
 
 ## security

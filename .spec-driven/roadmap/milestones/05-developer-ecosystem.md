@@ -17,7 +17,7 @@ Complete the production observability story, enable external integrations via we
 - session.start accepts template param; explicit params override template defaults
 
 ## Planned Changes
-- `opentelemetry-metrics` - Declared: planned - Prometheus metrics at GET /metrics
+- `opentelemetry-metrics` - Declared: complete - Prometheus metrics at GET /metrics
 - `event-webhooks` - Declared: planned - HMAC-signed HTTP webhook delivery with retry
 - `session-templates` - Declared: planned - save and reuse session configurations
 
