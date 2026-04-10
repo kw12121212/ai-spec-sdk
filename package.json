@@ -15,6 +15,7 @@
     "lint": "tsc --project tsconfig.json --noEmit",
     "test": "bun test",
     "start": "node dist/src/cli.js",
+    "generate:types": "bun run scripts/generate-types.ts",
     "build:native": "bun build --compile src/cli.ts --outfile dist/ai-spec-bridge-native",
     "build:native:linux-x64": "bun build --compile --target=bun-linux-x64 src/cli.ts --outfile dist/ai-spec-bridge-linux-x64",
     "build:native:linux-arm64": "bun build --compile --target=bun-linux-arm64 src/cli.ts --outfile dist/ai-spec-bridge-linux-arm64",
@@ -30,9 +31,11 @@
   "license": "Apache-2.0",
   "devDependencies": {
     "@types/node": "^25.5.0",
+    "@types/js-yaml": "^4.0.9",
     "typescript": "^6.0.2"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.2.84"
+    "@anthropic-ai/claude-agent-sdk": "^0.2.84",
+    "js-yaml": "^4.1.0"
   }
 }

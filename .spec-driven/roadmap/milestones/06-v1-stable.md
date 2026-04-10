@@ -19,7 +19,7 @@ Establish the first stable API guarantee by auto-generating SDK types from the b
 - All milestones 01–05 are complete
 
 ## Planned Changes
-- `contract-type-generation` - Declared: planned - auto-generate TypeScript and Python types from bridge-contract.yaml
+- `contract-type-generation` - Declared: complete - auto-generate TypeScript and Python types from bridge-contract.yaml
 - `java-cli-demo` - Declared: planned - Java CLI REPL reference implementation
 
 ## Dependencies
@@ -35,3 +35,4 @@ Establish the first stable API guarantee by auto-generating SDK types from the b
 
 ## Notes
 gRPC transport is a long-term candidate for a future v1.x milestone targeting high-performance server integrations.
+
