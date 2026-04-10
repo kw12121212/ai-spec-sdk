@@ -34,3 +34,4 @@ Thumbs.db
 tmp/
 .tmp/
 .ai-spec-sessions/
+demo/java-cli/target/

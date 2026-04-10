@@ -20,7 +20,7 @@ Establish the first stable API guarantee by auto-generating SDK types from the b
 
 ## Planned Changes
 - `contract-type-generation` - Declared: complete - auto-generate TypeScript and Python types from bridge-contract.yaml
-- `java-cli-demo` - Declared: planned - Java CLI REPL reference implementation
+- `java-cli-demo` - Declared: complete - Java CLI REPL reference implementation
 
 ## Dependencies
 - 03-platform-reach — stable published artifacts needed before java-cli-demo
@@ -31,8 +31,10 @@ Establish the first stable API guarantee by auto-generating SDK types from the b
 - java-cli-demo is P2 and can slip to a post-v1 release without blocking the stability guarantee.
 
 ## Status
-- Declared: proposed
+- Declared: complete
 
 ## Notes
 gRPC transport is a long-term candidate for a future v1.x milestone targeting high-performance server integrations.
+
+
 

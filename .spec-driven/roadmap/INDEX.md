@@ -6,4 +6,4 @@
 - [03-platform-reach.md](milestones/03-platform-reach.md) - Platform Reach - complete
 - [04-advanced-runtime.md](milestones/04-advanced-runtime.md) - Advanced Runtime - complete
 - [05-developer-ecosystem.md](milestones/05-developer-ecosystem.md) - Developer Ecosystem - complete
-- [06-v1-stable.md](milestones/06-v1-stable.md) - v1 Stable - proposed
+- [06-v1-stable.md](milestones/06-v1-stable.md) - v1 Stable - complete
