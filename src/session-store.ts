@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { defaultLogger as logger } from "./logger.js";
+import { AgentStateMachine, type AgentExecutionState } from "./agent-state-machine.js";
 
 export interface SessionHistoryEntry {
   type: string;
@@ -18,6 +19,7 @@ export interface Session {
   createdAt: string;
   updatedAt: string;
   status: "active" | "completed" | "stopped" | "interrupted";
+  executionState: AgentExecutionState;
   stopRequested: boolean;
   stream: boolean;
   history: SessionHistoryEntry[];
@@ -30,10 +32,12 @@ function nowIso(): string {
 
 export class SessionStore {
   private sessions: Map<string, Session>;
+  private stateMachines: Map<string, AgentStateMachine>;
   private sessionsDir: string | undefined;
 
   constructor(sessionsDir?: string) {
     this.sessions = new Map();
+    this.stateMachines = new Map();
     this.sessionsDir = sessionsDir;
 
     if (sessionsDir) {
@@ -49,12 +53,18 @@ export class SessionStore {
         const raw = fs.readFileSync(path.join(dir, file), "utf8");
         const session = JSON.parse(raw) as Session;
         if (session && typeof session.id === "string" && Array.isArray(session.history)) {
+          // Backfill executionState for sessions persisted before this feature
+          if (!session.executionState) {
+            session.executionState = "idle";
+          }
           if (session.status === "active") {
             session.status = "interrupted";
+            session.executionState = "error";
             this._persist(session);
             logger.info("session recovered as interrupted", { sessionId: session.id });
           }
           this.sessions.set(session.id, session);
+          this.stateMachines.set(session.id, new AgentStateMachine(session.id, session.executionState));
         }
       } catch {
         // skip corrupt files
@@ -87,6 +97,7 @@ export class SessionStore {
       createdAt,
       updatedAt: createdAt,
       status: "active",
+      executionState: "idle",
       stopRequested: false,
       stream,
       history: [
@@ -100,6 +111,7 @@ export class SessionStore {
     };
 
     this.sessions.set(sessionId, session);
+    this.stateMachines.set(sessionId, new AgentStateMachine(sessionId));
     this._persist(session);
     logger.info("session created", { sessionId, workspace });
     return session;
@@ -107,6 +119,21 @@ export class SessionStore {
 
   get(sessionId: string): Session | null {
     return this.sessions.get(sessionId) ?? null;
+  }
+
+  transitionExecutionState(sessionId: string, to: AgentExecutionState, trigger: string): boolean {
+    const sm = this.stateMachines.get(sessionId);
+    const session = this.get(sessionId);
+    if (!sm || !session) {
+      return false;
+    }
+    const ok = sm.transition(to, trigger);
+    if (ok) {
+      session.executionState = sm.state;
+      session.updatedAt = nowIso();
+      this._persist(session);
+    }
+    return ok;
   }
 
   setSdkSessionId(sessionId: string, sdkSessionId: string): Session | null {
@@ -145,6 +172,7 @@ export class SessionStore {
     }
 
     session.status = "completed";
+    session.executionState = "completed";
     session.result = result;
     session.updatedAt = nowIso();
     this._persist(session);
@@ -161,6 +189,7 @@ export class SessionStore {
     for (const child of this.getActiveDescendants(sessionId)) {
       child.stopRequested = true;
       child.status = "stopped";
+      child.executionState = "completed";
       child.updatedAt = nowIso();
       this._persist(child);
       logger.info("session stopped", { sessionId: child.id, parentSessionId: sessionId });
@@ -168,6 +197,7 @@ export class SessionStore {
 
     session.stopRequested = true;
     session.status = "stopped";
+    session.executionState = "completed";
     session.updatedAt = nowIso();
     this._persist(session);
     logger.info("session stopped", { sessionId });

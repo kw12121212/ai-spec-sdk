@@ -655,6 +655,8 @@ export class BridgeServer {
       requestId,
     );
 
+    this.sessionStore.transitionExecutionState(session.id, "running", "query_started");
+
     return this._runQuery(
       session,
       prompt,
@@ -747,6 +749,8 @@ export class BridgeServer {
       requestId,
     );
 
+    this.sessionStore.transitionExecutionState(session.id, "running", "query_started");
+
     return this._runQuery(
       session,
       prompt,
@@ -821,6 +825,8 @@ export class BridgeServer {
       requestId,
     );
 
+    this.sessionStore.transitionExecutionState(session.id, "running", "query_started");
+
     return this._runQuery(
       session,
       prompt,
@@ -882,6 +888,22 @@ export class BridgeServer {
         const current = this.sessionStore.get(session.id);
         if (current?.stopRequested) {
           return;
+        }
+
+        // Transition to waiting_for_input when tool approval is needed
+        if (
+          message !== null &&
+          typeof message === "object" &&
+          (message as Record<string, unknown>)["type"] === "assistant"
+        ) {
+          const innerMsg = (message as Record<string, unknown>)["message"] as Record<string, unknown> | undefined;
+          const content = innerMsg?.["content"] ?? (message as Record<string, unknown>)["content"];
+          if (Array.isArray(content)) {
+            const blocks = content as Array<Record<string, unknown>>;
+            if (blocks.some((b) => b["type"] === "tool_use")) {
+              this.sessionStore.transitionExecutionState(session.id, "waiting_for_input", "tool_approval_needed");
+            }
+          }
         }
 
         // Handle streaming partial messages (SDKPartialAssistantMessage with content_block_delta)
@@ -949,6 +971,7 @@ export class BridgeServer {
           // File change tracking for Write/Edit tools
           this._emitFileChange(session.id, toolName, message, context.cwd);
         } else if (msgType === "tool_result") {
+          this.sessionStore.transitionExecutionState(session.id, "running", "tool_result_received");
           this._fireHooks("post_tool_use", session.id, context.cwd);
         }
 
@@ -1034,6 +1057,7 @@ export class BridgeServer {
       sessionId,
       parentSessionId: session.parentSessionId ?? null,
       status: session.status,
+      executionState: session.executionState,
       createdAt: session.createdAt,
       updatedAt: session.updatedAt,
       historyLength: session.history.length,
@@ -1163,6 +1187,7 @@ export class BridgeServer {
         return {
           sessionId: s.id,
           status: s.status,
+          executionState: s.executionState,
           workspace: s.workspace,
           parentSessionId: s.parentSessionId ?? null,
           createdAt: s.createdAt,
@@ -1584,6 +1609,8 @@ export class BridgeServer {
 
     // If prompt is provided, start the branched session
     if (typeof prompt === "string") {
+      this.sessionStore.transitionExecutionState(newSession.id, "running", "query_started");
+
       const options: Record<string, unknown> = {};
       // Only try SDK resume when branching from the full history end.
       // If fromIndex is set, the SDK has no concept of a mid-point branch,
@@ -1732,6 +1759,7 @@ export class BridgeServer {
       parentSessionId: session.parentSessionId ?? null,
       sdkSessionId: session.sdkSessionId,
       status: session.status,
+      executionState: session.executionState,
       createdAt: session.createdAt,
       updatedAt: session.updatedAt,
       history: session.history,

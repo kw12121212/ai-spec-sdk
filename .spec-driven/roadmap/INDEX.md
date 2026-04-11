@@ -7,7 +7,7 @@
 - [04-advanced-runtime.md](milestones/04-advanced-runtime.md) - Advanced Runtime - complete
 - [05-developer-ecosystem.md](milestones/05-developer-ecosystem.md) - Developer Ecosystem - complete
 - [06-v1-stable.md](milestones/06-v1-stable.md) - v1 Stable - complete
-- [07-agent-lifecycle.md](milestones/07-agent-lifecycle.md) - Agent Lifecycle Deep Management - planned
+- [07-agent-lifecycle.md](milestones/07-agent-lifecycle.md) - Agent Lifecycle Deep Management - active
 - [08-llm-provider.md](milestones/08-llm-provider.md) - LLM Provider Abstraction Layer - planned
 - [09-permissions-hooks.md](milestones/09-permissions-hooks.md) - Permissions Model and Execution Hooks - planned
 - [10-task-team-registry.md](milestones/10-task-team-registry.md) - Task and Team Registry - planned
