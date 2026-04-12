@@ -1,5 +1,6 @@
 import path from "node:path";
 import fs from "node:fs";
+import { spawn } from "node:child_process";
 import type { PermissionResult } from "@anthropic-ai/claude-agent-sdk";
 import { BridgeError, isJsonRpcRequest } from "./errors.js";
 import { getCapabilities, BUILTIN_SPEC_SKILLS, SUPPORTED_MODELS, BUILTIN_TOOLS, API_VERSION } from "./capabilities.js";
@@ -966,16 +967,21 @@ export class BridgeServer {
         // Fire hooks based on message type
         if (msgType === "tool_use") {
           const toolName = this._extractToolName(message);
-          this._fireHooks("pre_tool_use", session.id, context.cwd, toolName);
+          // Blocking hooks execute asynchronously; if they fail, stop the session
+          this._fireHooks("pre_tool_use", session.id, context.cwd, toolName).then((passed) => {
+            if (!passed) {
+              this.sessionStore.stop(session.id);
+            }
+          });
 
           // File change tracking for Write/Edit tools
           this._emitFileChange(session.id, toolName, message, context.cwd);
         } else if (msgType === "tool_result") {
           this.sessionStore.transitionExecutionState(session.id, "running", "tool_result_received");
-          this._fireHooks("post_tool_use", session.id, context.cwd);
+          void this._fireHooks("post_tool_use", session.id, context.cwd);
         }
 
-        this._fireHooks("notification", session.id, context.cwd);
+        void this._fireHooks("notification", session.id, context.cwd);
       },
     });
 
@@ -1031,11 +1037,11 @@ export class BridgeServer {
       }
     }
 
-    this._fireHooks("stop", sessionId, session.workspace);
+    void this._fireHooks("stop", sessionId, session.workspace);
     for (const childSessionId of cascadedSessionIds) {
       const childSession = this.sessionStore.get(childSessionId);
       if (childSession) {
-        this._fireHooks("subagent_stop", childSessionId, childSession.workspace);
+        void this._fireHooks("subagent_stop", childSessionId, childSession.workspace);
       }
     }
 
@@ -1214,21 +1220,136 @@ export class BridgeServer {
     return undefined;
   }
 
-  private _fireHooks(event: HookEvent, sessionId: string, workspace?: string, toolName?: string): void {
+  private readonly HOOK_TIMEOUT_MS = 30_000; // 30 seconds default
+
+  private _executeHook(
+    hook: { hookId: string; event: HookEvent; command: string; matcher?: string },
+    sessionId: string,
+    workspace?: string,
+  ): Promise<{ exitCode: number | null; stdout: string; stderr: string; durationMs: number; timedOut: boolean }> {
+    return new Promise((resolve) => {
+      const start = Date.now();
+      const cwd = workspace ?? process.cwd();
+
+      const child = spawn(hook.command, {
+        shell: true,
+        cwd,
+        stdio: ["pipe", "pipe", "pipe"],
+      });
+
+      let stdout = "";
+      let stderr = "";
+      let timedOut = false;
+
+      const timer = setTimeout(() => {
+        timedOut = true;
+        child.kill("SIGKILL");
+      }, this.HOOK_TIMEOUT_MS);
+
+      child.stdout.on("data", (chunk: Buffer) => {
+        stdout += chunk.toString("utf8");
+      });
+
+      child.stderr.on("data", (chunk: Buffer) => {
+        stderr += chunk.toString("utf8");
+      });
+
+      child.on("error", () => {
+        clearTimeout(timer);
+        resolve({
+          exitCode: null,
+          stdout: stdout.slice(0, 4096),
+          stderr: stderr.slice(0, 4096),
+          durationMs: Date.now() - start,
+          timedOut,
+        });
+      });
+
+      child.on("close", (code: number | null) => {
+        clearTimeout(timer);
+        resolve({
+          exitCode: code,
+          stdout: stdout.slice(0, 4096),
+          stderr: stderr.slice(0, 4096),
+          durationMs: Date.now() - start,
+          timedOut,
+        });
+      });
+    });
+  }
+
+  private _emitHookNotification(
+    hook: { hookId: string; event: HookEvent; command: string; matcher?: string },
+    sessionId: string,
+    result: { exitCode: number | null; stdout: string; stderr: string; durationMs: number; timedOut: boolean } | null,
+  ): void {
+    this.notify({
+      jsonrpc: "2.0",
+      method: "bridge/hook_triggered",
+      params: {
+        sessionId,
+        hookId: hook.hookId,
+        event: hook.event,
+        command: hook.command,
+        ...(hook.matcher && { matcher: hook.matcher }),
+        ...(result !== null
+          ? {
+              exitCode: result.exitCode,
+              stdout: result.stdout,
+              stderr: result.stderr,
+              durationMs: result.durationMs,
+              timedOut: result.timedOut,
+            }
+          : {
+              exitCode: null,
+              stdout: null,
+              stderr: null,
+              durationMs: null,
+              timedOut: false,
+            }),
+      },
+    });
+  }
+
+  /**
+   * Execute hook commands for matching hooks.
+   * Returns true if all blocking hooks passed (exit 0), false if any blocking hook failed.
+   */
+  private async _fireHooks(
+    event: HookEvent,
+    sessionId: string,
+    workspace?: string,
+    toolName?: string,
+  ): Promise<boolean> {
     const matchingHooks = this.hooksStore.findMatching(event, toolName, workspace);
+    const isBlocking = this.hooksStore.isBlocking(event);
+
+    if (matchingHooks.length === 0) {
+      return true;
+    }
+
+    if (isBlocking) {
+      // Execute blocking hooks sequentially; stop on first failure
+      for (const hook of matchingHooks) {
+        const result = await this._executeHook(hook, sessionId, workspace);
+        this._emitHookNotification(hook, sessionId, result);
+        if (result.exitCode !== 0) {
+          return false; // Tool use must be aborted
+        }
+      }
+      return true;
+    }
+
+    // Non-blocking: fire-and-forget
     for (const hook of matchingHooks) {
-      this.notify({
-        jsonrpc: "2.0",
-        method: "bridge/hook_triggered",
-        params: {
-          sessionId,
-          hookId: hook.hookId,
-          event: hook.event,
-          command: hook.command,
-          ...(hook.matcher && { matcher: hook.matcher }),
-        },
+      this._emitHookNotification(hook, sessionId, null);
+      this._executeHook(hook, sessionId, workspace).then((result) => {
+        // Re-emit notification with actual result after completion
+        this._emitHookNotification(hook, sessionId, result);
       });
     }
+
+    return true;
   }
 
   private _emitFileChange(

@@ -16,6 +16,9 @@
 ## docs
 - [integrator-onboarding.md](docs/integrator-onboarding.md) - integrator-onboarding
 
+## hooks
+- [hook-execution.md](hooks/hook-execution.md) - hook-execution
+
 ## network
 - [proxy-forwarding.md](network/proxy-forwarding.md) - proxy-forwarding
 
