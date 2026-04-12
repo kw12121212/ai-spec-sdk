@@ -1382,3 +1382,217 @@ test("session.list returns cancelledAt and cancelReason as null when not cancell
     fs.rmSync(wsDir, { recursive: true, force: true });
   }
 });
+
+test("session.cancel returns error when called on non-running (completed) session", async () => {
+  const wsDir = fs.mkdtempSync(path.join(os.tmpdir(), "cancel-nonrunning-test-"));
+  const server = new BridgeServer();
+
+  try {
+    globalThis.__AI_SPEC_SDK_QUERY__ = async function* () {
+      yield { type: "system", subtype: "init", session_id: "sdk-cancel-nr-1" };
+      yield { result: "done" };
+    };
+
+    const startResp = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 1210,
+      method: "session.start",
+      params: { workspace: wsDir, prompt: "complete quickly" },
+    });
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+
+    assert.ok(!startResp.error, "start should succeed");
+    const sessionId = (startResp.result as Record<string, unknown>)["sessionId"] as string;
+
+    const cancelResp = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 1211,
+      method: "session.cancel",
+      params: { sessionId },
+    });
+
+    assert.ok(cancelResp.error, "cancel should return error for completed session");
+    assert.equal(cancelResp.error!.code, -32602);
+  } finally {
+    fs.rmSync(wsDir, { recursive: true, force: true });
+  }
+});
+
+test("timeoutMs on session.start automatically cancels session after duration", async () => {
+  const wsDir = fs.mkdtempSync(path.join(os.tmpdir(), "timeout-auto-cancel-start-"));
+  const notifications: unknown[] = [];
+  const server = new BridgeServer({
+    notify: (message) => notifications.push(message),
+  });
+
+  let queryStarted = false;
+  const queryDone = new Promise<void>((resolve) => {
+    globalThis.__AI_SPEC_SDK_QUERY__ = async function* () {
+      queryStarted = true;
+      yield { type: "system", subtype: "init", session_id: "sdk-timeout-auto-1" };
+      const deadline = Date.now() + 5000;
+      while (Date.now() < deadline) {
+        yield { type: "assistant", message: { content: [{ type: "text", text: "working..." }] } };
+        await new Promise<void>((r) => setTimeout(r, 20));
+      }
+      yield { result: "should not complete" };
+      resolve();
+    };
+  });
+
+  try {
+    const startPromise = server.handleMessage({
+      jsonrpc: "2.0",
+      id: 1220,
+      method: "session.start",
+      params: { workspace: wsDir, prompt: "long running", timeoutMs: 80 },
+    });
+
+    const sessionId = await waitForSessionStarted(notifications as Array<Record<string, unknown>>);
+
+    const startResult = await startPromise;
+    const result = startResult.result as Record<string, unknown>;
+    assert.equal(result["status"], "completed", "session should be completed (cancelled)");
+    assert.ok(result["cancelledAt"], "should have cancelledAt");
+    assert.equal(result["cancelReason"], "timeout", "reason should be timeout");
+
+    const statusResp = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 1221,
+      method: "session.status",
+      params: { sessionId },
+    });
+    const statusResult = statusResp.result as Record<string, unknown>;
+    assert.equal(statusResult["status"], "completed");
+    assert.ok(statusResult["cancelledAt"]);
+    assert.equal(statusResult["cancelReason"], "timeout");
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    fs.rmSync(wsDir, { recursive: true, force: true });
+  }
+});
+
+test("timer is cleared when session completes normally before timeout", async () => {
+  const wsDir = fs.mkdtempSync(path.join(os.tmpdir(), "timeout-cleared-test-"));
+  const server = new BridgeServer();
+
+  try {
+    globalThis.__AI_SPEC_SDK_QUERY__ = async function* () {
+      yield { type: "system", subtype: "init", session_id: "sdk-timeout-clear-1" };
+      yield { result: "done fast" };
+    };
+
+    const startResp = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 1230,
+      method: "session.start",
+      params: { workspace: wsDir, prompt: "fast completion", timeoutMs: 10000 },
+    });
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+
+    assert.ok(!startResp.error, "start should succeed");
+    const result = startResp.result as Record<string, unknown>;
+    assert.equal(result["status"], "completed");
+    assert.equal(result["result"], "done fast");
+
+    const sessionId = result["sessionId"] as string;
+
+    const statusResp = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 1231,
+      method: "session.status",
+      params: { sessionId },
+    });
+    const statusResult = statusResp.result as Record<string, unknown>;
+    assert.equal(statusResult["status"], "completed");
+    assert.equal(statusResult["cancelledAt"], null, "should NOT be cancelled");
+    assert.equal(statusResult["cancelReason"], null, "should have no cancel reason");
+  } finally {
+    fs.rmSync(wsDir, { recursive: true, force: true });
+  }
+});
+
+test("timeoutMs on session.resume automatically cancels session after duration", async () => {
+  const wsDir = fs.mkdtempSync(path.join(os.tmpdir(), "timeout-auto-cancel-resume-"));
+  const notifications: unknown[] = [];
+  const server = new BridgeServer({
+    notify: (message) => notifications.push(message),
+  });
+
+  try {
+    globalThis.__AI_SPEC_SDK_QUERY__ = async function* ({ options }: { prompt: string; options: Record<string, unknown> }) {
+      yield { type: "system", subtype: "init", session_id: options?.["resume"] ?? "sdk-timeout-resume-1" };
+      yield { result: "initial done" };
+    };
+
+    const startResp = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 1240,
+      method: "session.start",
+      params: { workspace: wsDir, prompt: "first run" },
+    });
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+
+    assert.ok(!startResp.error);
+    const sessionId = (startResp.result as Record<string, unknown>)["sessionId"] as string;
+
+    globalThis.__AI_SPEC_SDK_QUERY__ = async function* () {
+      yield { type: "system", subtype: "init", session_id: "sdk-timeout-resume-2" };
+      const deadline = Date.now() + 5000;
+      while (Date.now() < deadline) {
+        yield { type: "assistant", message: { content: [{ type: "text", text: "working..." }] } };
+        await new Promise<void>((r) => setTimeout(r, 20));
+      }
+      yield { result: "should not complete" };
+    };
+
+    const resumePromise = server.handleMessage({
+      jsonrpc: "2.0",
+      id: 1241,
+      method: "session.resume",
+      params: { sessionId, prompt: "continue", timeoutMs: 80 },
+    });
+
+    const resumeResult = await resumePromise;
+    const result = resumeResult.result as Record<string, unknown>;
+    assert.equal(result["status"], "completed", "resume should complete (cancelled)");
+    assert.ok(result["cancelledAt"], "should have cancelledAt");
+    assert.equal(result["cancelReason"], "timeout", "reason should be timeout");
+
+    const statusResp = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 1242,
+      method: "session.status",
+      params: { sessionId },
+    });
+    const statusResult = statusResp.result as Record<string, unknown>;
+    assert.equal(statusResult["status"], "completed");
+    assert.ok(statusResult["cancelledAt"]);
+    assert.equal(statusResult["cancelReason"], "timeout");
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    fs.rmSync(wsDir, { recursive: true, force: true });
+  }
+});
+
+async function waitForSessionStarted(
+  notifications: Array<Record<string, unknown>>,
+): Promise<string> {
+  const started = () =>
+    notifications.find(
+      (item) =>
+        item["method"] === "bridge/session_event" &&
+        (item["params"] as Record<string, unknown>)?.["type"] === "session_started",
+    );
+
+  const timeoutMs = 1000;
+  const start = Date.now();
+  while (!started()) {
+    if (Date.now() - start > timeoutMs) {
+      throw new Error("Timed out waiting for session_started event");
+    }
+    await new Promise<void>((resolve) => setTimeout(resolve, 5));
+  }
+
+  return (started()!["params"] as Record<string, unknown>)["sessionId"] as string;
+}

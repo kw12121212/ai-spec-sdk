@@ -27,7 +27,7 @@ Enhance agent lifecycle management with richer state machines, execution hooks, 
 - `execution-hooks` - Declared: complete - pre/post tool execution hook system
 - `audit-logging` - Declared: complete - comprehensive execution audit trail
 - `pause-resume` - Declared: complete - graceful pause and resume with state preservation
-- `timeout-cancellation` - Declared: planned - execution timeout and cancellation support
+- `timeout-cancellation` - Declared: complete - execution timeout and cancellation support
 
 ## Dependencies
 - 04-advanced-runtime — builds on parent-child session relationships
@@ -39,7 +39,5 @@ Enhance agent lifecycle management with richer state machines, execution hooks, 
 - Audit logs may grow large; retention policy needed
 
 ## Status
-- Declared: proposed
-
-
+- Declared: complete
 

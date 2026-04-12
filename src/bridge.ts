@@ -814,7 +814,7 @@ export class BridgeServer {
     requestId: unknown,
   ): Promise<unknown> {
     const { sessionId, prompt, options = {}, proxy } = params;
-    const { model, allowedTools, disallowedTools, permissionMode, maxTurns, systemPrompt, stream } = params;
+    const { model, allowedTools, disallowedTools, permissionMode, maxTurns, systemPrompt, stream, timeoutMs } = params;
 
     if (!sessionId || typeof sessionId !== "string") {
       throw new BridgeError(-32602, "'sessionId' must be provided");
@@ -833,6 +833,10 @@ export class BridgeServer {
 
     if (stream !== undefined && typeof stream !== "boolean") {
       throw new BridgeError(-32602, "'stream' must be a boolean");
+    }
+
+    if (timeoutMs !== undefined && (typeof timeoutMs !== "number" || !Number.isInteger(timeoutMs) || timeoutMs < 1)) {
+      throw new BridgeError(-32602, "'timeoutMs' must be a positive integer");
     }
 
     const typedOptions = options as Record<string, unknown>;
@@ -854,6 +858,11 @@ export class BridgeServer {
     // Update stream flag if specified, otherwise keep existing value
     if (stream === true) {
       session.stream = true;
+    }
+
+    if (timeoutMs !== undefined) {
+      session.timeoutMs = timeoutMs;
+      this.sessionStore.persist(session);
     }
 
     const proxyParams = validateProxy(proxy);
@@ -908,6 +917,10 @@ export class BridgeServer {
       );
 
       this.sessionStore.transitionExecutionState(session.id, "running", "query_started");
+
+      session.status = "active";
+      session.stopRequested = false;
+      this.sessionStore.persist(session);
 
       const queryPrompt = typeof prompt === "string" ? prompt : "";
       return this._runQuery(
