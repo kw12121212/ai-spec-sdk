@@ -3,7 +3,9 @@ mapping:
   implementation:
     - src/bridge.ts
     - src/capabilities.ts
-  tests: []
+    - src/mcp-store.ts
+  tests:
+    - test/mcp-store.test.ts
 ---
 ### Requirement: Built-in Skill Discovery
 The SDK MUST let clients discover which spec-driven skills are bundled and available through the current SDK distribution.

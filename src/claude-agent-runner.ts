@@ -1,10 +1,10 @@
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import { defaultLogger as logger } from "./logger.js";
+import { AnthropicAdapter } from "./llm-provider/adapters/anthropic.js";
+import type { LLMProvider, ProviderConfig } from "./llm-provider/types.js";
 
 type QueryFunction = typeof query;
 
-// Test hook: inject a stub query function via globalThis.__AI_SPEC_SDK_QUERY__
-// to avoid real Anthropic API calls in tests.
 declare global {
   // eslint-disable-next-line no-var
   var __AI_SPEC_SDK_QUERY__: QueryFunction | undefined;
@@ -100,5 +100,42 @@ export async function runClaudeQuery({
   } catch (err) {
     logger.error("query error", { error: String(err) });
     throw err;
+  }
+}
+
+let defaultProvider: LLMProvider | null = null;
+
+export function getDefaultProvider(): LLMProvider | null {
+  return defaultProvider;
+}
+
+export async function initializeDefaultProvider(config?: Partial<ProviderConfig>): Promise<LLMProvider> {
+  if (defaultProvider) {
+    return defaultProvider;
+  }
+
+  const providerConfig: ProviderConfig = {
+    id: config?.id ?? "default-anthropic",
+    type: "anthropic",
+    apiKey: config?.apiKey,
+    model: config?.model,
+    temperature: config?.temperature,
+    maxTokens: config?.maxTokens,
+    ...config,
+  };
+
+  const adapter = new AnthropicAdapter(providerConfig);
+  await adapter.initialize();
+  defaultProvider = adapter;
+
+  logger.info("Default LLM provider initialized", { providerId: defaultProvider.id });
+  return defaultProvider;
+}
+
+export function destroyDefaultProvider(): void {
+  if (defaultProvider) {
+    defaultProvider.destroy();
+    defaultProvider = null;
+    logger.info("Default LLM provider destroyed");
   }
 }

@@ -16,6 +16,7 @@ export interface Session {
   id: string;
   workspace: string;
   parentSessionId?: string;
+  providerId?: string;
   sdkSessionId: string | null;
   createdAt: string;
   updatedAt: string;
@@ -107,6 +108,7 @@ export class SessionStore {
     prompt: string,
     stream: boolean = false,
     parentSessionId?: string,
+    providerId?: string,
   ): Session {
     const sessionId = crypto.randomUUID();
     const createdAt = nowIso();
@@ -115,6 +117,7 @@ export class SessionStore {
       id: sessionId,
       workspace,
       ...(parentSessionId !== undefined ? { parentSessionId } : {}),
+      ...(providerId !== undefined ? { providerId } : {}),
       sdkSessionId: null,
       createdAt,
       updatedAt: createdAt,

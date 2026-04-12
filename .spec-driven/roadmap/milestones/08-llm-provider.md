@@ -24,7 +24,7 @@ Abstract the LLM backend integration to support multiple providers (OpenAI, Anth
 - Fallback to backup provider occurs seamlessly on primary failure
 
 ## Planned Changes
-- `provider-interface` - Declared: planned - abstraction layer for LLM providers
+- `provider-interface` - Declared: complete - abstraction layer for LLM providers
 - `provider-registry` - Declared: planned - registry for multiple provider configurations
 - `provider-switching` - Declared: planned - runtime provider switching mechanism
 - `token-tracking` - Declared: planned - per-session and per-provider token accounting
@@ -42,4 +42,5 @@ Abstract the LLM backend integration to support multiple providers (OpenAI, Anth
 - Load balancing adds latency; health checks must be efficient
 
 ## Status
-- Declared: planned
+- Declared: proposed
+

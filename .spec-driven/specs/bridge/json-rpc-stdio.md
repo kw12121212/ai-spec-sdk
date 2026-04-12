@@ -6,6 +6,7 @@ mapping:
     - src/errors.ts
     - src/capabilities.ts
     - src/runtime-info.ts
+    - src/index.ts
   tests:
     - test/bridge.test.ts
     - test/bridge-audit.test.ts
