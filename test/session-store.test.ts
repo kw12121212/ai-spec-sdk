@@ -369,3 +369,111 @@ test("SessionStore persists pausedAt and pauseReason to disk", () => {
     fs.rmSync(sessionsDir, { recursive: true, force: true });
   }
 });
+
+// --- Cancel/Timeout ---
+
+test("Session creates sessions with cancelledAt, cancelReason, and timeoutMs as undefined", () => {
+  const store = new SessionStore();
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-ws-cancel1-"));
+
+  try {
+    const session = store.create(ws, "test cancel init");
+    assert.equal(session.cancelledAt, undefined);
+    assert.equal(session.cancelReason, undefined);
+    assert.equal(session.timeoutMs, undefined);
+  } finally {
+    fs.rmSync(ws, { recursive: true, force: true });
+  }
+});
+
+test("SessionStore.cancelSession cancels an active session", () => {
+  const store = new SessionStore();
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-ws-cancel2-"));
+
+  try {
+    const session = store.create(ws, "test cancel active");
+    store.transitionExecutionState(session.id, "running", "test");
+    const cancelled = store.cancelSession(session.id, "test reason");
+
+    assert.ok(cancelled);
+    assert.equal(cancelled!.status, "completed");
+    assert.equal(cancelled!.executionState, "completed");
+    assert.ok(cancelled!.cancelledAt);
+    assert.equal(cancelled!.cancelReason, "test reason");
+  } finally {
+    fs.rmSync(ws, { recursive: true, force: true });
+  }
+});
+
+test("SessionStore.cancelSession uses default reason when none provided", () => {
+  const store = new SessionStore();
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-ws-cancel3-"));
+
+  try {
+    const session = store.create(ws, "test cancel default reason");
+    store.transitionExecutionState(session.id, "running", "test");
+    const cancelled = store.cancelSession(session.id);
+
+    assert.ok(cancelled);
+    assert.equal(cancelled!.cancelReason, "user_requested");
+  } finally {
+    fs.rmSync(ws, { recursive: true, force: true });
+  }
+});
+
+test("SessionStore.cancelSession returns null for unknown session", () => {
+  const store = new SessionStore();
+  const cancelled = store.cancelSession("nonexistent");
+  assert.equal(cancelled, null);
+});
+
+test("SessionStore persists cancelledAt, cancelReason, and timeoutMs to disk", () => {
+  const sessionsDir = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-cancel-persist-"));
+
+  try {
+    const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-ws-cancel4-"));
+    const store1 = new SessionStore(sessionsDir);
+    const session = store1.create(ws, "test cancel persist");
+
+    // Manually set cancel/timeout fields
+    const loaded1 = store1.get(session.id)!;
+    loaded1.cancelledAt = "2026-04-12T10:00:00.000Z";
+    loaded1.cancelReason = "timeout";
+    loaded1.timeoutMs = 60000;
+    // Save manually since we mutated directly
+    const filePath = path.join(sessionsDir, `${session.id}.json`);
+    fs.writeFileSync(filePath, JSON.stringify(loaded1), "utf8");
+
+    // Reload from disk
+    const store2 = new SessionStore(sessionsDir);
+    const loaded2 = store2.get(session.id);
+    assert.ok(loaded2);
+    assert.equal(loaded2!.cancelledAt, "2026-04-12T10:00:00.000Z");
+    assert.equal(loaded2!.cancelReason, "timeout");
+    assert.equal(loaded2!.timeoutMs, 60000);
+  } finally {
+    fs.rmSync(sessionsDir, { recursive: true, force: true });
+  }
+});
+
+test("SessionStore.persist saves session changes to disk", () => {
+  const sessionsDir = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-persist-"));
+
+  try {
+    const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-ws-persist-"));
+    const store = new SessionStore(sessionsDir);
+    const session = store.create(ws, "test persist");
+    
+    // Modify session
+    const loaded = store.get(session.id)!;
+    loaded.timeoutMs = 30000;
+    store.persist(loaded);
+    
+    // Verify on disk
+    const filePath = path.join(sessionsDir, `${session.id}.json`);
+    const parsed = JSON.parse(fs.readFileSync(filePath, "utf8")) as Record<string, unknown>;
+    assert.equal(parsed["timeoutMs"], 30000);
+  } finally {
+    fs.rmSync(sessionsDir, { recursive: true, force: true });
+  }
+});

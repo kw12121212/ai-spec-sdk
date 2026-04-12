@@ -1253,3 +1253,132 @@ test("session.list returns pausedAt and pauseReason as null when not paused", as
     fs.rmSync(wsDir, { recursive: true, force: true });
   }
 });
+
+// --- Session Cancel/Timeout ---
+
+test("bridge.capabilities includes session.cancel", async () => {
+  const server = new BridgeServer();
+  const response = await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 1200,
+    method: "bridge.capabilities",
+  });
+  const methods = (response.result as Record<string, unknown>)["methods"] as string[];
+  assert.ok(methods.includes("session.cancel"), "capabilities must include session.cancel");
+  const agentControlParams = (response.result as Record<string, unknown>)["agentControlParams"] as string[];
+  assert.ok(agentControlParams.includes("timeoutMs"), "capabilities must include timeoutMs in agentControlParams");
+});
+
+test("session.cancel requires sessionId", async () => {
+  const server = new BridgeServer();
+  const response = await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 1201,
+    method: "session.cancel",
+    params: {},
+  });
+  assert.ok(response.error);
+  assert.equal(response.error!.code, -32602);
+});
+
+test("session.cancel returns -32011 for unknown session", async () => {
+  const server = new BridgeServer();
+  const response = await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 1202,
+    method: "session.cancel",
+    params: { sessionId: "nonexistent-id" },
+  });
+  assert.ok(response.error);
+  assert.equal(response.error!.code, -32011);
+});
+
+test("session.start accepts timeoutMs parameter", async () => {
+  const wsDir = fs.mkdtempSync(path.join(os.tmpdir(), "timeout-start-test-"));
+  const server = new BridgeServer();
+
+  try {
+    globalThis.__AI_SPEC_SDK_QUERY__ = async function* () {
+      yield { type: "system", subtype: "init", session_id: "sdk-timeout-1" };
+      yield { type: "result", subtype: "success", result: "done" };
+    };
+
+    const startResp = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 1203,
+      method: "session.start",
+      params: { workspace: wsDir, prompt: "test timeout start", timeoutMs: 60000 },
+    });
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+
+    assert.ok(!startResp.error);
+    const sessionId = (startResp.result as Record<string, unknown>)["sessionId"] as string;
+
+    // Check session status includes timeoutMs
+    const statusResp = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 1204,
+      method: "session.status",
+      params: { sessionId },
+    });
+    const statusResult = statusResp.result as Record<string, unknown>;
+    assert.equal(statusResult["timeoutMs"], 60000);
+  } finally {
+    fs.rmSync(wsDir, { recursive: true, force: true });
+  }
+});
+
+test("session.start rejects timeoutMs < 1", async () => {
+  const wsDir = fs.mkdtempSync(path.join(os.tmpdir(), "timeout-invalid-test-"));
+  const server = new BridgeServer();
+
+  try {
+    const response = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 1205,
+      method: "session.start",
+      params: { workspace: wsDir, prompt: "test invalid timeout", timeoutMs: 0 },
+    });
+    assert.ok(response.error);
+    assert.equal(response.error!.code, -32602);
+  } finally {
+    fs.rmSync(wsDir, { recursive: true, force: true });
+  }
+});
+
+test("session.list returns cancelledAt and cancelReason as null when not cancelled", async () => {
+  const wsDir = fs.mkdtempSync(path.join(os.tmpdir(), "list-cancel-test-"));
+  const server = new BridgeServer();
+
+  try {
+    globalThis.__AI_SPEC_SDK_QUERY__ = async function* () {
+      yield { type: "system", subtype: "init", session_id: "sdk-list-cancel-1" };
+      yield { type: "result", subtype: "success", result: "done" };
+    };
+
+    const startResp = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 1206,
+      method: "session.start",
+      params: { workspace: wsDir, prompt: "test list cancel" },
+    });
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+
+    const sessionId = (startResp.result as Record<string, unknown>)["sessionId"] as string;
+
+    const listResp = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 1207,
+      method: "session.list",
+      params: { status: "all" },
+    });
+
+    const sessions = (listResp.result as Record<string, unknown>)["sessions"] as Array<Record<string, unknown>>;
+    const listed = sessions.find((s) => s["sessionId"] === sessionId);
+    assert.ok(listed, "session should be listed");
+    assert.ok("cancelledAt" in listed!, "should have cancelledAt field");
+    assert.ok("cancelReason" in listed!, "should have cancelReason field");
+  } finally {
+    fs.rmSync(wsDir, { recursive: true, force: true });
+  }
+});
