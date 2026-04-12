@@ -23,6 +23,7 @@
 - [proxy-forwarding.md](network/proxy-forwarding.md) - proxy-forwarding
 
 ## observability
+- [audit-logging.md](observability/audit-logging.md) - audit-logging
 - [runtime-diagnostics.md](observability/runtime-diagnostics.md) - runtime-diagnostics
 - [prometheus-metrics.md](observability/prometheus-metrics.md) - prometheus-metrics
 - [structured-logging.md](observability/structured-logging.md) - structured-logging
