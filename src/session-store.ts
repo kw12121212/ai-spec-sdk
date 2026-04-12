@@ -27,6 +27,9 @@ export interface Session {
   result: unknown;
   pausedAt?: string;
   pauseReason?: string;
+  cancelledAt?: string;
+  cancelReason?: string;
+  timeoutMs?: number;
 }
 
 function nowIso(): string {
@@ -88,13 +91,16 @@ export class SessionStore {
     }
   }
 
-  private _persist(session: Session): void {
+  persist(session: Session): void {
     if (!this.sessionsDir) return;
     const tmpPath = path.join(this.sessionsDir, `${session.id}.json.tmp`);
     const finalPath = path.join(this.sessionsDir, `${session.id}.json`);
     fs.writeFileSync(tmpPath, JSON.stringify(session), "utf8");
     fs.renameSync(tmpPath, finalPath);
   }
+
+  // 为了向后兼容，保留私有别名
+  private _persist = this.persist.bind(this);
 
   create(
     workspace: string,
@@ -126,6 +132,9 @@ export class SessionStore {
       result: null,
       pausedAt: undefined,
       pauseReason: undefined,
+      cancelledAt: undefined,
+      cancelReason: undefined,
+      timeoutMs: undefined,
     };
 
     this.sessions.set(sessionId, session);
@@ -233,6 +242,35 @@ export class SessionStore {
     session.updatedAt = nowIso();
     this._persist(session);
     logger.info("session stopped", { sessionId });
+    return session;
+  }
+
+  cancelSession(sessionId: string, reason?: string): Session | null {
+    const session = this.get(sessionId);
+    if (!session) {
+      return null;
+    }
+
+    const cancelledAt = nowIso();
+    const cancelReason = reason ?? "user_requested";
+
+    for (const child of this.getActiveDescendants(sessionId)) {
+      child.cancelledAt = cancelledAt;
+      child.cancelReason = cancelReason;
+      child.status = "completed";
+      child.executionState = "completed";
+      child.updatedAt = cancelledAt;
+      this._persist(child);
+      logger.info("session cancelled", { sessionId: child.id, parentSessionId: sessionId, reason: cancelReason });
+    }
+
+    session.cancelledAt = cancelledAt;
+    session.cancelReason = cancelReason;
+    session.status = "completed";
+    session.executionState = "completed";
+    session.updatedAt = cancelledAt;
+    this._persist(session);
+    logger.info("session cancelled", { sessionId, reason: cancelReason });
     return session;
   }
 

@@ -278,6 +278,8 @@ export class BridgeServer {
   private webhookManager: WebhookManager;
   private templateStore: TemplateStore;
   private auditLog: AuditLog;
+  private abortControllers: Map<string, AbortController>;
+  private timeoutIds: Map<string, NodeJS.Timeout>;
 
   constructor({ notify = () => {}, sessionsDir, workspacesDir, logger, transport = "stdio", runtimeInfoOptions, auditDir }: BridgeServerOptions = {}) {
     this.notify = notify;
@@ -299,6 +301,8 @@ export class BridgeServer {
     this.pendingApprovals = new Map();
     this.webhookManager = new WebhookManager(sessionsDir);
     this.templateStore = new TemplateStore(sessionsDir ? path.join(sessionsDir, "templates") : undefined);
+    this.abortControllers = new Map();
+    this.timeoutIds = new Map();
 
     const activeSessionIds = new Set(this.sessionStore.list({ status: "all" }).map((s) => s.id));
     const removedCount = this.auditLog.cleanup(30, activeSessionIds);
@@ -436,6 +440,8 @@ export class BridgeServer {
         return this.pauseSession(params);
       case "session.stop":
         return this.stopSession(params);
+      case "session.cancel":
+        return this.cancelSession(params);
       case "session.status":
         return this.getSessionStatus(params);
       case "session.list":
@@ -590,7 +596,7 @@ export class BridgeServer {
     requestId: unknown,
   ): Promise<unknown> {
     const { workspace, prompt, options = {}, proxy, template } = params;
-    const { model, allowedTools, disallowedTools, permissionMode, maxTurns, systemPrompt, stream } = params;
+    const { model, allowedTools, disallowedTools, permissionMode, maxTurns, systemPrompt, stream, timeoutMs } = params;
 
     if (!workspace || typeof workspace !== "string") {
       throw new BridgeError(-32602, "'workspace' must be provided");
@@ -602,6 +608,10 @@ export class BridgeServer {
 
     if (stream !== undefined && typeof stream !== "boolean") {
       throw new BridgeError(-32602, "'stream' must be a boolean");
+    }
+
+    if (timeoutMs !== undefined && (typeof timeoutMs !== "number" || !Number.isInteger(timeoutMs) || timeoutMs < 1)) {
+      throw new BridgeError(-32602, "'timeoutMs' must be a positive integer");
     }
 
     if (template !== undefined && typeof template !== "string") {
@@ -663,11 +673,17 @@ export class BridgeServer {
 
     const session = this.sessionStore.create(resolvedWorkspace, prompt, stream === true);
 
+    if (timeoutMs !== undefined) {
+      session.timeoutMs = timeoutMs;
+      this.sessionStore.persist(session);
+    }
+
     this.auditLog.write(
       this.auditLog.createEntry(session.id, "session_started", "lifecycle", {
         workspace: resolvedWorkspace,
         model: controlParams.model ?? undefined,
         permissionMode: controlParams.permissionMode ?? undefined,
+        timeoutMs: session.timeoutMs,
       }, { workspace: resolvedWorkspace }),
     );
 
@@ -943,16 +959,30 @@ export class BridgeServer {
     // Track per-turn chunk index for streaming
     let streamChunkIndex = 0;
 
-    const queryResult = await runClaudeQuery({
-      prompt,
-      options: resolvedOptions,
-      cwd: context.cwd,
-      env: context.env,
-      shouldStop: () => {
-        const current = this.sessionStore.get(session.id);
-        return Boolean(current?.stopRequested);
-      },
-      onEvent: (message) => {
+    const abortController = new AbortController();
+    this.abortControllers.set(session.id, abortController);
+
+    // Setup timeout if needed
+    const fullSession = this.sessionStore.get(session.id);
+    if (fullSession && fullSession.timeoutMs !== undefined) {
+      const timeoutId = setTimeout(() => {
+        this.cancelSession({ sessionId: session.id, reason: "timeout" });
+      }, fullSession.timeoutMs);
+      this.timeoutIds.set(session.id, timeoutId);
+    }
+
+    try {
+      const queryResult = await runClaudeQuery({
+        prompt,
+        options: resolvedOptions,
+        cwd: context.cwd,
+        env: context.env,
+        shouldStop: () => {
+          const current = this.sessionStore.get(session.id);
+          return Boolean(current?.stopRequested);
+        },
+        signal: abortController.signal,
+        onEvent: (message) => {
         const current = this.sessionStore.get(session.id);
         if (current?.stopRequested) {
           return;
@@ -1068,37 +1098,72 @@ export class BridgeServer {
 
         void this._fireHooks("notification", session.id, context.cwd);
       },
-    });
+      });
 
-    if (queryResult.status === "stopped") {
-      const stopped = this.sessionStore.stop(session.id);
+      const currentSession = this.sessionStore.get(session.id);
+      if (currentSession?.cancelledAt) {
+        const cancelledAt = currentSession.cancelledAt;
+        const cancelReason = currentSession.cancelReason;
+        this.emit(
+          "bridge/session_event",
+          {
+            sessionId: session.id,
+            type: "session_completed",
+            cancelledAt,
+            cancelReason,
+            result: null,
+            usage: null,
+          },
+          requestId,
+        );
+
+        return {
+          sessionId: session.id,
+          status: "completed",
+          cancelledAt,
+          cancelReason,
+          result: null,
+          usage: null,
+        };
+      }
+
+      if (queryResult.status === "stopped") {
+        const stopped = this.sessionStore.stop(session.id);
+        this.emit(
+          "bridge/session_event",
+          {
+            sessionId: session.id,
+            type: "session_stopped",
+            status: stopped ? stopped.status : "stopped",
+          },
+          requestId,
+        );
+
+        return { sessionId: session.id, status: "stopped", result: null, usage: null };
+      }
+
+      this.sessionStore.complete(session.id, queryResult.result);
+
       this.emit(
         "bridge/session_event",
         {
           sessionId: session.id,
-          type: "session_stopped",
-          status: stopped ? stopped.status : "stopped",
+          type: "session_completed",
+          result: queryResult.result,
+          usage: queryResult.usage,
         },
         requestId,
       );
 
-      return { sessionId: session.id, status: "stopped", result: null, usage: null };
+      return { sessionId: session.id, status: "completed", result: queryResult.result, usage: queryResult.usage };
+    } finally {
+      this.abortControllers.delete(session.id);
+      const timeoutId = this.timeoutIds.get(session.id);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        this.timeoutIds.delete(session.id);
+      }
     }
-
-    this.sessionStore.complete(session.id, queryResult.result);
-
-    this.emit(
-      "bridge/session_event",
-      {
-        sessionId: session.id,
-        type: "session_completed",
-        result: queryResult.result,
-        usage: queryResult.usage,
-      },
-      requestId,
-    );
-
-    return { sessionId: session.id, status: "completed", result: queryResult.result, usage: queryResult.usage };
   }
 
   private stopSession(params: Record<string, unknown>): unknown {
@@ -1181,6 +1246,59 @@ export class BridgeServer {
     return { success: true, sessionId, pausedAt };
   }
 
+  private cancelSession(params: Record<string, unknown>): unknown {
+    const { sessionId, reason } = params;
+
+    if (!sessionId || typeof sessionId !== "string") {
+      throw new BridgeError(-32602, "'sessionId' must be provided");
+    }
+
+    if (reason !== undefined && typeof reason !== "string") {
+      throw new BridgeError(-32602, "'reason' must be a string");
+    }
+
+    const session = this.sessionStore.get(sessionId);
+    if (!session) {
+      throw new BridgeError(-32011, "Session not found", { sessionId });
+    }
+
+    if (session.status !== "active") {
+      throw new BridgeError(-32602, "Session is not active", { sessionId });
+    }
+
+    const cancelledAt = new Date().toISOString();
+    const cancelReason = reason ?? "user_requested";
+    const ok = this.sessionStore.transitionExecutionState(sessionId, "completed", "cancelled");
+    if (!ok) {
+      throw new BridgeError(-32602, "State transition failed");
+    }
+
+    this.sessionStore.cancelSession(sessionId, cancelReason);
+
+    const abortController = this.abortControllers.get(sessionId);
+    if (abortController) {
+      abortController.abort();
+      this.abortControllers.delete(sessionId);
+    }
+
+    const timeoutId = this.timeoutIds.get(sessionId);
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      this.timeoutIds.delete(sessionId);
+    }
+
+    this.auditLog.write(
+      this.auditLog.createEntry(sessionId, "session_cancelled", "lifecycle", {
+        reason: cancelReason,
+        cancelledAt,
+      }, { workspace: session.workspace }),
+    );
+
+    void this._fireHooks("notification", sessionId, session.workspace);
+
+    return { success: true, sessionId, cancelledAt, cancelReason };
+  }
+
   private auditQuery(params: Record<string, unknown>): unknown {
     const { sessionId, category, eventType, since, until, limit } = params;
 
@@ -1247,6 +1365,9 @@ export class BridgeServer {
       result: session.result,
       pausedAt: session.pausedAt ?? null,
       pauseReason: session.pauseReason ?? null,
+      cancelledAt: session.cancelledAt ?? null,
+      cancelReason: session.cancelReason ?? null,
+      timeoutMs: session.timeoutMs ?? null,
     };
   }
 
@@ -1380,6 +1501,9 @@ export class BridgeServer {
           prompt,
           pausedAt: s.pausedAt ?? null,
           pauseReason: s.pauseReason ?? null,
+          cancelledAt: s.cancelledAt ?? null,
+          cancelReason: s.cancelReason ?? null,
+          timeoutMs: s.timeoutMs ?? null,
         };
       }),
     };
@@ -2146,6 +2270,11 @@ export class BridgeServer {
       updatedAt: session.updatedAt,
       history: session.history,
       result: session.result,
+      pausedAt: session.pausedAt ?? null,
+      pauseReason: session.pauseReason ?? null,
+      cancelledAt: session.cancelledAt ?? null,
+      cancelReason: session.cancelReason ?? null,
+      timeoutMs: session.timeoutMs ?? null,
     };
   }
 

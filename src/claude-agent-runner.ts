@@ -21,6 +21,7 @@ export interface RunClaudeQueryOptions {
   env?: Record<string, string | undefined>;
   onEvent: (message: unknown) => void;
   shouldStop?: () => boolean;
+  signal?: AbortSignal;
 }
 
 export interface TokenUsage {
@@ -41,6 +42,7 @@ export async function runClaudeQuery({
   env,
   onEvent,
   shouldStop = () => false,
+  signal,
 }: RunClaudeQueryOptions): Promise<QueryResult> {
   const queryFn = getQueryFunction();
   logger.debug("query started", { promptLength: prompt.length });
@@ -53,9 +55,16 @@ export async function runClaudeQuery({
     if (cwd !== undefined) sdkOptions["cwd"] = cwd;
     if (env !== undefined) sdkOptions["env"] = env;
 
+    const abortController = signal ? new AbortController() : undefined;
+    if (signal) {
+      signal.addEventListener("abort", () => {
+        abortController?.abort();
+      });
+    }
+
     for await (const message of queryFn({ prompt, options: sdkOptions } as Parameters<QueryFunction>[0])) {
-      if (shouldStop()) {
-        logger.debug("query stopped by caller");
+      if (shouldStop() || signal?.aborted) {
+        logger.debug("query stopped by caller or aborted");
         return {
           status: "stopped",
           result: null,
