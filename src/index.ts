@@ -17,3 +17,5 @@ export type { HookEntry, HookEvent } from "./hooks-store.js";
 export type { ContextFile } from "./context-store.js";
 export { Logger, defaultLogger } from "./logger.js";
 export type { LogLevel, LogBindings } from "./logger.js";
+export { AuditLog } from "./audit-log.js";
+export type { AuditEntry, AuditQueryFilters } from "./audit-log.js";

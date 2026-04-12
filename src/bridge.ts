@@ -1,5 +1,6 @@
 import path from "node:path";
 import fs from "node:fs";
+import crypto from "node:crypto";
 import { spawn } from "node:child_process";
 import type { PermissionResult } from "@anthropic-ai/claude-agent-sdk";
 import { BridgeError, isJsonRpcRequest } from "./errors.js";
@@ -18,6 +19,7 @@ import { defaultLogger, VALID_LOG_LEVELS, type Logger, type LogLevel } from "./l
 import { buildRuntimeInfo, type RuntimeInfoOptions } from "./runtime-info.js";
 import { WebhookManager } from "./webhooks.js";
 import { TemplateStore } from "./template-store.js";
+import { AuditLog } from "./audit-log.js";
 
 const METHOD_NOT_FOUND = -32601;
 const INTERNAL_ERROR = -32603;
@@ -246,6 +248,7 @@ export interface BridgeServerOptions {
   transport?: string;
   /** Options forwarded to buildRuntimeInfo for bridge.info responses. */
   runtimeInfoOptions?: RuntimeInfoOptions;
+  auditDir?: string;
 }
 
 interface AgentQueryContext {
@@ -274,13 +277,16 @@ export class BridgeServer {
   private pendingApprovals: Map<string, PendingApproval>;
   private webhookManager: WebhookManager;
   private templateStore: TemplateStore;
+  private auditLog: AuditLog;
 
-  constructor({ notify = () => {}, sessionsDir, workspacesDir, logger, transport = "stdio", runtimeInfoOptions }: BridgeServerOptions = {}) {
+  constructor({ notify = () => {}, sessionsDir, workspacesDir, logger, transport = "stdio", runtimeInfoOptions, auditDir }: BridgeServerOptions = {}) {
     this.notify = notify;
     this.logger = logger ?? defaultLogger;
     this.transport = transport;
     this.runtimeInfoOptions = { transport, sessionsDir, ...runtimeInfoOptions };
-    this.sessionStore = new SessionStore(sessionsDir);
+    const resolvedAuditDir = auditDir ?? (sessionsDir ? path.join(sessionsDir, "audit") : undefined);
+    this.auditLog = new AuditLog(resolvedAuditDir ?? ".audit", notify, API_VERSION);
+    this.sessionStore = new SessionStore(sessionsDir, this.auditLog);
     this.workspaceStore = new WorkspaceStore(workspacesDir);
     this.mcpStore = new McpStore((method, params) => {
       this.notify({ jsonrpc: "2.0", method, params });
@@ -293,6 +299,12 @@ export class BridgeServer {
     this.pendingApprovals = new Map();
     this.webhookManager = new WebhookManager(sessionsDir);
     this.templateStore = new TemplateStore(sessionsDir ? path.join(sessionsDir, "templates") : undefined);
+
+    const activeSessionIds = new Set(this.sessionStore.list({ status: "all" }).map((s) => s.id));
+    const removedCount = this.auditLog.cleanup(30, activeSessionIds);
+    if (removedCount > 0) {
+      this.logger.info(`cleaned up ${removedCount} stale audit log files`);
+    }
   }
 
   private _buildApprovalCallback(sessionId: string): (
@@ -499,6 +511,8 @@ export class BridgeServer {
         return this.templateList();
       case "template.delete":
         return this.templateDelete(params);
+      case "audit.query":
+        return this.auditQuery(params);
       default:
         throw new BridgeError(METHOD_NOT_FOUND, `Method not found: ${method}`);
     }
@@ -647,6 +661,14 @@ export class BridgeServer {
 
     const session = this.sessionStore.create(resolvedWorkspace, prompt, stream === true);
 
+    this.auditLog.write(
+      this.auditLog.createEntry(session.id, "session_started", "lifecycle", {
+        workspace: resolvedWorkspace,
+        model: controlParams.model ?? undefined,
+        permissionMode: controlParams.permissionMode ?? undefined,
+      }, { workspace: resolvedWorkspace }),
+    );
+
     // Collect custom tools for this workspace
     const customTools = this._getAvailableCustomTools(resolvedWorkspace, controlParams.allowedTools, controlParams.disallowedTools);
 
@@ -738,6 +760,13 @@ export class BridgeServer {
       parentSessionId,
     );
 
+    this.auditLog.write(
+      this.auditLog.createEntry(session.id, "session_spawned", "lifecycle", {
+        workspace: parentSession.workspace,
+        parentSessionId,
+      }, { workspace: parentSession.workspace, parentSessionId }),
+    );
+
     const customTools = this._getAvailableCustomTools(
       parentSession.workspace,
       controlParams.allowedTools,
@@ -816,6 +845,12 @@ export class BridgeServer {
     );
 
     this.sessionStore.appendEvent(session.id, { type: "resume_prompt", prompt });
+
+    this.auditLog.write(
+      this.auditLog.createEntry(sessionId, "session_resumed", "lifecycle", {
+        workspace: session.workspace,
+      }, { workspace: session.workspace }),
+    );
 
     // Collect custom tools for this workspace
     const customTools = this._getAvailableCustomTools(session.workspace, controlParams.allowedTools, controlParams.disallowedTools);
@@ -967,6 +1002,16 @@ export class BridgeServer {
         // Fire hooks based on message type
         if (msgType === "tool_use") {
           const toolName = this._extractToolName(message);
+          const toolInput = this._extractToolInput(message);
+          const toolId = this._extractToolUseId(message);
+          const inputHash = toolInput ? crypto.createHash("sha256").update(JSON.stringify(toolInput)).digest("hex") : undefined;
+          this.auditLog.write(
+            this.auditLog.createEntry(session.id, "tool_use", "execution", {
+              toolName: toolName ?? "unknown",
+              inputHash: inputHash ?? "",
+              id: toolId ?? "",
+            }, { workspace: context.cwd }),
+          );
           // Blocking hooks execute asynchronously; if they fail, stop the session
           this._fireHooks("pre_tool_use", session.id, context.cwd, toolName).then((passed) => {
             if (!passed) {
@@ -977,6 +1022,14 @@ export class BridgeServer {
           // File change tracking for Write/Edit tools
           this._emitFileChange(session.id, toolName, message, context.cwd);
         } else if (msgType === "tool_result") {
+          const toolName = this._extractToolNameFromResult(message);
+          this.auditLog.write(
+            this.auditLog.createEntry(session.id, "tool_result", "execution", {
+              toolName: toolName ?? "unknown",
+              inputHash: "",
+              status: "success",
+            }, { workspace: context.cwd }),
+          );
           this.sessionStore.transitionExecutionState(session.id, "running", "tool_result_received");
           void this._fireHooks("post_tool_use", session.id, context.cwd);
         }
@@ -1030,6 +1083,13 @@ export class BridgeServer {
       throw new BridgeError(-32011, "Session not found", { sessionId });
     }
 
+    this.auditLog.write(
+      this.auditLog.createEntry(sessionId, "session_stopped", "lifecycle", {
+        status: session.status,
+        workspace: session.workspace,
+      }, { workspace: session.workspace }),
+    );
+
     for (const [reqId, pending] of this.pendingApprovals) {
       if (pending.sessionId === sessionId) {
         this.pendingApprovals.delete(reqId);
@@ -1046,6 +1106,50 @@ export class BridgeServer {
     }
 
     return { sessionId, status: session.status };
+  }
+
+  private auditQuery(params: Record<string, unknown>): unknown {
+    const { sessionId, category, eventType, since, until, limit } = params;
+
+    const filters: Record<string, unknown> = {};
+    if (sessionId !== undefined) {
+      if (typeof sessionId !== "string") {
+        throw new BridgeError(-32602, "'sessionId' must be a string");
+      }
+      filters.sessionId = sessionId;
+    }
+    if (category !== undefined) {
+      if (typeof category !== "string") {
+        throw new BridgeError(-32602, "'category' must be a string");
+      }
+      filters.category = category;
+    }
+    if (eventType !== undefined) {
+      if (typeof eventType !== "string") {
+        throw new BridgeError(-32602, "'eventType' must be a string");
+      }
+      filters.eventType = eventType;
+    }
+    if (since !== undefined) {
+      if (typeof since !== "string") {
+        throw new BridgeError(-32602, "'since' must be an ISO-8601 timestamp string");
+      }
+      filters.since = since;
+    }
+    if (until !== undefined) {
+      if (typeof until !== "string") {
+        throw new BridgeError(-32602, "'until' must be an ISO-8601 timestamp string");
+      }
+      filters.until = until;
+    }
+    if (limit !== undefined) {
+      if (typeof limit !== "number" || !Number.isInteger(limit) || limit < 1) {
+        throw new BridgeError(-32602, "'limit' must be a positive integer");
+      }
+      filters.limit = Math.min(limit, 500);
+    }
+
+    return this.auditLog.query(filters as import("./audit-log.js").AuditQueryFilters);
   }
 
   private getSessionStatus(params: Record<string, unknown>): unknown {
@@ -1220,6 +1324,48 @@ export class BridgeServer {
     return undefined;
   }
 
+  private _extractToolInput(message: unknown): Record<string, unknown> | undefined {
+    if (message === null || typeof message !== "object") return undefined;
+    const msg = message as Record<string, unknown>;
+    const innerMsg = msg["message"] as Record<string, unknown> | undefined;
+    const content = innerMsg?.["content"] ?? msg["content"];
+    if (!Array.isArray(content)) return undefined;
+    for (const block of content as Array<Record<string, unknown>>) {
+      if (block["type"] === "tool_use" && typeof block["input"] === "object" && block["input"] !== null) {
+        return block["input"] as Record<string, unknown>;
+      }
+    }
+    return undefined;
+  }
+
+  private _extractToolUseId(message: unknown): string | undefined {
+    if (message === null || typeof message !== "object") return undefined;
+    const msg = message as Record<string, unknown>;
+    const innerMsg = msg["message"] as Record<string, unknown> | undefined;
+    const content = innerMsg?.["content"] ?? msg["content"];
+    if (!Array.isArray(content)) return undefined;
+    for (const block of content as Array<Record<string, unknown>>) {
+      if (block["type"] === "tool_use" && typeof block["id"] === "string") {
+        return block["id"];
+      }
+    }
+    return undefined;
+  }
+
+  private _extractToolNameFromResult(message: unknown): string | undefined {
+    if (message === null || typeof message !== "object") return undefined;
+    const msg = message as Record<string, unknown>;
+    const innerMsg = msg["message"] as Record<string, unknown> | undefined;
+    const content = innerMsg?.["content"] ?? msg["content"];
+    if (!Array.isArray(content)) return undefined;
+    for (const block of content as Array<Record<string, unknown>>) {
+      if (block["type"] === "tool_result" && typeof block["name"] === "string") {
+        return block["name"];
+      }
+    }
+    return undefined;
+  }
+
   private readonly HOOK_TIMEOUT_MS = 30_000; // 30 seconds default
 
   private _executeHook(
@@ -1333,6 +1479,16 @@ export class BridgeServer {
       for (const hook of matchingHooks) {
         const result = await this._executeHook(hook, sessionId, workspace);
         this._emitHookNotification(hook, sessionId, result);
+        this.auditLog.write(
+          this.auditLog.createEntry(sessionId, "hook_execution", "security", {
+            hookId: hook.hookId,
+            event: hook.event,
+            command: hook.command,
+            exitCode: result.exitCode,
+            durationMs: result.durationMs,
+            timedOut: result.timedOut,
+          }, { workspace }),
+        );
         if (result.exitCode !== 0) {
           return false; // Tool use must be aborted
         }
@@ -1343,9 +1499,29 @@ export class BridgeServer {
     // Non-blocking: fire-and-forget
     for (const hook of matchingHooks) {
       this._emitHookNotification(hook, sessionId, null);
+      this.auditLog.write(
+        this.auditLog.createEntry(sessionId, "hook_execution", "security", {
+          hookId: hook.hookId,
+          event: hook.event,
+          command: hook.command,
+          exitCode: null as unknown as number,
+          durationMs: null as unknown as number,
+          timedOut: false,
+        }, { workspace }),
+      );
       this._executeHook(hook, sessionId, workspace).then((result) => {
         // Re-emit notification with actual result after completion
         this._emitHookNotification(hook, sessionId, result);
+        this.auditLog.write(
+          this.auditLog.createEntry(sessionId, "hook_execution", "security", {
+            hookId: hook.hookId,
+            event: hook.event,
+            command: hook.command,
+            exitCode: result.exitCode,
+            durationMs: result.durationMs,
+            timedOut: result.timedOut,
+          }, { workspace }),
+        );
       });
     }
 
@@ -1712,6 +1888,14 @@ export class BridgeServer {
     // Create new session in the same workspace
     const branchPrompt = typeof prompt === "string" ? prompt : "(branched session)";
     const newSession = this.sessionStore.create(source.workspace, branchPrompt);
+
+    this.auditLog.write(
+      this.auditLog.createEntry(newSession.id, "session_branched", "lifecycle", {
+        workspace: source.workspace,
+        parentSessionId: sessionId,
+        fromIndex: branchIndex,
+      }, { workspace: source.workspace, parentSessionId: sessionId }),
+    );
 
     // Copy history from source up to branchIndex
     const copiedHistory = source.history.slice(0, branchIndex);

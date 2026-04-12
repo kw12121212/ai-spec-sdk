@@ -29,6 +29,8 @@ logs/
 Thumbs.db
 .idea/
 .vscode/
+.audit/
+.pytest_cache/
 
 # Test temp files
 tmp/

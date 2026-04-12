@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { defaultLogger as logger } from "./logger.js";
 import { AgentStateMachine, type AgentExecutionState } from "./agent-state-machine.js";
+import type { AuditLog } from "./audit-log.js";
 
 export interface SessionHistoryEntry {
   type: string;
@@ -34,11 +35,13 @@ export class SessionStore {
   private sessions: Map<string, Session>;
   private stateMachines: Map<string, AgentStateMachine>;
   private sessionsDir: string | undefined;
+  private auditLog: AuditLog | undefined;
 
-  constructor(sessionsDir?: string) {
+  constructor(sessionsDir?: string, auditLog?: AuditLog) {
     this.sessions = new Map();
     this.stateMachines = new Map();
     this.sessionsDir = sessionsDir;
+    this.auditLog = auditLog;
 
     if (sessionsDir) {
       fs.mkdirSync(sessionsDir, { recursive: true });
@@ -65,6 +68,17 @@ export class SessionStore {
           }
           this.sessions.set(session.id, session);
           this.stateMachines.set(session.id, new AgentStateMachine(session.id, session.executionState));
+          if (this.auditLog) {
+            this.stateMachines.get(session.id)?.onTransition((event) => {
+              this.auditLog?.write(
+                this.auditLog!.createEntry(event.sessionId, "state_transition", "lifecycle", {
+                  from: event.from,
+                  to: event.to,
+                  trigger: event.trigger,
+                }),
+              );
+            });
+          }
         }
       } catch {
         // skip corrupt files
@@ -114,6 +128,20 @@ export class SessionStore {
     this.stateMachines.set(sessionId, new AgentStateMachine(sessionId));
     this._persist(session);
     logger.info("session created", { sessionId, workspace });
+    if (this.auditLog) {
+      this.auditLog.write(
+        this.auditLog.createEntry(sessionId, "session_created", "lifecycle", { workspace }, { workspace, parentSessionId }),
+      );
+      this.stateMachines.get(sessionId)?.onTransition((event) => {
+        this.auditLog?.write(
+          this.auditLog!.createEntry(event.sessionId, "state_transition", "lifecycle", {
+            from: event.from,
+            to: event.to,
+            trigger: event.trigger,
+          }),
+        );
+      });
+    }
     return session;
   }
 
