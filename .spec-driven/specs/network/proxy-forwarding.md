@@ -1,3 +1,9 @@
+---
+mapping:
+  implementation:
+    - src/bridge.ts
+  tests: []
+---
 ### Requirement: Explicit Proxy Configuration
 The SDK MUST accept an optional `proxy` parameter on session start and resume requests and MUST translate it into the agent process environment so the agent can reach the Anthropic API through a corporate HTTP proxy.
 

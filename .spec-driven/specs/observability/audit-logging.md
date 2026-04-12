@@ -1,8 +1,14 @@
 ---
-implementation:
-  - src/audit-log.ts
-tests:
-  - test/audit-log.test.ts
+mapping:
+  implementation:
+    - src/audit-log.ts
+    - src/session-store.ts
+    - src/agent-state-machine.ts
+    - src/hooks-store.ts
+  tests:
+    - test/audit-log.test.ts
+    - test/session-store-audit.test.ts
+    - test/hook-audit.test.ts
 ---
 
 # Audit Logging

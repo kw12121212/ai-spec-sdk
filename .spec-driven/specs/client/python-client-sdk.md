@@ -1,3 +1,8 @@
+---
+mapping:
+  implementation: []
+  tests: []
+---
 ## ADDED Requirements
 
 ### Requirement: Python BridgeClient Dual Transport

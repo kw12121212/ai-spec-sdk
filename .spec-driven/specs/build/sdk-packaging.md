@@ -1,3 +1,9 @@
+---
+mapping:
+  implementation:
+    - package.json
+  tests: []
+---
 # SDK Packaging
 
 ### Requirement: build:pack script exists

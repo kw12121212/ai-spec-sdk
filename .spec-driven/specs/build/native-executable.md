@@ -1,3 +1,10 @@
+---
+mapping:
+  implementation:
+    - package.json
+  tests:
+    - test/native-build.test.ts
+---
 # Native Executable Build
 
 ### Requirement: build:native script exists

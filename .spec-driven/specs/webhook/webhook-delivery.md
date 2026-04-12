@@ -1,3 +1,12 @@
+---
+mapping:
+  implementation:
+    - src/webhooks.ts
+    - src/http-server.ts
+    - src/bridge.ts
+  tests:
+    - test/webhooks.test.ts
+---
 ## ADDED Requirements
 
 ### Requirement: Webhook Subscribe

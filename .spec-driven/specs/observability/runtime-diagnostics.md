@@ -1,3 +1,11 @@
+---
+mapping:
+  implementation:
+    - src/cli.ts
+    - src/runtime-info.ts
+  tests:
+    - test/cli.test.ts
+---
 ### Requirement: CLI Help Output
 Running `ai-spec-bridge --help` MUST print usage information to stdout and exit successfully without starting stdio or HTTP transport.
 

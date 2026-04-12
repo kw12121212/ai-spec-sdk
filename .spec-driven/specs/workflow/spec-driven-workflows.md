@@ -1,3 +1,11 @@
+---
+mapping:
+  implementation:
+    - src/workflow.ts
+    - src/capabilities.ts
+  tests:
+    - test/workflow.test.ts
+---
 ### Requirement: Supported Workflow Invocation
 The SDK MUST let clients invoke supported spec-driven workflow operations against an explicit workspace through the bridge.
 

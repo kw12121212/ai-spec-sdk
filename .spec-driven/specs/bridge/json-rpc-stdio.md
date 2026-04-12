@@ -1,3 +1,17 @@
+---
+mapping:
+  implementation:
+    - src/bridge.ts
+    - src/cli.ts
+    - src/errors.ts
+    - src/capabilities.ts
+    - src/runtime-info.ts
+  tests:
+    - test/bridge.test.ts
+    - test/bridge-audit.test.ts
+    - test/bridge-tools.test.ts
+    - test/cli.test.ts
+---
 ### Requirement: JSON-RPC Stdio Bridge
 The SDK MUST expose a local JSON-RPC 2.0 interface over standard input and standard output so external tools can call it as a subprocess.
 

@@ -1,3 +1,15 @@
+---
+mapping:
+  implementation:
+    - src/key-store.ts
+    - src/auth.ts
+    - src/http-server.ts
+    - src/cli.ts
+  tests:
+    - test/key-store.test.ts
+    - test/auth.test.ts
+    - test/cli.test.ts
+---
 ### Requirement: API Key Authentication on HTTP Transport
 When the bridge is running in HTTP mode and auth is enabled (default), every `POST /rpc` request MUST include an `Authorization: Bearer <key>` header. Requests missing this header or carrying an invalid or expired key MUST receive a JSON-RPC error response with code `-32061` and MUST NOT be dispatched to any bridge method.
 

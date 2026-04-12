@@ -1,3 +1,13 @@
+---
+mapping:
+  implementation:
+    - src/logger.ts
+    - src/bridge.ts
+    - src/cli.ts
+  tests:
+    - test/logger.test.ts
+    - test/cli.test.ts
+---
 ## ADDED Requirements
 
 ### Requirement: Structured Log Output

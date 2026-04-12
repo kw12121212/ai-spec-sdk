@@ -1,3 +1,13 @@
+---
+mapping:
+  implementation:
+    - src/http-server.ts
+    - src/cli.ts
+    - src/bridge.ts
+    - src/runtime-info.ts
+  tests:
+    - test/http-server.test.ts
+---
 ### Requirement: HTTP Transport Entrypoint
 When started with `--transport http` (or `AI_SPEC_SDK_TRANSPORT=http`), the bridge MUST listen for HTTP connections on the configured port instead of reading from stdin/stdout. The default port is `8765` and MUST be overridable via `--port <n>` or `AI_SPEC_SDK_PORT`.
 

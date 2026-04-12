@@ -1,3 +1,19 @@
+---
+mapping:
+  implementation:
+    - src/session-store.ts
+    - src/agent-state-machine.ts
+    - src/claude-agent-runner.ts
+    - src/workspace-store.ts
+    - src/template-store.ts
+    - src/audit-log.ts
+  tests:
+    - test/session-store.test.ts
+    - test/session-store-audit.test.ts
+    - test/session.test.ts
+    - test/agent-state-machine.test.ts
+    - test/template-store.test.ts
+---
 ### Requirement: Start Agent Session
 The SDK MUST let a client start a Claude-backed agent session for an explicit workspace and prompt through the bridge.
 

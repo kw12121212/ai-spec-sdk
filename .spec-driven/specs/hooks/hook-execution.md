@@ -1,8 +1,12 @@
 ---
-implementation:
-  - src/bridge.ts
-tests:
-  - test/hook-execution.test.ts
+mapping:
+  implementation:
+    - src/hooks-store.ts
+    - src/bridge.ts
+  tests:
+    - test/hooks-store.test.ts
+    - test/hook-execution.test.ts
+    - test/hook-audit.test.ts
 ---
 
 # Hook Execution

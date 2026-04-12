@@ -1,3 +1,12 @@
+---
+mapping:
+  implementation:
+    - src/template-store.ts
+    - src/bridge.ts
+  tests:
+    - test/template-store.test.ts
+    - test/session.test.ts
+---
 # Session Templates
 
 ## ADDED Requirements

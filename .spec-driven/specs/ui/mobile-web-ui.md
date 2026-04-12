@@ -1,3 +1,11 @@
+---
+mapping:
+  implementation:
+    - src/http-server.ts
+    - src/ui/index.html
+  tests:
+    - test/http-server.test.ts
+---
 ## ADDED Requirements
 
 ### Requirement: Mobile Web UI Served at Root

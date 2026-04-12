@@ -1,3 +1,8 @@
+---
+mapping:
+  implementation: []
+  tests: []
+---
 ## ADDED Requirements
 
 ### Requirement: Stream Chunk Event Type

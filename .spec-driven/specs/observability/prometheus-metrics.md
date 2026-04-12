@@ -1,3 +1,11 @@
+---
+mapping:
+  implementation:
+    - src/http-server.ts
+    - src/metrics.ts
+  tests:
+    - test/http-server.test.ts
+---
 ## ADDED Requirements
 
 ### Requirement: Prometheus Metrics Endpoint

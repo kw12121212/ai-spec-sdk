@@ -1,3 +1,13 @@
+---
+mapping:
+  implementation:
+    - src/http-server.ts
+    - src/cli.ts
+    - src/bridge.ts
+    - src/runtime-info.ts
+  tests:
+    - test/ws-server.test.ts
+---
 # websocket-transport
 
 ## ADDED Requirements

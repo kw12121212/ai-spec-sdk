@@ -1,3 +1,8 @@
+---
+mapping:
+  implementation: []
+  tests: []
+---
 ### Requirement: README Onboarding Coverage
 The project README MUST include a working onboarding path for bridge users.
 

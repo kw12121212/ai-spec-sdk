@@ -1,3 +1,13 @@
+---
+mapping:
+  implementation:
+    - src/rate-limiter.ts
+    - src/http-server.ts
+    - src/auth.ts
+  tests:
+    - test/rate-limiter.test.ts
+    - test/auth.test.ts
+---
 ### Requirement: Per-Key Token Bucket Rate Limiting
 When the bridge is running in HTTP mode with auth enabled, each `POST /rpc` request authenticated with a non-`admin` API key MUST be subject to per-key rate limiting using a token bucket algorithm. The default limit is 120 requests per minute per key. Keys with scope `admin` MUST bypass all rate limit checks. When the bridge is started with `--no-auth`, rate limiting MUST be disabled entirely. Public methods that remain callable without credentials MUST continue to work without requiring a key.
 
