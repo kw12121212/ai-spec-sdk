@@ -25,6 +25,8 @@ export interface Session {
   stream: boolean;
   history: SessionHistoryEntry[];
   result: unknown;
+  pausedAt?: string;
+  pauseReason?: string;
 }
 
 function nowIso(): string {
@@ -122,6 +124,8 @@ export class SessionStore {
         },
       ],
       result: null,
+      pausedAt: undefined,
+      pauseReason: undefined,
     };
 
     this.sessions.set(sessionId, session);

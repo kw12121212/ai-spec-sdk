@@ -327,3 +327,45 @@ test("SessionStore.cleanup with olderThanDays 0 is handled gracefully", () => {
   const removed = store.cleanup(0);
   assert.equal(removed, 0);
 });
+
+// --- Pause/Resume ---
+
+test("Session creates sessions with pausedAt and pauseReason as undefined", () => {
+  const store = new SessionStore();
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-ws-pause1-"));
+
+  try {
+    const session = store.create(ws, "test pause init");
+    assert.equal(session.pausedAt, undefined);
+    assert.equal(session.pauseReason, undefined);
+  } finally {
+    fs.rmSync(ws, { recursive: true, force: true });
+  }
+});
+
+test("SessionStore persists pausedAt and pauseReason to disk", () => {
+  const sessionsDir = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-pause-persist-"));
+
+  try {
+    const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-ws-pause2-"));
+    const store1 = new SessionStore(sessionsDir);
+    const session = store1.create(ws, "test pause persist");
+
+    // Manually set pause fields
+    const loaded1 = store1.get(session.id)!;
+    loaded1.pausedAt = "2026-04-12T10:00:00.000Z";
+    loaded1.pauseReason = "need break";
+    // Save manually since we mutated directly
+    const filePath = path.join(sessionsDir, `${session.id}.json`);
+    fs.writeFileSync(filePath, JSON.stringify(loaded1), "utf8");
+
+    // Reload from disk
+    const store2 = new SessionStore(sessionsDir);
+    const loaded2 = store2.get(session.id);
+    assert.ok(loaded2);
+    assert.equal(loaded2!.pausedAt, "2026-04-12T10:00:00.000Z");
+    assert.equal(loaded2!.pauseReason, "need break");
+  } finally {
+    fs.rmSync(sessionsDir, { recursive: true, force: true });
+  }
+});

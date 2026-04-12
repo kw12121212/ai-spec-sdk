@@ -9,10 +9,24 @@ The SDK MUST let a client start a Claude-backed agent session for an explicit wo
 ### Requirement: Resume Agent Session
 The SDK MUST let a client resume a previously created session when the session identifier is still available to the bridge.
 
+The existing `session.resume` method MUST support resuming from the `"paused"` state.
+
+When `executionState` is `"paused"` and `session.resume` is called, the bridge MUST:
+1. Transition `executionState` to `"running"`
+2. Clear the `pausedAt` and `pauseReason` fields
+3. Continue executing the agent query using the stored `sdkSessionId` and message history
+4. Return the same response format as the existing `session.resume`
+
 #### Scenario: Resume existing context
 - GIVEN a client previously received a session identifier from the bridge
 - WHEN the client requests session resumption using that identifier
 - THEN the bridge continues the session with preserved context instead of starting from an empty conversation
+
+#### Scenario: Resume from paused state
+- GIVEN a session with `executionState` `"paused"`
+- WHEN the client calls `session.resume`
+- THEN the session's `executionState` becomes `"running"`
+- AND the agent query continues execution
 
 ### Requirement: Observe Session Progress
 The SDK MUST provide machine-readable session events that let clients follow progress and receive final results through the bridge.
@@ -29,6 +43,42 @@ The SDK SHOULD let a client request termination of an active session and return 
 - GIVEN a client has an active session in progress
 - WHEN the client requests session termination
 - THEN the bridge reports whether the session stopped successfully and what terminal state was recorded
+
+### Requirement: Pause Agent Session
+The bridge MUST expose a `session.pause` method that allows clients to pause an actively executing session.
+
+Parameters: `{ sessionId: string, reason?: string }`.
+
+The bridge MUST:
+1. Verify the `sessionId` exists; return `-32011` error if not
+2. Check the session's `executionState`; only allow pause from `"running"` or `"waiting_for_input"`
+3. Return `-32602` error with reason if state is invalid
+4. Transition `executionState` to `"paused"`
+5. Record `pausedAt` timestamp (ISO 8601)
+6. Save the `reason` if provided
+7. Persist the session state to disk
+8. Return `{ success: true, sessionId: string, pausedAt: string }`
+
+#### Scenario: Pause a running session
+- GIVEN a session with `executionState` `"running"`
+- WHEN the client calls `session.pause` with that session ID
+- THEN the session's `executionState` becomes `"paused"`
+- AND `pausedAt` timestamp is returned
+
+#### Scenario: Pause a waiting-for-input session
+- GIVEN a session with `executionState` `"waiting_for_input"`
+- WHEN the client calls `session.pause`
+- THEN the session is successfully paused
+
+#### Scenario: Pause from invalid state returns error
+- GIVEN a session with `executionState` `"idle"`
+- WHEN the client calls `session.pause`
+- THEN `-32602` error is returned
+
+#### Scenario: Pause unknown session returns error
+- GIVEN no session exists
+- WHEN the client calls `session.pause` with invalid ID
+- THEN `-32011` error is returned
 
 ### Requirement: Workspace-Aligned Agent Working Directory
 The SDK MUST set the agent's working directory to the validated workspace path when starting or resuming a session, and MUST reject any request that supplies `cwd` directly in session options.
@@ -162,6 +212,21 @@ The session status type MUST include `interrupted` as a valid value: `"active" |
 - GIVEN sessions with status `completed` or `stopped` exist on disk
 - WHEN a new bridge process starts and loads sessions from disk
 - THEN those sessions retain their original status
+
+Session persistence MUST include pause-related fields:
+- `pausedAt?: string` - ISO 8601 timestamp
+- `pauseReason?: string` - user-provided pause reason
+
+#### Scenario: Pause fields are persisted
+- GIVEN a paused session
+- WHEN the session is saved to disk
+- THEN the JSON file includes `pausedAt` field (may include `pauseReason`)
+
+#### Scenario: Pause fields are restored
+- GIVEN a session file on disk containing `pausedAt`
+- WHEN the bridge starts and loads that session
+- THEN the session's `pausedAt` and `pauseReason` are correctly restored
+
 ### Requirement: Session History Retrieval
 The bridge MUST expose a `session.history` method that returns the stored event log for a session with offset/limit pagination.
 
@@ -509,6 +574,21 @@ The `executionState` type MUST be: `"idle" | "running" | "paused" | "waiting_for
 - WHEN the agent query throws an error or fails to start
 - THEN the session's `executionState` transitions to `"error"`
 
+#### Scenario: Transition from running to paused succeeds
+- GIVEN a state machine in state `"running"`
+- WHEN transition("paused", "user_pause") is called
+- THEN the transition succeeds and returns true
+
+#### Scenario: Transition from paused to running succeeds
+- GIVEN a state machine in state `"paused"`
+- WHEN transition("running", "user_resume") is called
+- THEN the transition succeeds and returns true
+
+#### Scenario: Invalid transition is rejected
+- GIVEN a state machine in state `"idle"`
+- WHEN transition("paused", "user_pause") is called
+- THEN the transition fails and returns false
+
 ### Requirement: Invalid State Transitions Are Rejected
 
 The state machine MUST reject transitions that are not in the valid transition table.
@@ -572,6 +652,10 @@ The `executionState` field MUST be persisted to disk as part of the session JSON
 
 The `session.status`, `session.list`, and `session.export` responses MUST include the `executionState` field.
 
+The `session.status`, `session.list`, and `session.export` responses MUST include pause-related fields (if present):
+- `pausedAt?: string`
+- `pauseReason?: string`
+
 #### Scenario: Session status includes execution state
 - GIVEN a session with `executionState` `"running"`
 - WHEN a client calls `session.status`
@@ -581,6 +665,35 @@ The `session.status`, `session.list`, and `session.export` responses MUST includ
 - GIVEN sessions exist with various execution states
 - WHEN a client calls `session.list`
 - THEN each entry includes its `executionState`
+
+#### Scenario: Status response includes pause info
+- GIVEN a paused session
+- WHEN a client calls `session.status`
+- THEN the response includes `pausedAt` (may include `pauseReason`)
+
+### Requirement: Pause/Resume Audit Logging
+
+The bridge MUST write audit log entries for pause and resume operations:
+- `session_paused` event (category: "lifecycle"), payload includes `reason` (if any) and `pausedAt`
+- `session_resumed` event (category: "lifecycle"), payload includes `resumedAt`
+
+#### Scenario: Pause writes audit log
+- GIVEN a client pauses a session
+- WHEN the pause operation completes
+- THEN a `session_paused` audit entry exists
+
+#### Scenario: Resume writes audit log
+- GIVEN a client resumes a paused session
+- WHEN the resume operation completes
+- THEN a `session_resumed` audit entry exists
+
+### Requirement: Capabilities include session.pause
+
+The `bridge.capabilities` response MUST include `session.pause` in the supported methods list.
+
+#### Scenario: Capabilities include session.pause
+- GIVEN a client calls `bridge.capabilities`
+- THEN the `methods` array in the response includes `"session.pause"`
 
 ## Requirement: Session Store Audit Integration
 

@@ -131,6 +131,7 @@ export function getCapabilities(transport = "stdio"): Capabilities {
       "session.start",
       "session.spawn",
       "session.resume",
+      "session.pause",
       "session.stop",
       "session.status",
       "session.list",

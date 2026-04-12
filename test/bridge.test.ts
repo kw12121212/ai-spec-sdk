@@ -1133,3 +1133,123 @@ test("bridge.capabilities advertises template.* methods", async () => {
   assert.ok(methods.includes("template.list"), "capabilities must advertise template.list");
   assert.ok(methods.includes("template.delete"), "capabilities must advertise template.delete");
 });
+
+// --- Session Pause/Resume ---
+
+test("bridge.capabilities includes session.pause", async () => {
+  const server = new BridgeServer();
+  const response = await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 1100,
+    method: "bridge.capabilities",
+  });
+  const methods = (response.result as Record<string, unknown>)["methods"] as string[];
+  assert.ok(methods.includes("session.pause"), "capabilities must include session.pause");
+});
+
+test("session.pause requires sessionId", async () => {
+  const server = new BridgeServer();
+  const response = await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 1101,
+    method: "session.pause",
+    params: {},
+  });
+  assert.ok(response.error);
+  assert.equal(response.error!.code, -32602);
+});
+
+test("session.pause returns -32011 for unknown session", async () => {
+  const server = new BridgeServer();
+  const response = await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 1102,
+    method: "session.pause",
+    params: { sessionId: "nonexistent-id" },
+  });
+  assert.ok(response.error);
+  assert.equal(response.error!.code, -32011);
+});
+
+test("session.pause returns -32602 when session not pausable", async () => {
+  const server = new BridgeServer();
+  const wsDir = fs.mkdtempSync(path.join(os.tmpdir(), "pause-state-test-"));
+
+  try {
+    globalThis.__AI_SPEC_SDK_QUERY__ = async function* () {
+      yield { type: "system", subtype: "init", session_id: "sdk-pause-test" };
+      yield { type: "result", subtype: "success", result: "done" };
+    };
+
+    const startResp = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 1103,
+      method: "session.start",
+      params: { workspace: wsDir, prompt: "test pause state" },
+    });
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+
+    const sessionId = (startResp.result as Record<string, unknown>)["sessionId"] as string;
+
+    // Try to pause a completed session (it's already completed by our stub)
+    const pauseResp = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 1104,
+      method: "session.pause",
+      params: { sessionId },
+    });
+    assert.ok(pauseResp.error);
+    assert.equal(pauseResp.error!.code, -32602);
+  } finally {
+    fs.rmSync(wsDir, { recursive: true, force: true });
+  }
+});
+
+test("session.resume returns -32011 for unknown session", async () => {
+  const server = new BridgeServer();
+  const response = await server.handleMessage({
+    jsonrpc: "2.0",
+    id: 1105,
+    method: "session.resume",
+    params: { sessionId: "nonexistent-id", prompt: "test" },
+  });
+  assert.ok(response.error);
+  assert.equal(response.error!.code, -32011);
+});
+
+test("session.list returns pausedAt and pauseReason as null when not paused", async () => {
+  const wsDir = fs.mkdtempSync(path.join(os.tmpdir(), "list-pause-test-"));
+  const server = new BridgeServer();
+
+  try {
+    globalThis.__AI_SPEC_SDK_QUERY__ = async function* () {
+      yield { type: "system", subtype: "init", session_id: "sdk-list-pause-1" };
+      yield { type: "result", subtype: "success", result: "done" };
+    };
+
+    const startResp = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 1106,
+      method: "session.start",
+      params: { workspace: wsDir, prompt: "test list pause" },
+    });
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+
+    const sessionId = (startResp.result as Record<string, unknown>)["sessionId"] as string;
+
+    const listResp = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 1107,
+      method: "session.list",
+      params: { status: "all" },
+    });
+
+    const sessions = (listResp.result as Record<string, unknown>)["sessions"] as Array<Record<string, unknown>>;
+    const listed = sessions.find((s) => s["sessionId"] === sessionId);
+    assert.ok(listed, "session should be listed");
+    assert.ok("pausedAt" in listed!, "should have pausedAt field");
+    assert.ok("pauseReason" in listed!, "should have pauseReason field");
+  } finally {
+    fs.rmSync(wsDir, { recursive: true, force: true });
+  }
+});

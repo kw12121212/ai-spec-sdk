@@ -432,6 +432,8 @@ export class BridgeServer {
         return this.spawnSession(params, requestId);
       case "session.resume":
         return this.resumeSession(params, requestId);
+      case "session.pause":
+        return this.pauseSession(params);
       case "session.stop":
         return this.stopSession(params);
       case "session.status":
@@ -807,8 +809,10 @@ export class BridgeServer {
       throw new BridgeError(-32011, "Session not found", { sessionId });
     }
 
-    if (!prompt || typeof prompt !== "string") {
-      throw new BridgeError(-32602, "'prompt' must be provided");
+    if (session.executionState !== "paused") {
+      if (!prompt || typeof prompt !== "string") {
+        throw new BridgeError(-32602, "'prompt' must be provided");
+      }
     }
 
     if (stream !== undefined && typeof stream !== "boolean") {
@@ -844,33 +848,61 @@ export class BridgeServer {
       proxyEnv,
     );
 
-    this.sessionStore.appendEvent(session.id, { type: "resume_prompt", prompt });
+    if (session.executionState === "paused") {
+      const ok = this.sessionStore.transitionExecutionState(sessionId, "running", "user_resume");
+      if (!ok) {
+        throw new BridgeError(-32602, "State transition failed");
+      }
 
-    this.auditLog.write(
-      this.auditLog.createEntry(sessionId, "session_resumed", "lifecycle", {
-        workspace: session.workspace,
-      }, { workspace: session.workspace }),
-    );
+      session.pausedAt = undefined;
+      session.pauseReason = undefined;
 
-    // Collect custom tools for this workspace
-    const customTools = this._getAvailableCustomTools(session.workspace, controlParams.allowedTools, controlParams.disallowedTools);
+      this.auditLog.write(
+        this.auditLog.createEntry(sessionId, "session_resumed", "lifecycle", {
+          workspace: session.workspace,
+        }, { workspace: session.workspace }),
+      );
 
-    this.emit(
-      "bridge/session_event",
-      { sessionId: session.id, type: "session_resumed" },
-      requestId,
-    );
+      this.emit(
+        "bridge/session_event",
+        { sessionId: session.id, type: "session_resumed" },
+        requestId,
+      );
 
-    this.sessionStore.transitionExecutionState(session.id, "running", "query_started");
+      void this._fireHooks("notification", sessionId, session.workspace);
 
-    return this._runQuery(
-      session,
-      prompt,
-      { ...passthroughOptions, resume: session.sdkSessionId, ...buildControlOptions(controlParams) },
-      { cwd: session.workspace, env: resolvedEnv },
-      requestId,
-      customTools,
-    );
+      return { sessionId: session.id, status: "resumed" };
+    } else {
+      const safePrompt = typeof prompt === "string" ? prompt : undefined;
+      this.sessionStore.appendEvent(session.id, { type: "resume_prompt", prompt: safePrompt });
+
+      this.auditLog.write(
+        this.auditLog.createEntry(sessionId, "session_resumed", "lifecycle", {
+          workspace: session.workspace,
+        }, { workspace: session.workspace }),
+      );
+
+      // Collect custom tools for this workspace
+      const customTools = this._getAvailableCustomTools(session.workspace, controlParams.allowedTools, controlParams.disallowedTools);
+
+      this.emit(
+        "bridge/session_event",
+        { sessionId: session.id, type: "session_resumed" },
+        requestId,
+      );
+
+      this.sessionStore.transitionExecutionState(session.id, "running", "query_started");
+
+      const queryPrompt = typeof prompt === "string" ? prompt : "";
+      return this._runQuery(
+        session,
+        queryPrompt,
+        { ...passthroughOptions, resume: session.sdkSessionId, ...buildControlOptions(controlParams) },
+        { cwd: session.workspace, env: resolvedEnv },
+        requestId,
+        customTools,
+      );
+    }
   }
 
   private async _runQuery(
@@ -1108,6 +1140,47 @@ export class BridgeServer {
     return { sessionId, status: session.status };
   }
 
+  private pauseSession(params: Record<string, unknown>): unknown {
+    const { sessionId, reason } = params;
+    if (!sessionId || typeof sessionId !== "string") {
+      throw new BridgeError(-32602, "'sessionId' must be provided");
+    }
+    if (reason !== undefined && typeof reason !== "string") {
+      throw new BridgeError(-32602, "'reason' must be a string if provided");
+    }
+
+    const session = this.sessionStore.get(sessionId);
+    if (!session) {
+      throw new BridgeError(-32011, "Session not found", { sessionId });
+    }
+
+    if (session.executionState !== "running" && session.executionState !== "waiting_for_input") {
+      throw new BridgeError(-32602, `Cannot pause session in state: ${session.executionState}. Can only pause from "running" or "waiting_for_input".`);
+    }
+
+    const pausedAt = new Date().toISOString();
+    const ok = this.sessionStore.transitionExecutionState(sessionId, "paused", "user_pause");
+    if (!ok) {
+      throw new BridgeError(-32602, "State transition failed");
+    }
+
+    session.pausedAt = pausedAt;
+    if (reason !== undefined) {
+      session.pauseReason = reason;
+    }
+
+    this.auditLog.write(
+      this.auditLog.createEntry(sessionId, "session_paused", "lifecycle", {
+        reason: reason ?? undefined,
+        pausedAt,
+      }, { workspace: session.workspace }),
+    );
+
+    void this._fireHooks("notification", sessionId, session.workspace);
+
+    return { success: true, sessionId, pausedAt };
+  }
+
   private auditQuery(params: Record<string, unknown>): unknown {
     const { sessionId, category, eventType, since, until, limit } = params;
 
@@ -1172,6 +1245,8 @@ export class BridgeServer {
       updatedAt: session.updatedAt,
       historyLength: session.history.length,
       result: session.result,
+      pausedAt: session.pausedAt ?? null,
+      pauseReason: session.pauseReason ?? null,
     };
   }
 
@@ -1303,6 +1378,8 @@ export class BridgeServer {
           createdAt: s.createdAt,
           updatedAt: s.updatedAt,
           prompt,
+          pausedAt: s.pausedAt ?? null,
+          pauseReason: s.pauseReason ?? null,
         };
       }),
     };
