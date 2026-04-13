@@ -1,6 +1,7 @@
 import { ConfigStore } from "../config-store.js";
 import type { LLMProvider, ProviderConfig } from "./types.js";
 import { AnthropicAdapter } from "./adapters/anthropic.js";
+import type { Session } from "../session-store.js";
 
 type ProviderAdapterFactory = (config: ProviderConfig) => LLMProvider;
 
@@ -29,9 +30,11 @@ export class ProviderRegistry {
   private defaultProviderId: string | null = null;
   private adapterFactories: Record<string, ProviderAdapterFactory> = {};
   private configStore: ConfigStore;
+  private getSession?: (id: string) => Session | undefined;
 
-  constructor(configStore?: ConfigStore, options?: { skipLoadFromStore?: boolean }) {
+  constructor(configStore?: ConfigStore, options?: { skipLoadFromStore?: boolean; getSession?: (id: string) => Session | undefined }) {
     this.configStore = configStore ?? new ConfigStore();
+    this.getSession = options?.getSession;
     this.registerDefaultAdapters();
     if (!options?.skipLoadFromStore) {
       this.loadFromStore();
@@ -282,6 +285,64 @@ export class ProviderRegistry {
     } catch (error) {
       console.error("Failed to load provider registry from store:", error);
     }
+  }
+
+  async resolveForSession(sessionId: string): Promise<LLMProvider> {
+    const session = this.getSession?.(sessionId);
+    const activeProviderId = session?.activeProviderId;
+
+    if (activeProviderId && this.configs.has(activeProviderId)) {
+      try {
+        const instance = await this.getOrCreateInstance(activeProviderId);
+        const healthy = await instance.healthCheck();
+        if (healthy) return instance;
+      } catch {
+        // fall through to next level
+      }
+    }
+
+    if (this.defaultProviderId && this.configs.has(this.defaultProviderId)) {
+      try {
+        const instance = await this.getOrCreateInstance(this.defaultProviderId);
+        const healthy = await instance.healthCheck();
+        if (healthy) return instance;
+      } catch {
+        // fall through to built-in
+      }
+    }
+
+    const { initializeDefaultProvider } = await import("../claude-agent-runner.js");
+    return initializeDefaultProvider();
+  }
+
+  async switchSessionProvider(sessionId: string, targetProviderId: string): Promise<{
+    success: true;
+    sessionId: string;
+    previousProviderId: string | null;
+    newProviderId: string;
+  }> {
+    if (!this.configs.has(targetProviderId)) {
+      throw new ProviderRegistryError("NOT_FOUND", `Provider not found: ${targetProviderId}`);
+    }
+
+    const healthResult = await this.healthCheck(targetProviderId);
+    if (!healthResult.healthy) {
+      throw new ProviderRegistryError("UNHEALTHY", `Provider unhealthy: ${targetProviderId}: ${healthResult.error ?? "unknown error"}`);
+    }
+
+    const session = this.getSession?.(sessionId);
+    const previousProviderId = session?.activeProviderId ?? null;
+
+    return {
+      success: true,
+      sessionId,
+      previousProviderId,
+      newProviderId: targetProviderId,
+    };
+  }
+
+  setSessionGetter(getter: (id: string) => Session | undefined): void {
+    this.getSession = getter;
   }
 
   destroy(): void {

@@ -17,6 +17,7 @@ export interface Session {
   workspace: string;
   parentSessionId?: string;
   providerId?: string;
+  activeProviderId?: string;
   sdkSessionId: string | null;
   createdAt: string;
   updatedAt: string;
@@ -342,6 +343,18 @@ export class SessionStore {
 
     logger.info("session deleted", { sessionId });
     return "ok";
+  }
+
+  updateActiveProviderId(sessionId: string, activeProviderId: string | null): Session | null {
+    const session = this.get(sessionId);
+    if (!session) {
+      return null;
+    }
+
+    session.activeProviderId = activeProviderId ?? undefined;
+    session.updatedAt = nowIso();
+    this._persist(session);
+    return session;
   }
 
   cleanup(olderThanDays: number = 30): number {

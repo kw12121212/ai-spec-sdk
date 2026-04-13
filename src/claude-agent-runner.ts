@@ -22,6 +22,7 @@ export interface RunClaudeQueryOptions {
   onEvent: (message: unknown) => void;
   shouldStop?: () => boolean;
   signal?: AbortSignal;
+  provider?: LLMProvider;
 }
 
 export interface TokenUsage {
@@ -43,6 +44,7 @@ export async function runClaudeQuery({
   onEvent,
   shouldStop = () => false,
   signal,
+  provider,
 }: RunClaudeQueryOptions): Promise<QueryResult> {
   const queryFn = getQueryFunction();
   logger.debug("query started", { promptLength: prompt.length });
@@ -60,6 +62,39 @@ export async function runClaudeQuery({
       signal.addEventListener("abort", () => {
         abortController?.abort();
       });
+    }
+
+    if (provider) {
+      const queryOptions = {
+        messages: [{ role: "user" as const, content: prompt }],
+        stream: true,
+        ...(options.temperature !== undefined ? { temperature: options.temperature as number } : {}),
+        ...(options.maxTokens !== undefined ? { maxTokens: options.maxTokens as number } : {}),
+      };
+
+      const result = await provider.queryStream(queryOptions, (event: { type: string; data?: unknown }) => {
+        if (event.type === "complete" && event.data) {
+          const data = event.data as Record<string, unknown>;
+          terminalResult = data["result"];
+          const rawUsage = data["usage"];
+          if (rawUsage && typeof rawUsage === "object") {
+            const u = rawUsage as Record<string, unknown>;
+            if (typeof u["inputTokens"] === "number" && typeof u["outputTokens"] === "number") {
+              terminalUsage = { inputTokens: u["inputTokens"], outputTokens: u["outputTokens"] };
+            }
+          }
+        }
+        if (event.type === "text_delta" || event.type === "error") {
+          onEvent(event.data);
+        }
+      }, abortController?.signal);
+
+      if (result.status === "completed") {
+        terminalResult = result.result;
+        terminalUsage = result.usage;
+      }
+
+      return result;
     }
 
     for await (const message of queryFn({ prompt, options: sdkOptions } as Parameters<QueryFunction>[0])) {

@@ -1,0 +1,59 @@
+# Design: provider-switching
+
+## Approach
+
+The design introduces session-scoped provider overrides into the existing session and provider infrastructure. The key architectural decision is to keep provider resolution **lazy** — the session stores which provider it should use, and the actual provider instance is resolved at query-launch time by the runner. This avoids holding stale provider instances on sessions and keeps the lifecycle simple.
+
+### Component Changes
+
+**1. SessionStore extension**
+- Add `activeProviderId?: string` field to the session record schema
+- Persist this field alongside other session data so it survives restarts
+- No migration needed — field is optional, defaults to undefined (meaning "use registry default")
+
+**2. ProviderRegistry extension**
+- Add `resolveForSession(sessionId: string): Promise<LLMProvider>` method that looks up:
+  1. Session's `activeProviderId` if set → return that provider's instance
+  2. Registry's `defaultProviderId` if set → return that provider's instance
+  3. Fall back to built-in `initializeDefaultProvider()` (existing behavior)
+- Add `switchSessionProvider(sessionId: string, targetProviderId: string): Promise<{ success: true; sessionId: string; previousProviderId: string | null; newProviderId: string }>` method that:
+  - Validates target provider exists
+  - Runs health check on target (fail fast if unhealthy)
+  - Returns the before/after provider IDs for notification payload
+
+**3. Bridge method handlers (bridge.ts)**
+- Add `provider.switch` handler: calls `providerRegistry.switchSessionProvider()`, updates session record, emits `provider_switched` notification
+- Add `session.setProvider` handler: delegates to same core logic as `provider.switch`
+- Both methods validate:
+  - Session exists (`-32011`)
+  - Session is in switchable state (`idle`, `paused`, `running`) — reject `completed`/`stopped`/`interrupted` with `-32602`
+  - Target provider exists (`-32001`)
+  - Target provider passes health check (`-32004` new code: "Provider unhealthy")
+
+**4. ClaudeAgentRunner integration**
+- In `runClaudeQuery`, accept an optional `providerId` parameter
+- When `providerId` is provided, call `providerRegistry.getOrCreateInstance(providerId)` to get the provider, then use `provider.query()` / `provider.queryStream()` instead of the raw SDK `query()` function
+- When `providerId` is not provided, use existing `query()` path (backward compatible)
+
+**5. Notification**
+- Emit `bridge/provider_switched` notification with payload: `{ sessionId, previousProviderId: string | null, newProviderId: string, timestamp: ISO-8601 }`
+
+## Key Decisions
+
+1. **Switch takes effect on next query turn, not mid-stream**: Switching provider during an active streaming response would require aborting the in-flight query, which adds significant complexity. Instead, the switch is recorded and takes effect when the next agent turn starts. This is simpler and safer.
+
+2. **Health check before switch**: We validate the target provider is healthy before committing the switch. This prevents a session from being assigned to a broken provider, which would cause the next query turn to fail unexpectedly.
+
+3. **Session-level override, not global**: The provider override is stored per-session, not globally. This means different sessions can simultaneously use different providers, which is essential for multi-agent orchestration scenarios (Milestone 04 already supports child sessions).
+
+4. **Fallback chain preserved**: If a session has `activeProviderId` set but that provider is later removed or becomes unhealthy, the resolver falls back to registry default → built-in Anthropic. This ensures sessions never become unusable due to provider issues.
+
+5. **New error code `-32004` for unhealthy provider**: Consistent with existing custom error codes (`-32001` not found, `-32002` duplicate, `-32003` unsupported type).
+
+## Alternatives Considered
+
+1. **Global provider switch (affecting all sessions)**: Rejected because it would disrupt all active sessions simultaneously. Per-session switching gives callers fine-grained control and is necessary for multi-agent scenarios where different agents may need different providers.
+
+2. **Immediate mid-stream switch with query abort**: Rejected because aborting and restarting queries mid-stream is complex, may lose partial results, and the benefit over "next-turn" switching is minimal for the initial implementation. Can be added later if there's strong demand.
+
+3. **Provider proxy/normalization layer**: Rejected because this belongs in a future change (possibly `load-balancer` or a dedicated normalization layer). For now, each provider adapter handles its own request format.

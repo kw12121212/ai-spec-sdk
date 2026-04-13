@@ -290,6 +290,7 @@ export class BridgeServer {
     const resolvedAuditDir = auditDir ?? (sessionsDir ? path.join(sessionsDir, "audit") : undefined);
     this.auditLog = new AuditLog(resolvedAuditDir ?? ".audit", notify, API_VERSION);
     this.sessionStore = new SessionStore(sessionsDir, this.auditLog);
+    providerRegistry.setSessionGetter((id) => this.sessionStore.get(id) ?? undefined);
     this.workspaceStore = new WorkspaceStore(workspacesDir);
     this.mcpStore = new McpStore((method, params) => {
       this.notify({ jsonrpc: "2.0", method, params });
@@ -538,6 +539,10 @@ export class BridgeServer {
         return this.providerGetDefault();
       case "provider.healthCheck":
         return this.providerHealthCheck(params);
+      case "provider.switch":
+        return this.providerSwitch(params);
+      case "session.setProvider":
+        return this.sessionSetProvider(params);
       default:
         throw new BridgeError(METHOD_NOT_FOUND, `Method not found: ${method}`);
     }
@@ -1002,6 +1007,7 @@ export class BridgeServer {
     }
 
     try {
+      const resolvedProvider = await providerRegistry.resolveForSession(session.id);
       const queryResult = await runClaudeQuery({
         prompt,
         options: resolvedOptions,
@@ -1128,6 +1134,7 @@ export class BridgeServer {
 
         void this._fireHooks("notification", session.id, context.cwd);
       },
+      provider: resolvedProvider,
       });
 
       const currentSession = this.sessionStore.get(session.id);
@@ -1498,6 +1505,56 @@ export class BridgeServer {
     }
   }
 
+  private async providerSwitch(params: Record<string, unknown>): Promise<unknown> {
+    const { sessionId, providerId } = params;
+    if (!sessionId || typeof sessionId !== "string") {
+      throw new BridgeError(-32602, "'sessionId' must be a string");
+    }
+    if (!providerId || typeof providerId !== "string") {
+      throw new BridgeError(-32602, "'providerId' must be a string");
+    }
+
+    const session = this.sessionStore.get(sessionId);
+    if (!session) {
+      throw new BridgeError(-32011, "Session not found", { sessionId });
+    }
+
+    const switchableStates = new Set(["idle", "running", "paused", "waiting_for_input", "completed"]);
+    if (!switchableStates.has(session.executionState)) {
+      throw new BridgeError(-32602, `Cannot switch provider on session in state: ${session.executionState}`);
+    }
+
+    try {
+      const result = await providerRegistry.switchSessionProvider(sessionId, providerId);
+      this.sessionStore.updateActiveProviderId(sessionId, providerId);
+
+      this.emit("bridge/provider_switched", {
+        sessionId,
+        previousProviderId: result.previousProviderId,
+        newProviderId: result.newProviderId,
+        timestamp: new Date().toISOString(),
+      });
+
+      return result;
+    } catch (error) {
+      if (error instanceof Error && error.name === "ProviderRegistryError") {
+        const err = error as Error & { code?: string };
+        if (err.code === "NOT_FOUND") {
+          throw new BridgeError(-32001, error.message);
+        }
+        if (err.code === "UNHEALTHY") {
+          throw new BridgeError(-32004, error.message);
+        }
+        throw new BridgeError(-32603, error.message);
+      }
+      throw new BridgeError(-32603, `Failed to switch provider: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private async sessionSetProvider(params: Record<string, unknown>): Promise<unknown> {
+    return this.providerSwitch(params);
+  }
+
   private getSessionStatus(params: Record<string, unknown>): unknown {
     const { sessionId } = params;
     if (!sessionId || typeof sessionId !== "string") {
@@ -1514,6 +1571,7 @@ export class BridgeServer {
       parentSessionId: session.parentSessionId ?? null,
       status: session.status,
       executionState: session.executionState,
+      activeProviderId: session.activeProviderId ?? null,
       createdAt: session.createdAt,
       updatedAt: session.updatedAt,
       historyLength: session.history.length,
@@ -1651,6 +1709,7 @@ export class BridgeServer {
           executionState: s.executionState,
           workspace: s.workspace,
           parentSessionId: s.parentSessionId ?? null,
+          activeProviderId: s.activeProviderId ?? null,
           createdAt: s.createdAt,
           updatedAt: s.updatedAt,
           prompt,
