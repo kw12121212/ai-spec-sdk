@@ -118,3 +118,31 @@ The audit entry payload MUST include all fields from the `bridge/hook_triggered`
 - WHEN the event fires
 - THEN an audit entry with exitCode null is written immediately
 - AND a second audit entry with final exitCode is written when the hook process exits
+
+### Requirement: Hook Registration Methods
+In addition to hook execution behavior, the bridge MUST expose JSON-RPC methods for registering, removing, and listing hooks.
+
+#### Scenario: Register a hook
+- GIVEN a client calls `hooks.add` with `{ event, command, matcher?, scope, workspace? }`
+- WHEN the bridge validates and stores the hook
+- THEN the response includes the created hook entry with a unique `hookId`
+
+#### Scenario: Remove a hook by ID
+- GIVEN a hook exists with a specific hookId
+- WHEN the client calls `hooks.remove` with `{ hookId }`
+- THEN the hook is removed and `{ hookId, removed: true }` is returned
+
+#### Scenario: List hooks for workspace
+- GIVEN multiple hooks are registered for a workspace
+- WHEN the client calls `hooks.list` with `{ workspace }`
+- THEN the response includes `{ hooks: [...] }` with all matching hooks
+
+#### Scenario: Invalid scope rejected
+- GIVEN a client calls `hooks.add` with `scope: "global"`
+- WHEN the bridge validates the request
+- THEN the bridge returns a `-32602` error indicating scope must be "project" or "user"
+
+#### Scenario: Invalid event type rejected
+- GIVEN a client calls `hooks.add` with `event: "invalid_event"`
+- WHEN the bridge validates the request
+- THEN the bridge returns a `-32602` error indicating the event is not supported

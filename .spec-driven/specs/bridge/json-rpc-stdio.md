@@ -784,5 +784,29 @@ If both `since` and `until` are provided, only entries where `since <= timestamp
 
 #### Scenario: Query without sessionId scans all sessions
 - GIVEN multiple sessions have audit entries
-- WHEN a client calls `audit.query` without sessionId
+- WHEN the client calls `audit.query` without sessionId
 - THEN entries from all sessions are returned, merged in reverse chronological order
+
+### Requirement: API Version Negotiation
+The bridge MUST expose a `bridge.negotiateVersion` method that allows clients to verify API compatibility before using other methods.
+
+Parameters: `{ supportedVersions: string[] }`.
+
+The bridge MUST check each version in the array against its own `API_VERSION`. If a match is found, the bridge MUST return `{ negotiatedVersion: string, capabilities: object }` with the matched version. If no match is found, the bridge MUST return error code `-32050` including the bridge's supported versions in the error data.
+
+#### Scenario: Successful version negotiation
+- GIVEN a client calls `bridge.negotiateVersion` with `{ supportedVersions: ["0.2.0"] }`
+- WHEN the version matches the bridge's API_VERSION
+- THEN the response includes `{ negotiatedVersion: "0.2.0", capabilities: {...} }`
+
+#### Scenario: Version mismatch returns error
+- GIVEN a client sends unsupported versions only
+- WHEN no version matches the bridge's API_VERSION
+- THEN the bridge returns a `-32050` error with the bridge's supported versions in the error data
+
+### Requirement: Capabilities include negotiateVersion
+The `bridge.capabilities` response MUST include `bridge.negotiateVersion` in the supported methods list.
+
+#### Scenario: Capabilities include negotiateVersion
+- GIVEN a client calls `bridge.capabilities`
+- THEN the `methods` array includes `"bridge.negotiateVersion"`

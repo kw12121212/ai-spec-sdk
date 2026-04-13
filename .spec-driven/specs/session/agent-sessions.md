@@ -856,3 +856,261 @@ The `bridge.capabilities` response MUST include `session.cancel` in the supporte
 #### Scenario: Capabilities include session.cancel
 - GIVEN a client calls `bridge.capabilities`
 - THEN the `methods` array in the response includes `"session.cancel"`
+
+## Requirement: Workspace Registration
+The bridge MUST expose `workspace.register` and `workspace.list` methods for managing workspace paths that are prerequisites for sessions, custom tools, MCP servers, and other workspace-scoped operations.
+
+#### Scenario: Register a valid workspace
+- GIVEN a client calls `workspace.register` with an existing directory path
+- WHEN the bridge resolves and validates the path
+- THEN the workspace is registered and `{ workspace: "<resolved-path>" }` is returned
+
+#### Scenario: Reject non-existent workspace path
+- GIVEN a client calls `workspace.register` with a path that does not exist or is not a directory
+- WHEN the bridge validates the request
+- THEN the bridge returns a `-32001` error
+
+#### Scenario: List registered workspaces
+- GIVEN multiple workspaces have been registered
+- WHEN the client calls `workspace.list`
+- THEN the response includes `{ workspaces: ["<path1>", "<path2>", ...] }`
+
+## Requirement: Configuration Management
+The bridge MUST expose `config.get`, `config.set`, and `config.list` methods for managing session-related configuration values scoped to project or user level.
+
+Configuration values support two scopes:
+- `"project"` — stored per-workspace under `<workspace>/.claude/settings.json`
+- `"user"` — stored globally under `~/.claude/settings.json`
+
+Known configuration keys with validation:
+| Key | Type | Validation |
+|---|---|---|
+| `preferredModel` | string | must be a string |
+| `permissionMode` | string | must be one of: default, acceptEdits, bypassPermissions, approve |
+| `maxTurns` | number | must be an integer >= 1 |
+
+#### Scenario: Get existing config value
+- GIVEN a config key "preferredModel" has been set with scope "user"
+- WHEN the client calls `config.get` with `{ key: "preferredModel" }`
+- THEN the response includes `{ key, value, scope: "user" }`
+
+#### Scenario: Get missing config returns null
+- GIVEN no value exists for key "nonexistent"
+- WHEN the client calls `config.get` with `{ key: "nonexistent" }`
+- THEN the response includes `{ key, value: null, scope: null }`
+
+#### Scenario: Set config at user scope
+- GIVEN a client calls `config.set` with `{ key: "preferredModel", value: "claude-opus-4-6", scope: "user" }`
+- WHEN the bridge validates and persists the value
+- THEN the entry is returned with `{ key, value, scope: "user" }`
+
+#### Scenario: Set config at project scope
+- GIVEN a client calls `config.set` with `{ key: "maxTurns", value: 10, scope: "project", workspace: "/path/to/project" }`
+- WHEN the bridge validates and persists the value
+- THEN the entry is written to the project's settings file
+
+#### Scenario: Reject invalid scope
+- GIVEN a client calls `config.set` with `scope: "global"`
+- WHEN the bridge validates the request
+- THEN the bridge returns a `-32602` error indicating scope must be "project" or "user"
+
+#### Scenario: Reject invalid known key value
+- GIVEN a client calls `config.set` with `{ key: "maxTurns", value: "five" }`
+- WHEN the bridge validates the known key constraint
+- THEN the bridge returns a `-32602` error indicating maxTurns must be an integer >= 1
+
+#### Scenario: List all config for workspace
+- GIVEN both project-level and user-level configs have values set
+- WHEN the client calls `config.list` with `{ workspace: "/path/to/project" }`
+- THEN the response includes `{ settings: [...] }` with merged entries from both scopes
+
+## Requirement: Context File Management
+The bridge MUST expose `context.read`, `context.write`, and `context.list` methods for reading and writing context files used by Claude Code sessions.
+
+Context files support two scopes:
+- `"project"` — CLAUDE.md files at any depth under the workspace, and files under `.claude/`
+- `"user"` — any files under `~/.claude/`
+
+The bridge MUST enforce path security: context paths MUST NOT escape their allowed base directories.
+
+#### Scenario: Read project CLAUDE.md
+- GIVEN a workspace contains `CLAUDE.md` at its root
+- WHEN the client calls `context.read` with `{ scope: "project", path: "CLAUDE.md", workspace: "/path/to/project" }`
+- THEN the response includes `{ scope, path, content, size, modifiedAt }`
+
+#### Scenario: Read user context file
+- GIVEN `~/.claude/instructions.md` exists
+- WHEN the client calls `context.read` with `{ scope: "user", path: "instructions.md" }`
+- THEN the response includes the file content
+
+#### Scenario: Write context file
+- GIVEN a client calls `context.write` with `{ scope: "project", path: "CLAUDE.md", content: "New instructions", workspace: "/path/to/project" }`
+- WHEN the bridge writes the file within allowed bounds
+- THEN the response confirms the write with updated metadata
+
+#### Scenario: Reject path escape attempt
+- GIVEN a client calls `context.read` with `{ scope: "user", path: "../../etc/passwd" }`
+- WHEN the bridge resolves and validates the path
+- THEN the bridge returns a `-32602` error indicating the path is outside the allowed directory
+
+#### Scenario: List context files
+- GIVEN a workspace has CLAUDE.md files at various depths and `.claude/` contents
+- WHEN the client calls `context.list` with `{ workspace: "/path/to/project" }`
+- THEN the response includes `{ files: [...] }` listing all available context files with their scope, path, size, and modifiedAt
+
+## Requirement: Session Event Buffer
+The bridge MUST expose a `session.events` method that returns the buffered notification event log for a session with sequence-based pagination.
+
+Events are buffered in-memory with a capacity of 500 entries per session (FIFO eviction when exceeded). Each entry includes a monotonically increasing `seq` number and the full event payload.
+
+Parameters: `{ sessionId: string, since?: number, limit?: number }`.
+
+#### Scenario: Retrieve session events since a sequence number
+- GIVEN a session has emitted 20 events
+- WHEN the client calls `session.events` with `{ sessionId, since: 10, limit: 5 }`
+- THEN the response includes events from seq 10 onward, up to 5 entries, plus `total: 20`
+
+#### Scenario: Limit capped at 500
+- GIVEN a client calls `session.events` with `limit: 1000`
+- WHEN the bridge processes the request
+- THEN at most 500 events are returned
+
+#### Scenario: Unknown session returns error
+- GIVEN no session exists with the given ID
+- WHEN the client calls `session.events`
+- THEN the bridge returns a `-32011` error
+
+## Requirement: Session Deletion
+The bridge MUST expose a `session.delete` method that permanently removes a non-active session from the store and disk.
+
+#### Scenario: Delete a completed session
+- GIVEN a completed session exists
+- WHEN the client calls `session.delete` with `{ sessionId }`
+- THEN the session is removed from the store and disk
+- AND `{ deleted: true, sessionId }` is returned
+
+#### Scenario: Reject deletion of active session
+- GIVEN a session with status "active"
+- WHEN the client calls `session.delete`
+- THEN the bridge returns a `-32070` error indicating the session is active
+
+## Requirement: Session Cleanup
+The bridge MUST expose a `session.cleanup` method that removes sessions older than a specified number of days.
+
+Parameters: `{ olderThanDays?: number }`. Default is 30 days; maximum is 365 days.
+
+#### Scenario: Cleanup old sessions
+- GIVEN sessions older than 30 days exist
+- WHEN the client calls `session.cleanup` with `{ olderThanDays: 30 }`
+- THEN old sessions are removed and `{ removedCount: N }` is returned
+
+#### Scenario: Default cleanup uses 30 days
+- GIVEN `olderThanDays` is not provided
+- WHEN the client calls `session.cleanup`
+- THEN sessions older than 30 days are removed
+
+## Requirement: Tool Approval Flow
+When a session runs with `permissionMode: "approve"`, tool use requests that require approval MUST trigger a state transition to `"waiting_for_input"` and emit a notification. The client MUST then call `session.approveTool` or `session.rejectTool` to resolve the pending approval.
+
+#### Scenario: Approve pending tool use
+- GIVEN a session is in `"waiting_for_input"` state with a pending approval
+- WHEN the client calls `session.approveTool` with `{ sessionId, requestId }`
+- THEN the approval is resolved as allow and `{ requestId, behavior: "allow" }` is returned
+- AND the agent continues execution with the approved tool
+
+#### Scenario: Reject pending tool use
+- GIVEN a session is in `"waiting_for_input"` state with a pending approval
+- WHEN the client calls `session.rejectTool` with `{ sessionId, requestId, message: "Not allowed" }`
+- THEN the approval is resolved as deny with the message
+- AND the agent receives an error result indicating the tool was rejected
+
+#### Scenario: Approve unknown request returns error
+- GIVEN no pending approval matches the given requestId
+- WHEN the client calls `session.approveTool`
+- THEN the bridge returns a `-32020` error indicating the approval was not found
+
+#### Scenario: Reject supports optional message
+- GIVEN a pending tool approval exists
+- WHEN the client calls `session.rejectTool` with `{ sessionId, requestId, message: "Blocked by policy" }`
+- THEN the rejection message is passed to the agent as the error reason
+
+## Requirement: Session Search
+The bridge MUST expose a `session.search` method that searches session history across all sessions by query text.
+
+Parameters: `{ query: string, workspace?, status?, limit?: number }`. Results are limited to 100 matches maximum (default 20).
+
+Each result includes the session ID, workspace, status, and an array of matches with history index and text snippet.
+
+#### Scenario: Search sessions by query text
+- GIVEN multiple sessions contain history entries matching "refactor"
+- WHEN the client calls `session.search` with `{ query: "refactor" }`
+- THEN the response includes `{ results: [{ sessionId, workspace, status, matches: [{ historyIndex, snippet }] }] }`
+
+#### Scenario: Filter search by workspace
+- GIVEN sessions exist in different workspaces
+- WHEN the client calls `session.search` with `{ query: "test", workspace: "/specific/path" }`
+- THEN only sessions in that workspace are searched
+
+#### Scenario: Filter search by status
+- GIVEN sessions have various statuses
+- WHEN the client calls `session.search` with `{ query: "build", status: "completed" }`
+- THEN only completed sessions are included in results
+
+#### Scenario: Empty query rejected
+- GIVEN a client calls `session.search` with an empty query
+- WHEN the bridge validates the request
+- THEN the bridge returns a `-32602` error
+
+## Requirement: Models List
+The bridge MUST expose a `models.list` method that returns the list of supported Claude model identifiers and display names.
+
+#### Scenario: List supported models
+- GIVEN the bridge is running
+- WHEN the client calls `models.list`
+- THEN the response includes `{ models: [{ id, displayName }, ...] }` with all supported models
+
+## Requirement: Hook Registration Methods
+In addition to hook execution behavior, the bridge MUST expose JSON-RPC methods for registering, removing, and listing hooks.
+
+#### Scenario: Register a hook
+- GIVEN a client calls `hooks.add` with `{ event, command, matcher?, scope, workspace? }`
+- WHEN the bridge validates and stores the hook
+- THEN the response includes the created hook entry with a unique `hookId`
+
+#### Scenario: Remove a hook by ID
+- GIVEN a hook exists with a specific hookId
+- WHEN the client calls `hooks.remove` with `{ hookId }`
+- THEN the hook is removed and `{ hookId, removed: true }` is returned
+
+#### Scenario: List hooks for workspace
+- GIVEN multiple hooks are registered for a workspace
+- WHEN the client calls `hooks.list` with `{ workspace }`
+- THEN the response includes `{ hooks: [...] }` with all matching hooks
+
+#### Scenario: Invalid scope rejected
+- GIVEN a client calls `hooks.add` with `scope: "global"`
+- WHEN the bridge validates the request
+- THEN the bridge returns a `-32602` error indicating scope must be "project" or "user"
+
+## Requirement: Bridge Ping
+The bridge MUST expose a `bridge.ping` method that returns a simple liveness indicator.
+
+#### Scenario: Ping returns success
+- GIVEN the bridge process is running
+- WHEN the client calls `bridge.ping`
+- THEN the bridge returns `{ pong: true }` or equivalent success response
+
+## Requirement: API Version Negotiation
+The bridge MUST expose a `bridge.negotiateVersion` method that allows clients to verify API compatibility.
+
+Parameters: `{ supportedVersions: string[] }`.
+
+#### Scenario: Successful version negotiation
+- GIVEN a client calls `bridge.negotiateVersion` with `{ supportedVersions: ["0.2.0"] }`
+- WHEN the version matches the bridge's API_VERSION
+- THEN the response includes `{ negotiatedVersion: "0.2.0", capabilities: {...} }`
+
+#### Scenario: Version mismatch returns error
+- GIVEN a client sends unsupported versions only
+- WHEN no version matches the bridge's API_VERSION
+- THEN the bridge returns a `-32050` error with the bridge's supported versions

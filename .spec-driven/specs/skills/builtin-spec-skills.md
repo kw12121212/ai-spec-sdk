@@ -88,3 +88,60 @@ Custom tool invocations MUST trigger the same hooks as built-in tools.
 - GIVEN a registered `pre_tool_use` hook
 - WHEN a custom tool is invoked
 - THEN the hook receives the tool name and input, and can allow or deny the invocation
+
+### Requirement: MCP Server Management
+The bridge MUST expose MCP (Model Context Protocol) server lifecycle management methods that allow clients to register, start, stop, and list MCP servers scoped to a workspace.
+
+#### Scenario: Register and auto-start an MCP server
+- GIVEN a client calls `mcp.add` with `{ workspace, name, command, args?, env? }`
+- WHEN the bridge validates the request
+- THEN the MCP server config is persisted to `<workspace>/.claude/mcp/<name>.json`
+- AND the server process is started automatically
+- AND the response includes `{ name, status: "running", pid }`
+- AND a `mcp/server_started` notification is emitted
+
+#### Scenario: Reject duplicate MCP server name
+- GIVEN an MCP server with name "test-server" already exists for a workspace
+- WHEN the client calls `mcp.add` with the same name
+- THEN the bridge returns a `-32602` error indicating the server already exists
+
+#### Scenario: Remove and stop an MCP server
+- GIVEN a running MCP server exists
+- WHEN the client calls `mcp.remove` with `{ workspace, name }`
+- THEN the server process is stopped
+- AND the config file is deleted
+- AND `{ name, removed: true }` is returned
+
+#### Scenario: Start a stopped MCP server
+- GIVEN an MCP server with status "stopped"
+- WHEN the client calls `mcp.start` with `{ workspace, name }`
+- THEN the server process is restarted
+- AND `{ name, status: "running", pid }` is returned
+
+#### Scenario: Stop a running MCP server
+- GIVEN an MCP server with status "running"
+- WHEN the client calls `mcp.stop` with `{ workspace, name }`
+- THEN the server process is terminated
+- AND `{ name, status: "stopped" }` is returned
+
+#### Scenario: List MCP servers for workspace
+- GIVEN multiple MCP servers are registered for a workspace
+- WHEN the client calls `mcp.list` with `{ workspace }`
+- THEN the response includes `{ servers: [...] }` with each server's name, command, status, and pid
+
+#### Scenario: Workspace scoping isolates MCP servers
+- GIVEN two different workspaces each have an MCP server named "db"
+- WHEN the client lists servers for each workspace
+- THEN each workspace only sees its own "db" server
+
+#### Scenario: Invalid workspace returns error
+- GIVEN a non-existent path is provided as workspace
+- WHEN any mcp.* method is called
+- THEN the bridge returns a `-32001` error
+
+### Requirement: Capabilities include mcp methods
+The `bridge.capabilities` response MUST include `mcp.add`, `mcp.remove`, `mcp.start`, `mcp.stop`, and `mcp.list` in the supported methods list.
+
+#### Scenario: Capabilities include MCP methods
+- GIVEN a client calls `bridge.capabilities`
+- THEN the `methods` array includes all five `mcp.*` method names
