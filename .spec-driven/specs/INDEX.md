@@ -19,6 +19,9 @@
 ## hooks
 - [hook-execution.md](hooks/hook-execution.md) - hook-execution
 
+## llm-provider
+- [provider-registry.md](llm-provider/provider-registry.md) - provider-registry
+
 ## network
 - [proxy-forwarding.md](network/proxy-forwarding.md) - proxy-forwarding
 

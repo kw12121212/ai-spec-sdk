@@ -20,6 +20,7 @@ import { buildRuntimeInfo, type RuntimeInfoOptions } from "./runtime-info.js";
 import { WebhookManager } from "./webhooks.js";
 import { TemplateStore } from "./template-store.js";
 import { AuditLog } from "./audit-log.js";
+import { providerRegistry } from "./llm-provider/provider-registry.js";
 
 const METHOD_NOT_FOUND = -32601;
 const INTERNAL_ERROR = -32603;
@@ -521,6 +522,22 @@ export class BridgeServer {
         return this.templateDelete(params);
       case "audit.query":
         return this.auditQuery(params);
+      case "provider.register":
+        return this.providerRegister(params);
+      case "provider.list":
+        return this.providerList();
+      case "provider.get":
+        return this.providerGet(params);
+      case "provider.update":
+        return this.providerUpdate(params);
+      case "provider.remove":
+        return this.providerRemove(params);
+      case "provider.setDefault":
+        return this.providerSetDefault(params);
+      case "provider.getDefault":
+        return this.providerGetDefault();
+      case "provider.healthCheck":
+        return this.providerHealthCheck(params);
       default:
         throw new BridgeError(METHOD_NOT_FOUND, `Method not found: ${method}`);
     }
@@ -1354,6 +1371,131 @@ export class BridgeServer {
     }
 
     return this.auditLog.query(filters as import("./audit-log.js").AuditQueryFilters);
+  }
+
+  private providerRegister(params: Record<string, unknown>): unknown {
+    if (!params || typeof params !== "object" || Array.isArray(params)) {
+      throw new BridgeError(-32602, "params must be an object with provider configuration");
+    }
+
+    try {
+      const result = providerRegistry.register(params as import("./llm-provider/types.js").ProviderConfig);
+      return result;
+    } catch (error) {
+      if (error instanceof Error && error.name === "ProviderRegistryError") {
+        const err = error as Error & { code?: string };
+        switch (err.code) {
+          case "VALIDATION_ERROR":
+            throw new BridgeError(-32602, err.message);
+          case "DUPLICATE_ID":
+            throw new BridgeError(-32002, err.message);
+          case "UNSUPPORTED_TYPE":
+            throw new BridgeError(-32003, err.message);
+          default:
+            throw new BridgeError(-32603, err.message);
+        }
+      }
+      throw new BridgeError(-32603, `Failed to register provider: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private providerList(): unknown {
+    return providerRegistry.list();
+  }
+
+  private providerGet(params: Record<string, unknown>): unknown {
+    const { providerId } = params;
+    if (!providerId || typeof providerId !== "string") {
+      throw new BridgeError(-32602, "'providerId' must be a string");
+    }
+
+    try {
+      return providerRegistry.get(providerId);
+    } catch (error) {
+      if (error instanceof Error && error.name === "ProviderRegistryError") {
+        throw new BridgeError(-32001, error.message);
+      }
+      throw new BridgeError(-32603, `Failed to get provider: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private providerUpdate(params: Record<string, unknown>): unknown {
+    const { providerId, config } = params;
+    if (!providerId || typeof providerId !== "string") {
+      throw new BridgeError(-32602, "'providerId' must be a string");
+    }
+    if (!config || typeof config !== "object" || Array.isArray(config)) {
+      throw new BridgeError(-32602, "'config' must be an object");
+    }
+
+    try {
+      return providerRegistry.update(providerId, config as Partial<import("./llm-provider/types.js").ProviderConfig>);
+    } catch (error) {
+      if (error instanceof Error && error.name === "ProviderRegistryError") {
+        const err = error as Error & { code?: string };
+        switch (err.code) {
+          case "NOT_FOUND":
+            throw new BridgeError(-32001, err.message);
+          case "VALIDATION_ERROR":
+            throw new BridgeError(-32602, err.message);
+          default:
+            throw new BridgeError(-32603, err.message);
+        }
+      }
+      throw new BridgeError(-32603, `Failed to update provider: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private providerRemove(params: Record<string, unknown>): unknown {
+    const { providerId } = params;
+    if (!providerId || typeof providerId !== "string") {
+      throw new BridgeError(-32602, "'providerId' must be a string");
+    }
+
+    try {
+      return providerRegistry.remove(providerId);
+    } catch (error) {
+      if (error instanceof Error && error.name === "ProviderRegistryError") {
+        throw new BridgeError(-32001, error.message);
+      }
+      throw new BridgeError(-32603, `Failed to remove provider: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private providerSetDefault(params: Record<string, unknown>): unknown {
+    const { providerId } = params;
+    if (!providerId || typeof providerId !== "string") {
+      throw new BridgeError(-32602, "'providerId' must be a string");
+    }
+
+    try {
+      return providerRegistry.setDefault(providerId);
+    } catch (error) {
+      if (error instanceof Error && error.name === "ProviderRegistryError") {
+        throw new BridgeError(-32001, error.message);
+      }
+      throw new BridgeError(-32603, `Failed to set default provider: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private providerGetDefault(): unknown {
+    return providerRegistry.getDefault();
+  }
+
+  private async providerHealthCheck(params: Record<string, unknown>): Promise<unknown> {
+    const { providerId } = params;
+    if (!providerId || typeof providerId !== "string") {
+      throw new BridgeError(-32602, "'providerId' must be a string");
+    }
+
+    try {
+      return await providerRegistry.healthCheck(providerId);
+    } catch (error) {
+      if (error instanceof Error && error.name === "ProviderRegistryError") {
+        throw new BridgeError(-32001, error.message);
+      }
+      throw new BridgeError(-32603, `Failed to check provider health: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   private getSessionStatus(params: Record<string, unknown>): unknown {

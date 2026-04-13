@@ -25,7 +25,7 @@ Abstract the LLM backend integration to support multiple providers (OpenAI, Anth
 
 ## Planned Changes
 - `provider-interface` - Declared: complete - abstraction layer for LLM providers
-- `provider-registry` - Declared: planned - registry for multiple provider configurations
+- `provider-registry` - Declared: complete - registry for multiple provider configurations
 - `provider-switching` - Declared: planned - runtime provider switching mechanism
 - `token-tracking` - Declared: planned - per-session and per-provider token accounting
 - `quota-management` - Declared: planned - quota limits and enforcement policies
@@ -43,4 +43,5 @@ Abstract the LLM backend integration to support multiple providers (OpenAI, Anth
 
 ## Status
 - Declared: proposed
+
 
