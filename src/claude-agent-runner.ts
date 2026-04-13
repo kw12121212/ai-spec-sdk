@@ -2,6 +2,10 @@ import { query } from "@anthropic-ai/claude-agent-sdk";
 import { defaultLogger as logger } from "./logger.js";
 import { AnthropicAdapter } from "./llm-provider/adapters/anthropic.js";
 import type { LLMProvider, ProviderConfig } from "./llm-provider/types.js";
+import { getTokenStore } from "./token-tracking/store.js";
+import { counterRegistry } from "./token-tracking/counters/index.js";
+import type { TokenUsage } from "./token-tracking/types.js";
+import { computeTotalTokens } from "./token-tracking/types.js";
 
 type QueryFunction = typeof query;
 
@@ -14,6 +18,29 @@ function getQueryFunction(): QueryFunction {
   return globalThis.__AI_SPEC_SDK_QUERY__ ?? query;
 }
 
+function recordTokenUsage(
+  sessionId: string,
+  providerId: string,
+  providerType: string,
+  usage: TokenUsage | null,
+  messageId?: string,
+): void {
+  if (!usage) return;
+  try {
+    getTokenStore().record({
+      sessionId,
+      messageId,
+      providerId,
+      providerType,
+      inputTokens: usage.inputTokens,
+      outputTokens: usage.outputTokens,
+      timestamp: Date.now(),
+    });
+  } catch (err) {
+    logger.warn("failed to record token usage", { error: String(err), sessionId });
+  }
+}
+
 export interface RunClaudeQueryOptions {
   prompt: string;
   options: Record<string, unknown>;
@@ -23,11 +50,6 @@ export interface RunClaudeQueryOptions {
   shouldStop?: () => boolean;
   signal?: AbortSignal;
   provider?: LLMProvider;
-}
-
-export interface TokenUsage {
-  inputTokens: number;
-  outputTokens: number;
 }
 
 export interface QueryResult {
@@ -80,7 +102,9 @@ export async function runClaudeQuery({
           if (rawUsage && typeof rawUsage === "object") {
             const u = rawUsage as Record<string, unknown>;
             if (typeof u["inputTokens"] === "number" && typeof u["outputTokens"] === "number") {
-              terminalUsage = { inputTokens: u["inputTokens"], outputTokens: u["outputTokens"] };
+              const inT = u["inputTokens"] as number;
+              const outT = u["outputTokens"] as number;
+              terminalUsage = { inputTokens: inT, outputTokens: outT, totalTokens: computeTotalTokens(inT, outT) };
             }
           }
         }
@@ -91,10 +115,20 @@ export async function runClaudeQuery({
 
       if (result.status === "completed") {
         terminalResult = result.result;
-        terminalUsage = result.usage;
+        if (result.usage) {
+          terminalUsage = { inputTokens: result.usage.inputTokens, outputTokens: result.usage.outputTokens, totalTokens: computeTotalTokens(result.usage.inputTokens, result.usage.outputTokens) };
+        }
       }
 
-      return result;
+      recordTokenUsage(
+        (options["sessionId"] as string) ?? "unknown",
+        provider.id,
+        provider.config.type,
+        terminalUsage,
+        options["messageId"] as string | undefined,
+      );
+
+      return { status: result.status, result: terminalResult, usage: terminalUsage };
     }
 
     for await (const message of queryFn({ prompt, options: sdkOptions } as Parameters<QueryFunction>[0])) {
@@ -120,13 +154,22 @@ export async function runClaudeQuery({
         if (rawUsage !== null && typeof rawUsage === "object") {
           const u = rawUsage as Record<string, unknown>;
           if (typeof u["input_tokens"] === "number" && typeof u["output_tokens"] === "number") {
-            terminalUsage = { inputTokens: u["input_tokens"], outputTokens: u["output_tokens"] };
+            const inT = u["input_tokens"] as number;
+            const outT = u["output_tokens"] as number;
+            terminalUsage = { inputTokens: inT, outputTokens: outT, totalTokens: computeTotalTokens(inT, outT) };
           }
         }
       }
     }
 
     logger.debug("query completed");
+    recordTokenUsage(
+      (options["sessionId"] as string) ?? "unknown",
+      defaultProvider?.id ?? "default-anthropic",
+      defaultProvider?.config.type ?? "anthropic",
+      terminalUsage,
+      options["messageId"] as string | undefined,
+    );
     return {
       status: "completed",
       result: terminalResult,

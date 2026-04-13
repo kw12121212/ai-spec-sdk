@@ -21,6 +21,8 @@ import { WebhookManager } from "./webhooks.js";
 import { TemplateStore } from "./template-store.js";
 import { AuditLog } from "./audit-log.js";
 import { providerRegistry } from "./llm-provider/provider-registry.js";
+import { getTokenStore } from "./token-tracking/store.js";
+import { counterRegistry } from "./token-tracking/counters/index.js";
 
 const METHOD_NOT_FOUND = -32601;
 const INTERNAL_ERROR = -32603;
@@ -543,6 +545,20 @@ export class BridgeServer {
         return this.providerSwitch(params);
       case "session.setProvider":
         return this.sessionSetProvider(params);
+      case "token.getUsage":
+        return this.tokenGetUsage(params);
+      case "token.getSessionSummary":
+        return this.tokenGetSessionSummary(params);
+      case "token.getMessageUsage":
+        return this.tokenGetMessageUsage(params);
+      case "token.getProviderUsage":
+        return this.tokenGetProviderUsage(params);
+      case "token.clearAll":
+        return this.tokenClearAll(params);
+      case "token.registerCounter":
+        return this.tokenRegisterCounter(params);
+      case "token.listCounters":
+        return this.tokenListCounters();
       default:
         throw new BridgeError(METHOD_NOT_FOUND, `Method not found: ${method}`);
     }
@@ -1553,6 +1569,71 @@ export class BridgeServer {
 
   private async sessionSetProvider(params: Record<string, unknown>): Promise<unknown> {
     return this.providerSwitch(params);
+  }
+
+  private tokenGetUsage(params: Record<string, unknown>): unknown {
+    const { sessionId } = params;
+    if (!sessionId || typeof sessionId !== "string") {
+      throw new BridgeError(-32602, "'sessionId' must be provided");
+    }
+    const summary = getTokenStore().getSessionUsage(sessionId);
+    if (!summary) {
+      throw new BridgeError(-32051, "Session not found", { sessionId });
+    }
+    return summary;
+  }
+
+  private tokenGetSessionSummary(params: Record<string, unknown>): unknown {
+    const { sessionId } = params;
+    if (!sessionId || typeof sessionId !== "string") {
+      throw new BridgeError(-32602, "'sessionId' must be provided");
+    }
+    const summary = getTokenStore().getSessionUsage(sessionId);
+    if (!summary) {
+      throw new BridgeError(-32051, "Session not found", { sessionId });
+    }
+    return summary;
+  }
+
+  private tokenGetMessageUsage(params: Record<string, unknown>): unknown {
+    const { sessionId, messageId } = params;
+    if (!sessionId || typeof sessionId !== "string") {
+      throw new BridgeError(-32602, "'sessionId' must be provided");
+    }
+    if (!messageId || typeof messageId !== "string") {
+      throw new BridgeError(-32602, "'messageId' must be provided");
+    }
+    const record = getTokenStore().getMessageUsage(sessionId, messageId);
+    if (!record) {
+      throw new BridgeError(-32052, "Message not found", { sessionId, messageId });
+    }
+    return record;
+  }
+
+  private tokenGetProviderUsage(params: Record<string, unknown>): unknown {
+    const { providerId } = params;
+    const filter = providerId !== undefined ? String(providerId) : undefined;
+    return getTokenStore().getProviderUsage(filter);
+  }
+
+  private tokenClearAll(_params: Record<string, unknown>): unknown {
+    const clearedCount = getTokenStore().clearAll();
+    return { success: true, clearedCount };
+  }
+
+  private async tokenRegisterCounter(params: Record<string, unknown>): Promise<unknown> {
+    const { providerType } = params;
+    if (!providerType || typeof providerType !== "string") {
+      throw new BridgeError(-32602, "'providerType' must be a non-empty string");
+    }
+    const description = typeof params["description"] === "string" ? params["description"] : undefined;
+    const { PassthroughTokenCounter } = await import("./token-tracking/counters/anthropic.js");
+    counterRegistry.register(new PassthroughTokenCounter(providerType), description);
+    return { success: true, providerType };
+  }
+
+  private tokenListCounters(): unknown {
+    return counterRegistry.list();
   }
 
   private getSessionStatus(params: Record<string, unknown>): unknown {

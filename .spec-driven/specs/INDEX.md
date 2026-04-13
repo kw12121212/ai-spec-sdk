@@ -39,6 +39,9 @@
 - [agent-sessions.md](session/agent-sessions.md) - agent-sessions
 - [session-templates.md](session/session-templates.md) - Session Templates
 
+## token-tracking
+- [token-usage.md](token-tracking/token-usage.md) - Token usage recording, aggregation, and JSON-RPC query methods
+
 ## skills
 - [builtin-spec-skills.md](skills/builtin-spec-skills.md) - builtin-spec-skills
 

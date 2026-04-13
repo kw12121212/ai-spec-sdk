@@ -107,7 +107,7 @@ export class ProviderRegistry {
       );
     }
 
-    this.configs.set(config.id, { ...config });
+    this.configs.set(config.id, { ...config, counterType: config.type });
     this.saveToStore();
 
     return { success: true, providerId: config.id };
@@ -123,6 +123,12 @@ export class ProviderRegistry {
       throw new ProviderRegistryError("NOT_FOUND", `Provider not found: ${providerId}`);
     }
     return this.maskSensitiveFields(config);
+  }
+
+  getCounterType(providerId: string): string | null {
+    const config = this.configs.get(providerId);
+    if (!config) return null;
+    return (config as Record<string, unknown>)["counterType"] as string ?? config.type;
   }
 
   update(providerId: string, updates: Partial<ProviderConfig>): ProviderConfig {

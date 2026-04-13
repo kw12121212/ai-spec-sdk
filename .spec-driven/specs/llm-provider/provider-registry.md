@@ -3,19 +3,22 @@ mapping:
   implementation:
     - src/llm-provider/provider-registry.ts
     - src/bridge.ts
+    - src/token-tracking/counters/index.ts
   tests:
     - test/provider-registry.test.ts
     - test/provider-registry-bridge.test.ts
+    - test/token-tracking/counters.test.ts
 ---
 ## ADDED Requirements
 
 ### Requirement: Provider Registration
-The SDK MUST allow clients to register LLM provider configurations through the bridge.
+The SDK MUST allow clients to register LLM provider configurations through the bridge AND associate a TokenCounter with each provider type.
 
 #### Scenario: Register a valid Anthropic provider
 - GIVEN a client provides a valid provider configuration with `id`, `type: "anthropic"`, and `apiKey`
 - WHEN the client calls `provider.register` with that configuration
 - THEN the bridge stores the configuration and returns `{ success: true, providerId: "<id>" }`
+- AND the system associates the AnthropicTokenCounter with this provider
 
 #### Scenario: Register a provider with environment variable API key
 - GIVEN a client provides a configuration with `type: "anthropic"` but no `apiKey`
@@ -37,6 +40,13 @@ The SDK MUST allow clients to register LLM provider configurations through the b
 - GIVEN a client provides a configuration with `type: "unsupported-type"`
 - WHEN the client calls `provider.register`
 - THEN the bridge returns error `-32003` with message "Unsupported provider type"
+
+#### Scenario: Register unsupported provider type without built-in counter
+- GIVEN a client registers a provider with `type: "custom-provider"`
+- AND no built-in TokenCounter exists for "custom-provider"
+- WHEN the registration completes
+- THEN the system MUST register the provider with a default passthrough counter
+- AND the default counter attempts to extract inputTokens/outputTokens from raw usage data
 
 ### Requirement: Provider Listing
 The SDK MUST allow clients to list all registered provider configurations.
@@ -143,12 +153,13 @@ The SDK MUST allow clients to check the health of a registered provider.
 - THEN the bridge returns error `-32001` with message "Provider not found"
 
 ### Requirement: Provider Configuration Persistence
-The SDK MUST persist provider configurations to disk so they survive restarts.
+The SDK MUST persist provider configurations to disk so they survive restarts AND their associated counter type to disk.
 
 #### Scenario: Persist on registration
 - GIVEN a client registers a provider
 - WHEN the registration completes
 - THEN the provider configuration is saved to ConfigStore under key `llmProviders`
+- AND the stored configuration includes `counterType: "<type>"` metadata
 
 #### Scenario: Load on startup
 - GIVEN the bridge is starting AND persisted provider configurations exist
@@ -172,3 +183,21 @@ The SDK MUST NOT return sensitive information (API keys, tokens) in list or get 
 - GIVEN a provider is registered with `apiKey: "sk-ant-..."`
 - WHEN the client calls `provider.get`
 - THEN the response does not include the full `apiKey` value
+
+### Requirement: TokenCounter Registration
+The SDK MUST support registering custom TokenCounter implementations for provider types.
+
+#### Scenario: Register custom TokenCounter
+- GIVEN a developer registers a counter for provider type "openai" via `token.registerCounter`
+- WHEN subsequent providers of type "openai" are registered
+- THEN queries from those providers use the registered openai counter
+
+#### Scenario: Override built-in counter
+- GIVEN a built-in AnthropicTokenCounter is registered
+- WHEN a client calls `token.registerCounter` with `providerType: "anthropic"` and a custom description
+- THEN a new PassthroughTokenCounter replaces the built-in one for all Anthropic providers
+
+#### Scenario: List registered counters
+- GIVEN multiple counters are registered (built-in and custom)
+- WHEN the client calls `token.listCounters`
+- THEN the bridge returns an array of `{ providerType, description }` for all registered counters
