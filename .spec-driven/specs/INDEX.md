@@ -34,6 +34,7 @@
 
 ## security
 - [authentication.md](security/authentication.md) - authentication
+- [permission-scopes.md](security/permission-scopes.md) - permission-scopes
 - [rate-limiting.md](security/rate-limiting.md) - rate-limiting
 
 ## session

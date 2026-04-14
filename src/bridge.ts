@@ -29,6 +29,13 @@ import { getQuotaRegistry } from "./quota/registry.js";
 import { validateQuotaRule } from "./quota/types.js";
 import { buildQuotaStatuses } from "./quota/enforcer.js";
 import type { QuotaStatus, QuotaWarning, QuotaBlockedNotification } from "./quota/types.js";
+import {
+  isScopeDenied,
+  validateScopeStrings,
+  getAllScopes,
+  getToolMapping,
+  type ScopeConfig,
+} from "./permission-scopes.js";
 
 const METHOD_NOT_FOUND = -32601;
 const INTERNAL_ERROR = -32603;
@@ -58,6 +65,8 @@ interface AgentControlParams {
   permissionMode: string;
   maxTurns?: number;
   systemPrompt?: string;
+  allowedScopes?: string[];
+  blockedScopes?: string[];
 }
 
 function validateAgentControlParams(raw: Record<string, unknown>): AgentControlParams {
@@ -113,6 +122,36 @@ function validateAgentControlParams(raw: Record<string, unknown>): AgentControlP
     if (typeof raw["systemPrompt"] !== "string")
       throw new BridgeError(-32602, "'systemPrompt' must be a string");
     result.systemPrompt = raw["systemPrompt"];
+  }
+
+  if (raw["allowedScopes"] !== undefined) {
+    if (
+      !Array.isArray(raw["allowedScopes"]) ||
+      !(raw["allowedScopes"] as unknown[]).every((t) => typeof t === "string")
+    ) {
+      throw new BridgeError(-32602, "'allowedScopes' must be an array of strings");
+    }
+    try {
+      validateScopeStrings(raw["allowedScopes"] as string[], "allowedScopes");
+    } catch (err) {
+      throw new BridgeError(-32602, (err as Error).message);
+    }
+    result.allowedScopes = raw["allowedScopes"] as string[];
+  }
+
+  if (raw["blockedScopes"] !== undefined) {
+    if (
+      !Array.isArray(raw["blockedScopes"]) ||
+      !(raw["blockedScopes"] as unknown[]).every((t) => typeof t === "string")
+    ) {
+      throw new BridgeError(-32602, "'blockedScopes' must be an array of strings");
+    }
+    try {
+      validateScopeStrings(raw["blockedScopes"] as string[], "blockedScopes");
+    } catch (err) {
+      throw new BridgeError(-32602, (err as Error).message);
+    }
+    result.blockedScopes = raw["blockedScopes"] as string[];
   }
 
   return result;
@@ -610,6 +649,8 @@ export class BridgeServer {
         return this.balancerList();
       case "balancer.status":
         return this.balancerStatus(params);
+      case "permissions.scopes":
+        return this.permissionsScopes();
       default:
         throw new BridgeError(METHOD_NOT_FOUND, `Method not found: ${method}`);
     }
@@ -685,7 +726,7 @@ export class BridgeServer {
     requestId: unknown,
   ): Promise<unknown> {
     const { workspace, prompt, options = {}, proxy, template, balancerId } = params;
-    const { model, allowedTools, disallowedTools, permissionMode, maxTurns, systemPrompt, stream, timeoutMs } = params;
+    const { model, allowedTools, disallowedTools, permissionMode, maxTurns, systemPrompt, stream, timeoutMs, allowedScopes, blockedScopes } = params;
 
     if (!workspace || typeof workspace !== "string") {
       throw new BridgeError(-32602, "'workspace' must be provided");
@@ -729,6 +770,8 @@ export class BridgeServer {
         permissionMode: tmpl.permissionMode,
         maxTurns: tmpl.maxTurns,
         systemPrompt: tmpl.systemPrompt,
+        allowedScopes: tmpl.allowedScopes,
+        blockedScopes: tmpl.blockedScopes,
       };
     }
 
@@ -741,6 +784,8 @@ export class BridgeServer {
       ...(permissionMode !== undefined && { permissionMode }),
       ...(maxTurns !== undefined && { maxTurns }),
       ...(systemPrompt !== undefined && { systemPrompt }),
+      ...(allowedScopes !== undefined && { allowedScopes }),
+      ...(blockedScopes !== undefined && { blockedScopes }),
     };
 
     const controlParams = validateAgentControlParams(mergedParams);
@@ -761,6 +806,15 @@ export class BridgeServer {
     );
 
     const session = this.sessionStore.create(resolvedWorkspace, prompt, stream === true);
+
+    if (controlParams.allowedScopes !== undefined) {
+      session.allowedScopes = controlParams.allowedScopes;
+      this.sessionStore.persist(session);
+    }
+    if (controlParams.blockedScopes !== undefined) {
+      session.blockedScopes = controlParams.blockedScopes;
+      this.sessionStore.persist(session);
+    }
 
     if (balancerId !== undefined) {
       if (typeof balancerId !== "string") {
@@ -814,7 +868,7 @@ export class BridgeServer {
     requestId: unknown,
   ): Promise<unknown> {
     const { parentSessionId, prompt, options = {}, proxy, workspace } = params;
-    const { model, allowedTools, disallowedTools, permissionMode, maxTurns, systemPrompt, stream } = params;
+    const { model, allowedTools, disallowedTools, permissionMode, maxTurns, systemPrompt, stream, allowedScopes, blockedScopes } = params;
 
     if (!parentSessionId || typeof parentSessionId !== "string") {
       throw new BridgeError(-32602, "'parentSessionId' must be provided");
@@ -862,6 +916,8 @@ export class BridgeServer {
       permissionMode,
       maxTurns,
       systemPrompt,
+      allowedScopes,
+      blockedScopes,
     });
 
     const proxyParams = validateProxy(proxy);
@@ -878,6 +934,15 @@ export class BridgeServer {
       stream === true,
       parentSessionId,
     );
+
+    if (controlParams.allowedScopes !== undefined) {
+      session.allowedScopes = controlParams.allowedScopes;
+      this.sessionStore.persist(session);
+    }
+    if (controlParams.blockedScopes !== undefined) {
+      session.blockedScopes = controlParams.blockedScopes;
+      this.sessionStore.persist(session);
+    }
 
     this.auditLog.write(
       this.auditLog.createEntry(session.id, "session_spawned", "lifecycle", {
@@ -915,7 +980,7 @@ export class BridgeServer {
     requestId: unknown,
   ): Promise<unknown> {
     const { sessionId, prompt, options = {}, proxy } = params;
-    const { model, allowedTools, disallowedTools, permissionMode, maxTurns, systemPrompt, stream, timeoutMs } = params;
+    const { model, allowedTools, disallowedTools, permissionMode, maxTurns, systemPrompt, stream, timeoutMs, allowedScopes, blockedScopes } = params;
 
     if (!sessionId || typeof sessionId !== "string") {
       throw new BridgeError(-32602, "'sessionId' must be provided");
@@ -948,7 +1013,7 @@ export class BridgeServer {
       );
     }
 
-    const controlParams = validateAgentControlParams({ model, allowedTools, disallowedTools, permissionMode, maxTurns, systemPrompt });
+    const controlParams = validateAgentControlParams({ model, allowedTools, disallowedTools, permissionMode, maxTurns, systemPrompt, allowedScopes, blockedScopes });
 
     if (!session.sdkSessionId) {
       throw new BridgeError(SDK_SESSION_ID_UNAVAILABLE, "Session SDK ID not available", {
@@ -963,6 +1028,15 @@ export class BridgeServer {
 
     if (timeoutMs !== undefined) {
       session.timeoutMs = timeoutMs;
+      this.sessionStore.persist(session);
+    }
+
+    if (controlParams.allowedScopes !== undefined) {
+      session.allowedScopes = controlParams.allowedScopes;
+      this.sessionStore.persist(session);
+    }
+    if (controlParams.blockedScopes !== undefined) {
+      session.blockedScopes = controlParams.blockedScopes;
       this.sessionStore.persist(session);
     }
 
@@ -1171,6 +1245,36 @@ export class BridgeServer {
           const toolInput = this._extractToolInput(message);
           const toolId = this._extractToolUseId(message);
           const inputHash = toolInput ? crypto.createHash("sha256").update(JSON.stringify(toolInput)).digest("hex") : undefined;
+
+          // Scope check (before hooks and tool-name filtering)
+          const currentSession = this.sessionStore.get(session.id);
+          const scopeConfig: ScopeConfig = {
+            allowedScopes: currentSession?.allowedScopes,
+            blockedScopes: currentSession?.blockedScopes,
+          };
+          const scopeResult = isScopeDenied(toolName ?? "unknown", scopeConfig);
+          if (scopeResult.denied) {
+            this.auditLog.write(
+              this.auditLog.createEntry(session.id, "scope_denied", "security", {
+                toolName: toolName ?? "unknown",
+                requiredScopes: scopeResult.requiredScopes,
+                allowedScopes: scopeConfig.allowedScopes ?? null,
+                blockedScopes: scopeConfig.blockedScopes ?? null,
+              }, { workspace: context.cwd }),
+            );
+            this.notify({
+              jsonrpc: "2.0",
+              method: "bridge/scope_denied",
+              params: {
+                sessionId: session.id,
+                toolName: toolName ?? "unknown",
+                requiredScopes: scopeResult.requiredScopes,
+              },
+            });
+            this.sessionStore.stop(session.id);
+            return;
+          }
+
           this.auditLog.write(
             this.auditLog.createEntry(session.id, "tool_use", "execution", {
               toolName: toolName ?? "unknown",
@@ -2017,6 +2121,16 @@ export class BridgeServer {
       }
       throw new BridgeError(-32603, `Failed to get balancer status: ${err instanceof Error ? err.message : String(err)}`);
     }
+  }
+
+  private permissionsScopes(): unknown {
+    const scopes = getAllScopes();
+    const mapping = getToolMapping();
+    const toolMapping: Record<string, string[]> = {};
+    for (const [tool, toolScopes] of mapping) {
+      toolMapping[tool] = [...toolScopes];
+    }
+    return { scopes, toolMapping };
   }
 
   private getSessionStatus(params: Record<string, unknown>): unknown {
@@ -3142,14 +3256,14 @@ For example: __custom_tool__:custom.build --verbose`;
   // --- Template methods ---
 
   private templateCreate(params: Record<string, unknown>): unknown {
-    const { name, model, allowedTools, disallowedTools, permissionMode, maxTurns, systemPrompt } = params;
+    const { name, model, allowedTools, disallowedTools, permissionMode, maxTurns, systemPrompt, allowedScopes, blockedScopes } = params;
 
     if (!name || typeof name !== "string") {
       throw new BridgeError(-32602, "'name' must be a string");
     }
 
     // Validate parameters using same logic as session.start
-    const controlParams = validateAgentControlParams({ model, allowedTools, disallowedTools, permissionMode, maxTurns, systemPrompt });
+    const controlParams = validateAgentControlParams({ model, allowedTools, disallowedTools, permissionMode, maxTurns, systemPrompt, allowedScopes, blockedScopes });
 
     const template = this.templateStore.create({
       name,
@@ -3159,6 +3273,8 @@ For example: __custom_tool__:custom.build --verbose`;
       permissionMode: controlParams.permissionMode,
       maxTurns: controlParams.maxTurns,
       systemPrompt: controlParams.systemPrompt,
+      allowedScopes: controlParams.allowedScopes,
+      blockedScopes: controlParams.blockedScopes,
     });
 
     return template;

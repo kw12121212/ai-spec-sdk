@@ -12,6 +12,8 @@ export interface SessionTemplate {
   permissionMode?: string;
   maxTurns?: number;
   systemPrompt?: string;
+  allowedScopes?: string[];
+  blockedScopes?: string[];
 }
 
 function nowIso(): string {

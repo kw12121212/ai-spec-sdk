@@ -24,7 +24,7 @@ Implement a fine-grained permission model with pluggable policies and enhanced t
 - All permission denials are logged with context
 
 ## Planned Changes
-- `permission-scopes` - Declared: planned - define tool execution scopes
+- `permission-scopes` - Declared: complete - define tool execution scopes
 - `policy-interface` - Declared: planned - pluggable permission policy system
 - `approval-chains` - Declared: planned - multi-level authorization workflows
 - `rbac-system` - Declared: planned - role-based access control
@@ -45,4 +45,5 @@ Implement a fine-grained permission model with pluggable policies and enhanced t
 - Declared: proposed
 
 ## Notes
+
 

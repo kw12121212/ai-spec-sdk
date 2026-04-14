@@ -34,6 +34,8 @@ export interface Session {
   cancelledAt?: string;
   cancelReason?: string;
   timeoutMs?: number;
+  allowedScopes?: string[];
+  blockedScopes?: string[];
 }
 
 function nowIso(): string {

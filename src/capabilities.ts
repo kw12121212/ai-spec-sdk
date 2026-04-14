@@ -188,6 +188,7 @@ export function getCapabilities(transport = "stdio"): Capabilities {
       "quota.clear",
       "quota.getStatus",
       "quota.getViolations",
+      "permissions.scopes",
     ],
     agentControlParams: [
       "model",
