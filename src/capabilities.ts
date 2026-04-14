@@ -181,6 +181,13 @@ export function getCapabilities(transport = "stdio"): Capabilities {
       "template.get",
       "template.list",
       "template.delete",
+      "quota.set",
+      "quota.get",
+      "quota.list",
+      "quota.remove",
+      "quota.clear",
+      "quota.getStatus",
+      "quota.getViolations",
     ],
     agentControlParams: [
       "model",

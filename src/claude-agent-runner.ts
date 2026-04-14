@@ -6,6 +6,8 @@ import { getTokenStore } from "./token-tracking/store.js";
 import { counterRegistry } from "./token-tracking/counters/index.js";
 import type { TokenUsage } from "./token-tracking/types.js";
 import { computeTotalTokens } from "./token-tracking/types.js";
+import { preQueryCheck, postQueryCheck } from "./quota/enforcer.js";
+import type { QuotaEnforceResult, QuotaBlockedNotification } from "./quota/types.js";
 
 type QueryFunction = typeof query;
 
@@ -50,6 +52,8 @@ export interface RunClaudeQueryOptions {
   shouldStop?: () => boolean;
   signal?: AbortSignal;
   provider?: LLMProvider;
+  onQuotaWarning?: (warning: import("./quota/types.js").QuotaWarning) => void;
+  onQuotaBlocked?: (notification: QuotaBlockedNotification) => void;
 }
 
 export interface QueryResult {
@@ -67,9 +71,33 @@ export async function runClaudeQuery({
   shouldStop = () => false,
   signal,
   provider,
+  onQuotaWarning,
+  onQuotaBlocked,
 }: RunClaudeQueryOptions): Promise<QueryResult> {
   const queryFn = getQueryFunction();
   logger.debug("query started", { promptLength: prompt.length });
+
+  const sessionId = (options["sessionId"] as string) ?? "unknown";
+  const effectiveProviderId = provider?.id ?? defaultProvider?.id ?? "default-anthropic";
+
+  const quotaResult = preQueryCheck(sessionId, effectiveProviderId, {
+    onWarning: onQuotaWarning,
+    onBlocked: onQuotaBlocked,
+  });
+
+  if (!quotaResult.allowed) {
+    const err: Error & { code?: number; quotaData?: unknown } = new Error("Quota exceeded");
+    err.code = -32060;
+    err.quotaData = quotaResult.violation
+      ? {
+          quotaId: quotaResult.violation.quotaId,
+          scope: (quotaResult.violation as unknown as Record<string, unknown>).scope,
+          limit: quotaResult.violation.limit,
+          currentUsage: quotaResult.violation.usageAtViolation,
+        }
+      : undefined;
+    throw err;
+  }
 
   try {
     let terminalResult: unknown = null;
@@ -128,6 +156,8 @@ export async function runClaudeQuery({
         options["messageId"] as string | undefined,
       );
 
+      postQueryCheck(sessionId, effectiveProviderId, { onWarning: onQuotaWarning });
+
       return { status: result.status, result: terminalResult, usage: terminalUsage };
     }
 
@@ -170,6 +200,9 @@ export async function runClaudeQuery({
       terminalUsage,
       options["messageId"] as string | undefined,
     );
+
+    postQueryCheck(sessionId, effectiveProviderId, { onWarning: onQuotaWarning });
+
     return {
       status: "completed",
       result: terminalResult,

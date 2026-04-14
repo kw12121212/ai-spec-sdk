@@ -4,6 +4,7 @@ import path from "node:path";
 import { defaultLogger as logger } from "./logger.js";
 import { AgentStateMachine, type AgentExecutionState } from "./agent-state-machine.js";
 import type { AuditLog } from "./audit-log.js";
+import { getQuotaRegistry } from "./quota/registry.js";
 
 export interface SessionHistoryEntry {
   type: string;
@@ -331,6 +332,8 @@ export class SessionStore {
     if (session.status === "active") return "active";
 
     this.sessions.delete(sessionId);
+
+    getQuotaRegistry().removeBySession(sessionId);
 
     if (this.sessionsDir) {
       const filePath = path.join(this.sessionsDir, `${sessionId}.json`);

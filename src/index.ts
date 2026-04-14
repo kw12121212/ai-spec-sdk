@@ -19,3 +19,7 @@ export { Logger, defaultLogger } from "./logger.js";
 export type { LogLevel, LogBindings } from "./logger.js";
 export { AuditLog } from "./audit-log.js";
 export type { AuditEntry, AuditQueryFilters } from "./audit-log.js";
+export { getQuotaRegistry, setQuotaRegistry, QuotaRegistry } from "./quota/registry.js";
+export type { QuotaRule, QuotaScope, QuotaAction, QuotaStatus as QuotaRuleStatus, QuotaViolation, QuotaEnforceResult, QuotaWarning, QuotaNotificationPayload, QuotaBlockedNotification } from "./quota/types.js";
+export { preQueryCheck, postQueryCheck, buildQuotaStatuses } from "./quota/enforcer.js";
+export type { EnforcerOptions } from "./quota/enforcer.js";

@@ -23,6 +23,10 @@ import { AuditLog } from "./audit-log.js";
 import { providerRegistry } from "./llm-provider/provider-registry.js";
 import { getTokenStore } from "./token-tracking/store.js";
 import { counterRegistry } from "./token-tracking/counters/index.js";
+import { getQuotaRegistry } from "./quota/registry.js";
+import { validateQuotaRule } from "./quota/types.js";
+import { buildQuotaStatuses } from "./quota/enforcer.js";
+import type { QuotaStatus } from "./quota/types.js";
 
 const METHOD_NOT_FOUND = -32601;
 const INTERNAL_ERROR = -32603;
@@ -41,6 +45,8 @@ interface BufferedEvent {
 const PERMISSION_MODES = new Set(["default", "acceptEdits", "bypassPermissions", "approve"]);
 const APPROVAL_NOT_FOUND = -32020;
 const DEFAULT_PERMISSION_MODE = "bypassPermissions";
+const QUOTA_EXCEEDED = -32060;
+const QUOTA_NOT_FOUND = -32061;
 
 interface AgentControlParams {
   model?: string;
@@ -378,12 +384,21 @@ export class BridgeServer {
         result,
       };
     } catch (error) {
-      const bridgeError =
-        error instanceof BridgeError
-          ? error
-          : new BridgeError(INTERNAL_ERROR, "Internal bridge error", {
-              message: (error as Error).message,
-            });
+      const err = error as Error & { code?: number; quotaData?: unknown };
+      let bridgeError: BridgeError;
+
+      if (err.code === QUOTA_EXCEEDED) {
+        bridgeError = new BridgeError(QUOTA_EXCEEDED, "Quota limit exceeded", {
+          ...(typeof err.quotaData === "object" && err.quotaData !== null ? err.quotaData as Record<string, unknown> : {}),
+          message: err.message,
+        });
+      } else if (error instanceof BridgeError) {
+        bridgeError = error;
+      } else {
+        bridgeError = new BridgeError(INTERNAL_ERROR, "Internal bridge error", {
+          message: err.message,
+        });
+      }
 
       this.logger.error("dispatch error", {
         method: request.method,
@@ -559,6 +574,20 @@ export class BridgeServer {
         return this.tokenRegisterCounter(params);
       case "token.listCounters":
         return this.tokenListCounters();
+      case "quota.set":
+        return this.quotaSet(params);
+      case "quota.get":
+        return this.quotaGet(params);
+      case "quota.list":
+        return this.quotaList(params);
+      case "quota.remove":
+        return this.quotaRemove(params);
+      case "quota.clear":
+        return this.quotaClear();
+      case "quota.getStatus":
+        return this.quotaGetStatus(params);
+      case "quota.getViolations":
+        return this.quotaGetViolations(params);
       default:
         throw new BridgeError(METHOD_NOT_FOUND, `Method not found: ${method}`);
     }
@@ -1151,6 +1180,20 @@ export class BridgeServer {
         void this._fireHooks("notification", session.id, context.cwd);
       },
       provider: resolvedProvider,
+      onQuotaWarning: (warning) => {
+        this.emit("bridge/quota_warning", {
+          quotaId: warning.quotaId,
+          scope: warning.scope,
+          scopeId: warning.scopeId ?? null,
+          limit: warning.limit,
+          currentUsage: warning.currentUsage,
+          percentage: warning.percentage,
+          sessionId: warning.sessionId,
+        }, requestId);
+      },
+      onQuotaBlocked: (notification) => {
+        this.emit("bridge/quota_blocked", notification as unknown as Record<string, unknown>, requestId);
+      },
       });
 
       const currentSession = this.sessionStore.get(session.id);
@@ -1634,6 +1677,74 @@ export class BridgeServer {
 
   private tokenListCounters(): unknown {
     return counterRegistry.list();
+  }
+
+  private quotaSet(params: Record<string, unknown>): unknown {
+    const rule = validateQuotaRule(params);
+    if (!rule) {
+      throw new BridgeError(-32602, "Invalid quota rule parameters");
+    }
+    const registry = getQuotaRegistry();
+    if (!registry.set(rule)) {
+      throw new BridgeError(-32602, "Quota rule already exists", { quotaId: rule.quotaId });
+    }
+    return { success: true, quotaId: rule.quotaId };
+  }
+
+  private quotaGet(params: Record<string, unknown>): unknown {
+    const { quotaId } = params;
+    if (typeof quotaId !== "string" || !quotaId) {
+      throw new BridgeError(-32602, "'quotaId' must be a non-empty string");
+    }
+    const registry = getQuotaRegistry();
+    const rule = registry.get(quotaId);
+    if (!rule) {
+      throw new BridgeError(QUOTA_NOT_FOUND, "Quota rule not found", { quotaId });
+    }
+    return rule;
+  }
+
+  private quotaList(params: Record<string, unknown>): unknown {
+    const { scope } = params;
+    const registry = getQuotaRegistry();
+    if (scope !== undefined && typeof scope === "string") {
+      return registry.list(scope);
+    }
+    return registry.list();
+  }
+
+  private quotaRemove(params: Record<string, unknown>): unknown {
+    const { quotaId } = params;
+    if (typeof quotaId !== "string" || !quotaId) {
+      throw new BridgeError(-32602, "'quotaId' must be a non-empty string");
+    }
+    const registry = getQuotaRegistry();
+    if (!registry.remove(quotaId)) {
+      throw new BridgeError(QUOTA_NOT_FOUND, "Quota rule not found", { quotaId });
+    }
+    return { success: true, quotaId };
+  }
+
+  private quotaClear(): unknown {
+    const registry = getQuotaRegistry();
+    const clearedCount = registry.clear();
+    return { success: true, clearedCount };
+  }
+
+  private quotaGetStatus(params: Record<string, unknown>): unknown {
+    const { scope, sessionId, providerId } = params;
+    const registry = getQuotaRegistry();
+    let rules = registry.list(typeof scope === "string" ? scope : undefined);
+    if (rules.length === 0) return [];
+    const sid = typeof sessionId === "string" ? sessionId : "";
+    const pid = typeof providerId === "string" ? providerId : undefined;
+    return buildQuotaStatuses(rules, sid, pid);
+  }
+
+  private quotaGetViolations(params: Record<string, unknown>): unknown {
+    const { sessionId } = params;
+    const registry = getQuotaRegistry();
+    return registry.getViolations(typeof sessionId === "string" ? sessionId : undefined);
   }
 
   private getSessionStatus(params: Record<string, unknown>): unknown {
