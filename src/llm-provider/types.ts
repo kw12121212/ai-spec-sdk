@@ -47,6 +47,25 @@ export interface QueryResult {
   usage: TokenUsage | null;
 }
 
+export interface BalancerConfig {
+  id: string;
+  strategy: "round-robin" | "weighted";
+  providerIds: string[];
+  weights?: number[];
+  coolDownMs?: number;
+}
+
+export interface BalancerProviderStatus {
+  providerId: string;
+  excluded: boolean;
+  excludedUntil?: string;
+}
+
+export interface BalancerStatus {
+  balancerId: string;
+  providers: BalancerProviderStatus[];
+}
+
 export interface LLMProvider {
   readonly id: string;
   readonly config: ProviderConfig;

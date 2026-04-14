@@ -21,6 +21,8 @@ import { WebhookManager } from "./webhooks.js";
 import { TemplateStore } from "./template-store.js";
 import { AuditLog } from "./audit-log.js";
 import { providerRegistry } from "./llm-provider/provider-registry.js";
+import { balancerRegistry } from "./llm-provider/balancer-registry.js";
+import type { BalancerConfig } from "./llm-provider/types.js";
 import { getTokenStore } from "./token-tracking/store.js";
 import { counterRegistry } from "./token-tracking/counters/index.js";
 import { getQuotaRegistry } from "./quota/registry.js";
@@ -47,6 +49,7 @@ const APPROVAL_NOT_FOUND = -32020;
 const DEFAULT_PERMISSION_MODE = "bypassPermissions";
 const QUOTA_EXCEEDED = -32060;
 const QUOTA_NOT_FOUND = -32061;
+const BALANCER_ALL_EXCLUDED = -32005;
 
 interface AgentControlParams {
   model?: string;
@@ -299,6 +302,14 @@ export class BridgeServer {
     this.auditLog = new AuditLog(resolvedAuditDir ?? ".audit", notify, API_VERSION);
     this.sessionStore = new SessionStore(sessionsDir, this.auditLog);
     providerRegistry.setSessionGetter((id) => this.sessionStore.get(id) ?? undefined);
+    balancerRegistry.setEventCallbacks({
+      onExcluded: (bid, pid, reason, excludedUntil) => {
+        this.emit("bridge/balancer_provider_excluded", { balancerId: bid, providerId: pid, reason, excludedUntil });
+      },
+      onReadmitted: (bid, pid) => {
+        this.emit("bridge/balancer_provider_readmitted", { balancerId: bid, providerId: pid });
+      },
+    });
     this.workspaceStore = new WorkspaceStore(workspacesDir);
     this.mcpStore = new McpStore((method, params) => {
       this.notify({ jsonrpc: "2.0", method, params });
@@ -405,6 +416,7 @@ export class BridgeServer {
         durationMs: Date.now() - start,
         error: bridgeError.message,
         code: bridgeError.code,
+        stack: err.stack,
       });
 
       return {
@@ -590,6 +602,14 @@ export class BridgeServer {
         return this.quotaGetStatus(params);
       case "quota.getViolations":
         return this.quotaGetViolations(params);
+      case "balancer.create":
+        return this.balancerCreate(params);
+      case "balancer.remove":
+        return this.balancerRemove(params);
+      case "balancer.list":
+        return this.balancerList();
+      case "balancer.status":
+        return this.balancerStatus(params);
       default:
         throw new BridgeError(METHOD_NOT_FOUND, `Method not found: ${method}`);
     }
@@ -664,7 +684,7 @@ export class BridgeServer {
     params: Record<string, unknown>,
     requestId: unknown,
   ): Promise<unknown> {
-    const { workspace, prompt, options = {}, proxy, template } = params;
+    const { workspace, prompt, options = {}, proxy, template, balancerId } = params;
     const { model, allowedTools, disallowedTools, permissionMode, maxTurns, systemPrompt, stream, timeoutMs } = params;
 
     if (!workspace || typeof workspace !== "string") {
@@ -741,6 +761,18 @@ export class BridgeServer {
     );
 
     const session = this.sessionStore.create(resolvedWorkspace, prompt, stream === true);
+
+    if (balancerId !== undefined) {
+      if (typeof balancerId !== "string") {
+        throw new BridgeError(-32602, "'balancerId' must be a string");
+      }
+      try {
+        balancerRegistry.get(balancerId as string);
+      } catch {
+        throw new BridgeError(-32001, `Balancer not found: ${balancerId}`);
+      }
+      this.sessionStore.updateActiveBalancerId(session.id, balancerId as string);
+    }
 
     if (timeoutMs !== undefined) {
       session.timeoutMs = timeoutMs;
@@ -1199,20 +1231,37 @@ export class BridgeServer {
       };
 
       // Build ordered candidate list for reactive fallback
-      const candidateIds = providerRegistry.getSessionCandidateIds(session.id);
+      const sessionInfo = this.sessionStore.get(session.id);
+      const activeBalancerId = sessionInfo?.activeBalancerId;
       let queryResult: ClaudeQueryResult;
 
-      if (candidateIds.length === 0) {
-        // No registered providers configured — use existing health-check-based resolution
-        const resolvedProvider = await providerRegistry.resolveForSession(session.id);
-        queryResult = await runClaudeQuery({ ...sharedQueryOptions, provider: resolvedProvider });
-      } else {
-        // Walk candidate list reactively: try each provider, fall back on error
+      if (activeBalancerId) {
+        // Balancer-routed: ask the balancer for the next provider, then follow its fallback chain
+        let selectedProviderId: string;
+        try {
+          selectedProviderId = balancerRegistry.route(activeBalancerId);
+        } catch (err) {
+          if (err instanceof Error && (err as Error & { code?: string }).code === "ALL_EXCLUDED") {
+            throw new BridgeError(BALANCER_ALL_EXCLUDED, "No healthy providers available in balancer");
+          }
+          throw err;
+        }
+
+        // Build candidate list: selected provider + its fallback chain
+        let fallbackChain: string[] = [];
+        try {
+          fallbackChain = providerRegistry.getFallbackChain(selectedProviderId);
+        } catch {
+          // provider may not expose a chain
+        }
+        const balancerCandidates = [selectedProviderId, ...fallbackChain];
+
         let lastError: unknown = null;
         let resolved: ClaudeQueryResult | undefined;
         let fromProviderId: string | null = null;
+        let primaryFailed = false;
 
-        for (const candidateId of candidateIds) {
+        for (const candidateId of balancerCandidates) {
           if (fromProviderId !== null) {
             this.emit("bridge/provider_fallback_activated", {
               fromProviderId,
@@ -1229,14 +1278,67 @@ export class BridgeServer {
             break;
           } catch (err) {
             lastError = err;
+            if (candidateId === selectedProviderId) {
+              primaryFailed = true;
+              // Reactively exclude the balancer-selected provider
+              balancerRegistry.excludeProvider(
+                activeBalancerId,
+                selectedProviderId,
+                err instanceof Error ? err.message : String(err),
+              );
+            }
             fromProviderId = candidateId;
           }
+        }
+
+        if (!primaryFailed && resolved === undefined) {
+          // The selected provider was never tried (shouldn't happen) — exclude and throw
+          balancerRegistry.excludeProvider(activeBalancerId, selectedProviderId, "provider unavailable");
         }
 
         if (resolved === undefined) {
           throw lastError;
         }
         queryResult = resolved;
+      } else {
+        const candidateIds = providerRegistry.getSessionCandidateIds(session.id);
+
+        if (candidateIds.length === 0) {
+          // No registered providers configured — use existing health-check-based resolution
+          const resolvedProvider = await providerRegistry.resolveForSession(session.id);
+          queryResult = await runClaudeQuery({ ...sharedQueryOptions, provider: resolvedProvider });
+        } else {
+          // Walk candidate list reactively: try each provider, fall back on error
+          let lastError: unknown = null;
+          let resolved: ClaudeQueryResult | undefined;
+          let fromProviderId: string | null = null;
+
+          for (const candidateId of candidateIds) {
+            if (fromProviderId !== null) {
+              this.emit("bridge/provider_fallback_activated", {
+                fromProviderId,
+                toProviderId: candidateId,
+                reason: lastError instanceof Error ? lastError.message : String(lastError),
+                sessionId: session.id,
+              }, requestId);
+            }
+
+            try {
+              streamChunkIndex = 0;
+              const provider = await providerRegistry.resolveCandidate(candidateId);
+              resolved = await runClaudeQuery({ ...sharedQueryOptions, provider });
+              break;
+            } catch (err) {
+              lastError = err;
+              fromProviderId = candidateId;
+            }
+          }
+
+          if (resolved === undefined) {
+            throw lastError;
+          }
+          queryResult = resolved;
+        }
       }
 
       const currentSession = this.sessionStore.get(session.id);
@@ -1671,6 +1773,28 @@ export class BridgeServer {
   }
 
   private async sessionSetProvider(params: Record<string, unknown>): Promise<unknown> {
+    const { balancerId } = params;
+    if (balancerId !== undefined) {
+      if (typeof balancerId !== "string") {
+        throw new BridgeError(-32602, "'balancerId' must be a string");
+      }
+      const { sessionId } = params;
+      if (!sessionId || typeof sessionId !== "string") {
+        throw new BridgeError(-32602, "'sessionId' must be a string");
+      }
+      const session = this.sessionStore.get(sessionId);
+      if (!session) {
+        throw new BridgeError(-32011, "Session not found", { sessionId });
+      }
+      try {
+        balancerRegistry.get(balancerId); // validate exists
+      } catch {
+        throw new BridgeError(-32001, `Balancer not found: ${balancerId}`);
+      }
+      this.sessionStore.updateActiveBalancerId(sessionId, balancerId);
+      this.sessionStore.updateActiveProviderId(sessionId, null);
+      return { success: true, sessionId, balancerId };
+    }
     return this.providerSwitch(params);
   }
 
@@ -1805,6 +1929,94 @@ export class BridgeServer {
     const { sessionId } = params;
     const registry = getQuotaRegistry();
     return registry.getViolations(typeof sessionId === "string" ? sessionId : undefined);
+  }
+
+  private balancerCreate(params: Record<string, unknown>): unknown {
+    const { id, strategy, providerIds, weights, coolDownMs } = params;
+
+    if (!id || typeof id !== "string") {
+      throw new BridgeError(-32602, "'id' must be a non-empty string");
+    }
+    if (strategy !== "round-robin" && strategy !== "weighted") {
+      throw new BridgeError(-32602, "'strategy' must be 'round-robin' or 'weighted'");
+    }
+    if (!Array.isArray(providerIds) || providerIds.length === 0) {
+      throw new BridgeError(-32602, "'providerIds' must be a non-empty array");
+    }
+    if (!(providerIds as unknown[]).every((p) => typeof p === "string")) {
+      throw new BridgeError(-32602, "'providerIds' must contain only strings");
+    }
+    if (weights !== undefined) {
+      if (!Array.isArray(weights) || !(weights as unknown[]).every((w) => typeof w === "number")) {
+        throw new BridgeError(-32602, "'weights' must be an array of numbers");
+      }
+    }
+    if (coolDownMs !== undefined && (typeof coolDownMs !== "number" || !Number.isInteger(coolDownMs) || coolDownMs < 0)) {
+      throw new BridgeError(-32602, "'coolDownMs' must be a non-negative integer");
+    }
+
+    // Sync known provider IDs so balancerRegistry can validate
+    const knownIds = new Set(providerRegistry.list().map((p) => p.id));
+    balancerRegistry.setKnownProviderIds(knownIds);
+
+    const config: BalancerConfig = {
+      id: id as string,
+      strategy: strategy as "round-robin" | "weighted",
+      providerIds: providerIds as string[],
+      ...(weights !== undefined && { weights: weights as number[] }),
+      ...(coolDownMs !== undefined && { coolDownMs: coolDownMs as number }),
+    };
+
+    try {
+      return balancerRegistry.create(config);
+    } catch (err) {
+      if (err instanceof Error && err.name === "BalancerRegistryError") {
+        const e = err as Error & { code?: string };
+        switch (e.code) {
+          case "DUPLICATE_ID": throw new BridgeError(-32002, err.message);
+          case "PROVIDER_NOT_FOUND": throw new BridgeError(-32001, err.message);
+          case "INVALID_PARAMS": throw new BridgeError(-32602, err.message);
+          default: throw new BridgeError(-32603, err.message);
+        }
+      }
+      throw new BridgeError(-32603, `Failed to create balancer: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  private balancerRemove(params: Record<string, unknown>): unknown {
+    const { balancerId } = params;
+    if (!balancerId || typeof balancerId !== "string") {
+      throw new BridgeError(-32602, "'balancerId' must be a string");
+    }
+
+    try {
+      return balancerRegistry.remove(balancerId);
+    } catch (err) {
+      if (err instanceof Error && err.name === "BalancerRegistryError") {
+        throw new BridgeError(-32001, err.message);
+      }
+      throw new BridgeError(-32603, `Failed to remove balancer: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  private balancerList(): unknown {
+    return balancerRegistry.list();
+  }
+
+  private balancerStatus(params: Record<string, unknown>): unknown {
+    const { balancerId } = params;
+    if (!balancerId || typeof balancerId !== "string") {
+      throw new BridgeError(-32602, "'balancerId' must be a string");
+    }
+
+    try {
+      return balancerRegistry.status(balancerId);
+    } catch (err) {
+      if (err instanceof Error && err.name === "BalancerRegistryError") {
+        throw new BridgeError(-32001, err.message);
+      }
+      throw new BridgeError(-32603, `Failed to get balancer status: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
 
   private getSessionStatus(params: Record<string, unknown>): unknown {

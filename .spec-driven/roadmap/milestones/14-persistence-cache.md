@@ -24,7 +24,7 @@ Provide durable storage for session state, LLM response caching, and tool execut
 - Cache hit/miss metrics are exposed
 
 ## Planned Changes
-- `session-persistence` - Declared: planned - durable session state storage
+- `session-persistence` - Declared: complete - durable session state storage
 - `llm-response-cache` - Declared: planned - cache LLM completions
 - `tool-result-cache` - Declared: planned - cache deterministic tool outputs
 - `storage-backends` - Declared: planned - file, SQLite, external DB adapters

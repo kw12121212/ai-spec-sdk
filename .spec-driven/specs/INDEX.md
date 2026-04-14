@@ -20,6 +20,7 @@
 - [hook-execution.md](hooks/hook-execution.md) - hook-execution
 
 ## llm-provider
+- [load-balancer.md](llm-provider/load-balancer.md) - load-balancer
 - [provider-registry.md](llm-provider/provider-registry.md) - provider-registry
 
 ## network
