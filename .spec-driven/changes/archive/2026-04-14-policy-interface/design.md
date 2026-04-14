@@ -1,0 +1,39 @@
+# Design: policy-interface
+
+## Approach
+Introduce a new module `src/permission-policy.ts` that defines the `PermissionPolicy` interface and a `PolicyChain` executor. The bridge imports and invokes the policy chain at the existing scope-check integration point in `bridge.ts` (around line 1249), inserting the policy chain execution before the existing `isScopeDenied` call.
+
+Policies are bound at session creation time (static lifecycle). They are passed as serializable policy descriptors in `session.start`/`session.spawn`/`session.resume` params and resolved to `PermissionPolicy` instances during session initialization.
+
+### Execution Flow (per tool_use)
+1. Policy chain executes (ordered, async, deny-short-circuit)
+2. Existing scope check (`isScopeDenied`)
+3. Tool name filter (`allowedTools`/`disallowedTools`)
+4. `pre_tool_use` hooks
+5. Tool execution
+
+### Data Flow
+- Session stores `PolicyDescriptor[]` (name + config)
+- At tool_use time, `PolicyChain.run()` iterates policies, calling `policy.check(context)`
+- Each policy returns `PolicyResult` (`allow` | `deny` | `pass`)
+- Chain stops on first `deny`; if all `pass`, result is `pass` (default allow)
+
+## Key Decisions
+
+1. **Async-only interface** — `PermissionPolicy.check()` returns `Promise<PolicyResult>`. Sync implementations simply return a resolved promise. This avoids a breaking interface change when external policy services are needed later. Consistent with the existing async hook execution model.
+
+2. **Static policy binding** — Policies are set at session creation and cannot change during session execution. This eliminates concurrency risks from mid-session policy mutation and keeps the first implementation simple. Dynamic policies can be added as a future extension without breaking the static interface.
+
+3. **Deny-short-circuit with pass-through** — Policies return `allow`, `deny`, or `pass`. A `deny` immediately stops the chain and blocks the tool. An `allow` explicitly permits it (short-circuits remaining policies in the same direction). A `pass` delegates to the next policy. If all policies `pass`, the tool proceeds to the scope check. This mirrors the existing hook sequential execution pattern (bridge.ts lines 1286-1289).
+
+4. **Policy descriptors are serializable** — Policies are described as `{ name: string, config?: Record<string, unknown> }` in JSON-RPC params. The bridge resolves descriptors to `PermissionPolicy` instances via a registry. This keeps the JSON-RPC contract clean while allowing complex policy implementations internally.
+
+## Alternatives Considered
+
+1. **Sync-only interface** — Simpler but blocks integration with external policy services (HTTP calls to company permission APIs, Vault lookups). Would require a breaking change to add async later.
+
+2. **Dynamic policy registration at runtime** — More flexible but introduces race conditions when a policy is added/removed while a tool is executing. Deferred to a future change; the static model covers all current milestone 09 scenarios.
+
+3. **Weighted priority instead of registration order** — Adds configuration complexity without clear benefit for a small number of policies per session. Registration order is predictable and debuggable. Can be extended with an optional `priority` field later if needed.
+
+4. **Policy chain as middleware (next() pattern)** — Inspired by Express/Koa middleware. More powerful but significantly more complex for the first iteration. The simple ordered chain with deny/allow/pass is sufficient and easier to reason about.

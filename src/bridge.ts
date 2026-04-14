@@ -36,6 +36,13 @@ import {
   getToolMapping,
   type ScopeConfig,
 } from "./permission-scopes.js";
+import {
+  PolicyChain,
+  resolvePolicies,
+  hasPolicy,
+  getRegisteredPolicyNames,
+  type PolicyDescriptor,
+} from "./permission-policy.js";
 
 const METHOD_NOT_FOUND = -32601;
 const INTERNAL_ERROR = -32603;
@@ -67,6 +74,7 @@ interface AgentControlParams {
   systemPrompt?: string;
   allowedScopes?: string[];
   blockedScopes?: string[];
+  policies?: PolicyDescriptor[];
 }
 
 function validateAgentControlParams(raw: Record<string, unknown>): AgentControlParams {
@@ -152,6 +160,27 @@ function validateAgentControlParams(raw: Record<string, unknown>): AgentControlP
       throw new BridgeError(-32602, (err as Error).message);
     }
     result.blockedScopes = raw["blockedScopes"] as string[];
+  }
+
+  if (raw["policies"] !== undefined) {
+    if (!Array.isArray(raw["policies"])) {
+      throw new BridgeError(-32602, "'policies' must be an array of policy descriptors");
+    }
+    const descriptors: PolicyDescriptor[] = [];
+    for (const item of raw["policies"] as unknown[]) {
+      if (typeof item !== "object" || item === null || typeof (item as Record<string, unknown>)["name"] !== "string") {
+        throw new BridgeError(-32602, "Each policy descriptor must have a 'name' string");
+      }
+      const desc = item as Record<string, unknown>;
+      if (!hasPolicy(desc["name"] as string)) {
+        throw new BridgeError(-32602, `Unknown policy: '${desc["name"]}'. Registered policies: ${getRegisteredPolicyNames().join(", ") || "(none)"}`);
+      }
+      descriptors.push({
+        name: desc["name"] as string,
+        ...(desc["config"] !== undefined ? { config: desc["config"] as Record<string, unknown> } : {}),
+      });
+    }
+    result.policies = descriptors;
   }
 
   return result;
@@ -651,6 +680,8 @@ export class BridgeServer {
         return this.balancerStatus(params);
       case "permissions.scopes":
         return this.permissionsScopes();
+      case "permissions.policies.list":
+        return this.permissionsPoliciesList(params);
       default:
         throw new BridgeError(METHOD_NOT_FOUND, `Method not found: ${method}`);
     }
@@ -726,7 +757,7 @@ export class BridgeServer {
     requestId: unknown,
   ): Promise<unknown> {
     const { workspace, prompt, options = {}, proxy, template, balancerId } = params;
-    const { model, allowedTools, disallowedTools, permissionMode, maxTurns, systemPrompt, stream, timeoutMs, allowedScopes, blockedScopes } = params;
+    const { model, allowedTools, disallowedTools, permissionMode, maxTurns, systemPrompt, stream, timeoutMs, allowedScopes, blockedScopes, policies } = params;
 
     if (!workspace || typeof workspace !== "string") {
       throw new BridgeError(-32602, "'workspace' must be provided");
@@ -786,6 +817,7 @@ export class BridgeServer {
       ...(systemPrompt !== undefined && { systemPrompt }),
       ...(allowedScopes !== undefined && { allowedScopes }),
       ...(blockedScopes !== undefined && { blockedScopes }),
+      ...(policies !== undefined && { policies }),
     };
 
     const controlParams = validateAgentControlParams(mergedParams);
@@ -813,6 +845,10 @@ export class BridgeServer {
     }
     if (controlParams.blockedScopes !== undefined) {
       session.blockedScopes = controlParams.blockedScopes;
+      this.sessionStore.persist(session);
+    }
+    if (controlParams.policies !== undefined) {
+      session.policies = controlParams.policies;
       this.sessionStore.persist(session);
     }
 
@@ -868,7 +904,7 @@ export class BridgeServer {
     requestId: unknown,
   ): Promise<unknown> {
     const { parentSessionId, prompt, options = {}, proxy, workspace } = params;
-    const { model, allowedTools, disallowedTools, permissionMode, maxTurns, systemPrompt, stream, allowedScopes, blockedScopes } = params;
+    const { model, allowedTools, disallowedTools, permissionMode, maxTurns, systemPrompt, stream, allowedScopes, blockedScopes, policies } = params;
 
     if (!parentSessionId || typeof parentSessionId !== "string") {
       throw new BridgeError(-32602, "'parentSessionId' must be provided");
@@ -918,6 +954,7 @@ export class BridgeServer {
       systemPrompt,
       allowedScopes,
       blockedScopes,
+      policies,
     });
 
     const proxyParams = validateProxy(proxy);
@@ -941,6 +978,10 @@ export class BridgeServer {
     }
     if (controlParams.blockedScopes !== undefined) {
       session.blockedScopes = controlParams.blockedScopes;
+      this.sessionStore.persist(session);
+    }
+    if (controlParams.policies !== undefined) {
+      session.policies = controlParams.policies;
       this.sessionStore.persist(session);
     }
 
@@ -980,7 +1021,7 @@ export class BridgeServer {
     requestId: unknown,
   ): Promise<unknown> {
     const { sessionId, prompt, options = {}, proxy } = params;
-    const { model, allowedTools, disallowedTools, permissionMode, maxTurns, systemPrompt, stream, timeoutMs, allowedScopes, blockedScopes } = params;
+    const { model, allowedTools, disallowedTools, permissionMode, maxTurns, systemPrompt, stream, timeoutMs, allowedScopes, blockedScopes, policies } = params;
 
     if (!sessionId || typeof sessionId !== "string") {
       throw new BridgeError(-32602, "'sessionId' must be provided");
@@ -1013,7 +1054,7 @@ export class BridgeServer {
       );
     }
 
-    const controlParams = validateAgentControlParams({ model, allowedTools, disallowedTools, permissionMode, maxTurns, systemPrompt, allowedScopes, blockedScopes });
+    const controlParams = validateAgentControlParams({ model, allowedTools, disallowedTools, permissionMode, maxTurns, systemPrompt, allowedScopes, blockedScopes, policies });
 
     if (!session.sdkSessionId) {
       throw new BridgeError(SDK_SESSION_ID_UNAVAILABLE, "Session SDK ID not available", {
@@ -1037,6 +1078,10 @@ export class BridgeServer {
     }
     if (controlParams.blockedScopes !== undefined) {
       session.blockedScopes = controlParams.blockedScopes;
+      this.sessionStore.persist(session);
+    }
+    if (controlParams.policies !== undefined) {
+      session.policies = controlParams.policies;
       this.sessionStore.persist(session);
     }
 
@@ -1246,33 +1291,96 @@ export class BridgeServer {
           const toolId = this._extractToolUseId(message);
           const inputHash = toolInput ? crypto.createHash("sha256").update(JSON.stringify(toolInput)).digest("hex") : undefined;
 
-          // Scope check (before hooks and tool-name filtering)
-          const currentSession = this.sessionStore.get(session.id);
-          const scopeConfig: ScopeConfig = {
-            allowedScopes: currentSession?.allowedScopes,
-            blockedScopes: currentSession?.blockedScopes,
-          };
-          const scopeResult = isScopeDenied(toolName ?? "unknown", scopeConfig);
-          if (scopeResult.denied) {
+          // Policy chain check (before scope check)
+          const policySession = this.sessionStore.get(session.id);
+          const hasPolicies = policySession?.policies && policySession.policies.length > 0;
+
+          const proceedAfterPolicyCheck = (): void => {
+            // Scope check (before hooks and tool-name filtering)
+            const currentSession = this.sessionStore.get(session.id);
+            const scopeConfig: ScopeConfig = {
+              allowedScopes: currentSession?.allowedScopes,
+              blockedScopes: currentSession?.blockedScopes,
+            };
+            const scopeResult = isScopeDenied(toolName ?? "unknown", scopeConfig);
+            if (scopeResult.denied) {
+              this.auditLog.write(
+                this.auditLog.createEntry(session.id, "scope_denied", "security", {
+                  toolName: toolName ?? "unknown",
+                  requiredScopes: scopeResult.requiredScopes,
+                  allowedScopes: scopeConfig.allowedScopes ?? null,
+                  blockedScopes: scopeConfig.blockedScopes ?? null,
+                }, { workspace: context.cwd }),
+              );
+              this.notify({
+                jsonrpc: "2.0",
+                method: "bridge/scope_denied",
+                params: {
+                  sessionId: session.id,
+                  toolName: toolName ?? "unknown",
+                  requiredScopes: scopeResult.requiredScopes,
+                },
+              });
+              this.sessionStore.stop(session.id);
+              return;
+            }
+
             this.auditLog.write(
-              this.auditLog.createEntry(session.id, "scope_denied", "security", {
+              this.auditLog.createEntry(session.id, "tool_use", "execution", {
                 toolName: toolName ?? "unknown",
-                requiredScopes: scopeResult.requiredScopes,
-                allowedScopes: scopeConfig.allowedScopes ?? null,
-                blockedScopes: scopeConfig.blockedScopes ?? null,
+                inputHash: inputHash ?? "",
+                id: toolId ?? "",
               }, { workspace: context.cwd }),
             );
-            this.notify({
-              jsonrpc: "2.0",
-              method: "bridge/scope_denied",
-              params: {
-                sessionId: session.id,
-                toolName: toolName ?? "unknown",
-                requiredScopes: scopeResult.requiredScopes,
-              },
+            // Blocking hooks execute asynchronously; if they fail, stop the session
+            this._fireHooks("pre_tool_use", session.id, context.cwd, toolName).then((passed) => {
+              if (!passed) {
+                this.sessionStore.stop(session.id);
+              }
             });
-            this.sessionStore.stop(session.id);
-            return;
+
+            // File change tracking for Write/Edit tools
+            this._emitFileChange(session.id, toolName, message, context.cwd);
+          };
+
+          if (hasPolicies) {
+            const policyInstances = resolvePolicies(policySession!.policies!);
+            const chain = new PolicyChain(policyInstances);
+            void chain.run({
+              toolName: toolName ?? "unknown",
+              toolInput: toolInput,
+              sessionId: session.id,
+            }).then((chainResult) => {
+              // Write audit entries for non-pass decisions
+              for (const audit of chainResult.audits) {
+                this.auditLog.write(
+                  this.auditLog.createEntry(session.id, "policy_decision", "security", {
+                    policyName: audit.policyName,
+                    decision: audit.decision,
+                    toolName: toolName ?? "unknown",
+                    durationMs: audit.durationMs,
+                  }, { workspace: context.cwd }),
+                );
+              }
+
+              if (chainResult.decision === "deny") {
+                this.notify({
+                  jsonrpc: "2.0",
+                  method: "bridge/policy_denied",
+                  params: {
+                    sessionId: session.id,
+                    toolName: toolName ?? "unknown",
+                    policyName: chainResult.deniedBy,
+                  },
+                });
+                this.sessionStore.stop(session.id);
+                return;
+              }
+
+              proceedAfterPolicyCheck();
+            });
+          } else {
+            proceedAfterPolicyCheck();
           }
 
           this.auditLog.write(
@@ -2131,6 +2239,22 @@ export class BridgeServer {
       toolMapping[tool] = [...toolScopes];
     }
     return { scopes, toolMapping };
+  }
+
+  private permissionsPoliciesList(params: Record<string, unknown>): unknown {
+    const { sessionId } = params;
+    if (!sessionId || typeof sessionId !== "string") {
+      throw new BridgeError(-32602, "'sessionId' must be provided");
+    }
+    const session = this.sessionStore.get(sessionId);
+    if (!session) {
+      throw new BridgeError(-32011, "Session not found", { sessionId });
+    }
+    const policies = (session.policies ?? []).map((p) => ({
+      name: p.name,
+      config: p.config ?? null,
+    }));
+    return { policies };
   }
 
   private getSessionStatus(params: Record<string, unknown>): unknown {

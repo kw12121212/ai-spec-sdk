@@ -23,3 +23,18 @@ export { getQuotaRegistry, setQuotaRegistry, QuotaRegistry } from "./quota/regis
 export type { QuotaRule, QuotaScope, QuotaAction, QuotaStatus as QuotaRuleStatus, QuotaViolation, QuotaEnforceResult, QuotaWarning, QuotaNotificationPayload, QuotaBlockedNotification } from "./quota/types.js";
 export { preQueryCheck, postQueryCheck, buildQuotaStatuses } from "./quota/enforcer.js";
 export type { EnforcerOptions } from "./quota/enforcer.js";
+export {
+  PolicyChain,
+  registerPolicy,
+  hasPolicy,
+  getRegisteredPolicyNames,
+  resolvePolicies,
+} from "./permission-policy.js";
+export type {
+  PolicyResult,
+  PolicyContext,
+  PermissionPolicy,
+  PolicyDescriptor,
+  PolicyFactory,
+  ChainRunResult,
+} from "./permission-policy.js";

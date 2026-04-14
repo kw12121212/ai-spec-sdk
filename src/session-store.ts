@@ -5,6 +5,7 @@ import { defaultLogger as logger } from "./logger.js";
 import { AgentStateMachine, type AgentExecutionState } from "./agent-state-machine.js";
 import type { AuditLog } from "./audit-log.js";
 import { getQuotaRegistry } from "./quota/registry.js";
+import type { PolicyDescriptor } from "./permission-policy.js";
 
 export interface SessionHistoryEntry {
   type: string;
@@ -36,6 +37,7 @@ export interface Session {
   timeoutMs?: number;
   allowedScopes?: string[];
   blockedScopes?: string[];
+  policies?: PolicyDescriptor[];
 }
 
 function nowIso(): string {
