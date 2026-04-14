@@ -42,4 +42,7 @@ Implement an interactive question resolution protocol that enables agents to pau
 - Session resumption must preserve exact execution context
 
 ## Status
-- Declared: planned
+- Declared: proposed
+
+## Notes
+

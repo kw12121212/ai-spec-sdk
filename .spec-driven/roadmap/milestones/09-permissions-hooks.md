@@ -42,4 +42,7 @@ Implement a fine-grained permission model with pluggable policies and enhanced t
 - Policy plugins must be sandboxed to prevent privilege escalation
 
 ## Status
-- Declared: planned
+- Declared: proposed
+
+## Notes
+

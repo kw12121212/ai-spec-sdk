@@ -41,3 +41,6 @@ Enhance agent lifecycle management with richer state machines, execution hooks, 
 ## Status
 - Declared: complete
 
+
+## Notes
+

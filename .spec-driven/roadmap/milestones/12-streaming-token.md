@@ -41,4 +41,7 @@ Enhance streaming capabilities with granular token flow control, reasoning proce
 - Token prediction accuracy varies by provider
 
 ## Status
-- Declared: planned
+- Declared: proposed
+
+## Notes
+

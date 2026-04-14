@@ -14,7 +14,7 @@ import { ConfigStore } from "./config-store.js";
 import { HooksStore } from "./hooks-store.js";
 import type { HookEvent } from "./hooks-store.js";
 import { ContextStore } from "./context-store.js";
-import { runClaudeQuery } from "./claude-agent-runner.js";
+import { runClaudeQuery, type QueryResult as ClaudeQueryResult } from "./claude-agent-runner.js";
 import { defaultLogger, VALID_LOG_LEVELS, type Logger, type LogLevel } from "./logger.js";
 import { buildRuntimeInfo, type RuntimeInfoOptions } from "./runtime-info.js";
 import { WebhookManager } from "./webhooks.js";
@@ -26,7 +26,7 @@ import { counterRegistry } from "./token-tracking/counters/index.js";
 import { getQuotaRegistry } from "./quota/registry.js";
 import { validateQuotaRule } from "./quota/types.js";
 import { buildQuotaStatuses } from "./quota/enforcer.js";
-import type { QuotaStatus } from "./quota/types.js";
+import type { QuotaStatus, QuotaWarning, QuotaBlockedNotification } from "./quota/types.js";
 
 const METHOD_NOT_FOUND = -32601;
 const INTERNAL_ERROR = -32603;
@@ -556,6 +556,8 @@ export class BridgeServer {
         return this.providerGetDefault();
       case "provider.healthCheck":
         return this.providerHealthCheck(params);
+      case "provider.getFallbackChain":
+        return this.providerGetFallbackChain(params);
       case "provider.switch":
         return this.providerSwitch(params);
       case "session.setProvider":
@@ -1052,18 +1054,7 @@ export class BridgeServer {
     }
 
     try {
-      const resolvedProvider = await providerRegistry.resolveForSession(session.id);
-      const queryResult = await runClaudeQuery({
-        prompt,
-        options: resolvedOptions,
-        cwd: context.cwd,
-        env: context.env,
-        shouldStop: () => {
-          const current = this.sessionStore.get(session.id);
-          return Boolean(current?.stopRequested);
-        },
-        signal: abortController.signal,
-        onEvent: (message) => {
+      const onEvent = (message: unknown): void => {
         const current = this.sessionStore.get(session.id);
         if (current?.stopRequested) {
           return;
@@ -1178,23 +1169,75 @@ export class BridgeServer {
         }
 
         void this._fireHooks("notification", session.id, context.cwd);
-      },
-      provider: resolvedProvider,
-      onQuotaWarning: (warning) => {
-        this.emit("bridge/quota_warning", {
-          quotaId: warning.quotaId,
-          scope: warning.scope,
-          scopeId: warning.scopeId ?? null,
-          limit: warning.limit,
-          currentUsage: warning.currentUsage,
-          percentage: warning.percentage,
-          sessionId: warning.sessionId,
-        }, requestId);
-      },
-      onQuotaBlocked: (notification) => {
-        this.emit("bridge/quota_blocked", notification as unknown as Record<string, unknown>, requestId);
-      },
-      });
+      };
+
+      const sharedQueryOptions = {
+        prompt,
+        options: resolvedOptions,
+        cwd: context.cwd,
+        env: context.env,
+        shouldStop: () => {
+          const current = this.sessionStore.get(session.id);
+          return Boolean(current?.stopRequested);
+        },
+        signal: abortController.signal,
+        onEvent,
+        onQuotaWarning: (warning: QuotaWarning) => {
+          this.emit("bridge/quota_warning", {
+            quotaId: warning.quotaId,
+            scope: warning.scope,
+            scopeId: warning.scopeId ?? null,
+            limit: warning.limit,
+            currentUsage: warning.currentUsage,
+            percentage: warning.percentage,
+            sessionId: warning.sessionId,
+          }, requestId);
+        },
+        onQuotaBlocked: (notification: QuotaBlockedNotification) => {
+          this.emit("bridge/quota_blocked", notification as unknown as Record<string, unknown>, requestId);
+        },
+      };
+
+      // Build ordered candidate list for reactive fallback
+      const candidateIds = providerRegistry.getSessionCandidateIds(session.id);
+      let queryResult: ClaudeQueryResult;
+
+      if (candidateIds.length === 0) {
+        // No registered providers configured — use existing health-check-based resolution
+        const resolvedProvider = await providerRegistry.resolveForSession(session.id);
+        queryResult = await runClaudeQuery({ ...sharedQueryOptions, provider: resolvedProvider });
+      } else {
+        // Walk candidate list reactively: try each provider, fall back on error
+        let lastError: unknown = null;
+        let resolved: ClaudeQueryResult | undefined;
+        let fromProviderId: string | null = null;
+
+        for (const candidateId of candidateIds) {
+          if (fromProviderId !== null) {
+            this.emit("bridge/provider_fallback_activated", {
+              fromProviderId,
+              toProviderId: candidateId,
+              reason: lastError instanceof Error ? lastError.message : String(lastError),
+              sessionId: session.id,
+            }, requestId);
+          }
+
+          try {
+            streamChunkIndex = 0;
+            const provider = await providerRegistry.resolveCandidate(candidateId);
+            resolved = await runClaudeQuery({ ...sharedQueryOptions, provider });
+            break;
+          } catch (err) {
+            lastError = err;
+            fromProviderId = candidateId;
+          }
+        }
+
+        if (resolved === undefined) {
+          throw lastError;
+        }
+        queryResult = resolved;
+      }
 
       const currentSession = this.sessionStore.get(session.id);
       if (currentSession?.cancelledAt) {
@@ -1546,6 +1589,23 @@ export class BridgeServer {
 
   private providerGetDefault(): unknown {
     return providerRegistry.getDefault();
+  }
+
+  private providerGetFallbackChain(params: Record<string, unknown>): unknown {
+    const { providerId } = params;
+    if (!providerId || typeof providerId !== "string") {
+      throw new BridgeError(-32602, "'providerId' must be a string");
+    }
+
+    try {
+      const fallbackProviderIds = providerRegistry.getFallbackChain(providerId);
+      return { providerId, fallbackProviderIds };
+    } catch (error) {
+      if (error instanceof Error && error.name === "ProviderRegistryError") {
+        throw new BridgeError(-32001, error.message);
+      }
+      throw new BridgeError(-32603, `Failed to get fallback chain: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   private async providerHealthCheck(params: Record<string, unknown>): Promise<unknown> {

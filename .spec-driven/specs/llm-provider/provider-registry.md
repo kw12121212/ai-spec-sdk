@@ -1,10 +1,12 @@
 ---
 mapping:
   implementation:
+    - src/llm-provider/types.ts
     - src/llm-provider/provider-registry.ts
     - src/bridge.ts
     - src/token-tracking/counters/index.ts
   tests:
+    - test/provider-fallback.test.ts
     - test/provider-registry.test.ts
     - test/provider-registry-bridge.test.ts
     - test/token-tracking/counters.test.ts
@@ -201,3 +203,104 @@ The SDK MUST support registering custom TokenCounter implementations for provide
 - GIVEN multiple counters are registered (built-in and custom)
 - WHEN the client calls `token.listCounters`
 - THEN the bridge returns an array of `{ providerType, description }` for all registered counters
+
+### Requirement: Fallback Chain Configuration
+The SDK MUST allow clients to configure an ordered fallback chain on a provider by including `fallbackProviderIds` (an array of registered provider IDs) in the provider configuration.
+
+#### Scenario: Register provider with fallback chain
+- GIVEN a client provides a valid provider configuration with `fallbackProviderIds: ["backup-1", "backup-2"]`
+- WHEN the client calls `provider.register` with that configuration
+- THEN the bridge stores the configuration including `fallbackProviderIds`
+- AND returns `{ success: true, providerId: "<id>" }`
+
+#### Scenario: Register provider without fallback chain
+- GIVEN a client provides a valid provider configuration without `fallbackProviderIds`
+- WHEN the client calls `provider.register`
+- THEN the registration succeeds and behaves identically to the existing behavior
+
+#### Scenario: Reject non-array fallbackProviderIds
+- GIVEN a client provides a configuration with `fallbackProviderIds: "backup-1"` (a string, not an array)
+- WHEN the client calls `provider.register`
+- THEN the bridge returns error `-32602` (Invalid params) with details about the invalid field
+
+#### Scenario: Fallback chain persists across restarts
+- GIVEN a provider with `fallbackProviderIds` is registered
+- WHEN the bridge restarts and loads from ConfigStore
+- THEN the reloaded provider config includes the original `fallbackProviderIds`
+
+### Requirement: Reactive Fallback on Request Error
+The SDK MUST automatically retry a failed request on the next provider in the fallback chain when the active provider throws an error during a live request.
+
+#### Scenario: Fallback activates on primary provider error
+- GIVEN provider "primary" is active for a session
+- AND "primary" has `fallbackProviderIds: ["backup"]`
+- AND "primary" throws an error on query
+- WHEN the session executes a request
+- THEN the SDK retries the request on "backup"
+- AND returns the result from "backup"
+
+#### Scenario: Fallback walks the full chain in order
+- GIVEN provider "primary" has `fallbackProviderIds: ["b1", "b2"]`
+- AND "primary" and "b1" both throw on query
+- WHEN the session executes a request
+- THEN the SDK tries "primary", then "b1", then "b2" in that order
+- AND returns the result from "b2"
+
+#### Scenario: All chain members fail
+- GIVEN provider "primary" has `fallbackProviderIds: ["backup"]`
+- AND both "primary" and "backup" throw on query
+- WHEN the session executes a request
+- THEN the SDK returns an error indicating all providers in the chain failed
+
+#### Scenario: Fallback does not activate on successful request
+- GIVEN provider "primary" has `fallbackProviderIds: ["backup"]`
+- AND "primary" succeeds on query
+- WHEN the session executes a request
+- THEN only "primary" is used; "backup" is not called
+
+#### Scenario: No fallback when chain is absent
+- GIVEN provider "primary" has no `fallbackProviderIds`
+- AND "primary" throws on query
+- WHEN the session executes a request
+- THEN the SDK falls through to the default provider (existing behavior)
+
+### Requirement: Fallback Activation Event
+The SDK MUST emit a `bridge/provider_fallback_activated` notification on the bridge event stream whenever the fallback chain advances due to a provider error.
+
+#### Scenario: Event emitted on fallback
+- GIVEN provider "primary" has `fallbackProviderIds: ["backup"]`
+- AND "primary" throws on query
+- WHEN the SDK falls back to "backup"
+- THEN a `bridge/provider_fallback_activated` event is emitted with `{ fromProviderId: "primary", toProviderId: "backup", reason: "<error message>", sessionId: "<id>" }`
+
+#### Scenario: One event per chain step
+- GIVEN provider "primary" has `fallbackProviderIds: ["b1", "b2"]`
+- AND "primary" and "b1" both fail
+- WHEN the SDK walks to "b2"
+- THEN two `bridge/provider_fallback_activated` events are emitted: primary→b1 and b1→b2
+
+### Requirement: Fallback Chain Inspection
+The SDK MUST allow clients to retrieve the configured fallback chain for a provider via `provider.getFallbackChain`.
+
+#### Scenario: Get fallback chain for provider with chain configured
+- GIVEN provider "primary" is registered with `fallbackProviderIds: ["b1", "b2"]`
+- WHEN the client calls `provider.getFallbackChain` with `{ providerId: "primary" }`
+- THEN the bridge returns `{ providerId: "primary", fallbackProviderIds: ["b1", "b2"] }`
+
+#### Scenario: Get fallback chain for provider without chain
+- GIVEN provider "primary" is registered without `fallbackProviderIds`
+- WHEN the client calls `provider.getFallbackChain` with `{ providerId: "primary" }`
+- THEN the bridge returns `{ providerId: "primary", fallbackProviderIds: [] }`
+
+#### Scenario: Get fallback chain for non-existent provider
+- GIVEN no provider with ID "unknown" exists
+- WHEN the client calls `provider.getFallbackChain` with `{ providerId: "unknown" }`
+- THEN the bridge returns error `-32001` with message "Provider not found"
+
+### Requirement: Fallback Chain Update
+The SDK MUST allow clients to update the fallback chain on an existing provider via `provider.update`.
+
+#### Scenario: Update fallback chain
+- GIVEN provider "primary" is registered with no fallback chain
+- WHEN the client calls `provider.update` with `{ providerId: "primary", config: { fallbackProviderIds: ["backup"] } }`
+- THEN the bridge updates the stored config and returns the updated provider config including `fallbackProviderIds: ["backup"]`

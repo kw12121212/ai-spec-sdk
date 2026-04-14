@@ -42,4 +42,7 @@ Enable collaborative agent workflows through task templates, team registries, an
 - Team quotas need careful accounting to prevent overuse
 
 ## Status
-- Declared: planned
+- Declared: proposed
+
+## Notes
+

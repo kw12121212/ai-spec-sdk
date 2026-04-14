@@ -41,4 +41,7 @@ Provide secure storage and management for API keys, credentials, and sensitive c
 - Audit logs may contain sensitive metadata
 
 ## Status
-- Declared: planned
+- Declared: proposed
+
+## Notes
+

@@ -68,6 +68,14 @@ export class ProviderRegistry {
       });
     }
 
+    if (cfg.fallbackProviderIds !== undefined) {
+      if (!Array.isArray(cfg.fallbackProviderIds)) {
+        errors.push({ field: "fallbackProviderIds", message: "must be an array of strings" });
+      } else if (!(cfg.fallbackProviderIds as unknown[]).every((id) => typeof id === "string")) {
+        errors.push({ field: "fallbackProviderIds", message: "must contain only strings" });
+      }
+    }
+
     if (cfg.type === "anthropic" || cfg.type === "openai") {
       const hasApiKey = cfg.apiKey && typeof cfg.apiKey === "string" && cfg.apiKey.trim() !== "";
       const envVarName = cfg.type === "anthropic" ? "ANTHROPIC_API_KEY" : "OPENAI_API_KEY";
@@ -345,6 +353,53 @@ export class ProviderRegistry {
       previousProviderId,
       newProviderId: targetProviderId,
     };
+  }
+
+  getFallbackChain(providerId: string): string[] {
+    const config = this.configs.get(providerId);
+    if (!config) {
+      throw new ProviderRegistryError("NOT_FOUND", `Provider not found: ${providerId}`);
+    }
+    return Array.isArray(config.fallbackProviderIds) ? [...config.fallbackProviderIds] : [];
+  }
+
+  /**
+   * Returns the ordered list of candidate provider IDs for a session:
+   * [sessionActive, ...fallbackChain, default], deduplicated.
+   * Does not include the built-in terminal fallback.
+   */
+  getSessionCandidateIds(sessionId: string): string[] {
+    const session = this.getSession?.(sessionId);
+    const activeProviderId = session?.activeProviderId;
+
+    const candidates: string[] = [];
+    const seen = new Set<string>();
+
+    const add = (id: string | null | undefined): void => {
+      if (id && typeof id === "string" && this.configs.has(id) && !seen.has(id)) {
+        seen.add(id);
+        candidates.push(id);
+      }
+    };
+
+    add(activeProviderId);
+
+    if (activeProviderId && this.configs.has(activeProviderId)) {
+      const primaryConfig = this.configs.get(activeProviderId)!;
+      if (Array.isArray(primaryConfig.fallbackProviderIds)) {
+        for (const id of primaryConfig.fallbackProviderIds as string[]) {
+          add(id);
+        }
+      }
+    }
+
+    add(this.defaultProviderId);
+
+    return candidates;
+  }
+
+  async resolveCandidate(providerId: string): Promise<LLMProvider> {
+    return this.getOrCreateInstance(providerId);
   }
 
   setSessionGetter(getter: (id: string) => Session | undefined): void {

@@ -5,6 +5,7 @@ export interface ProviderConfig {
   model?: string;
   temperature?: number;
   maxTokens?: number;
+  fallbackProviderIds?: string[];
   [key: string]: unknown;
 }
 

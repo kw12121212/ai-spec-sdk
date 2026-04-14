@@ -46,4 +46,7 @@ Implement a self-driving development loop that automatically executes roadmap ch
 - Answer Agent accuracy affects loop reliability
 
 ## Status
-- Declared: planned
+- Declared: proposed
+
+## Notes
+

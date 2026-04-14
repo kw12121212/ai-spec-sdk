@@ -41,4 +41,7 @@ Provide durable storage for session state, LLM response caching, and tool execut
 - Storage backend failures need graceful degradation
 
 ## Status
-- Declared: planned
+- Declared: proposed
+
+## Notes
+

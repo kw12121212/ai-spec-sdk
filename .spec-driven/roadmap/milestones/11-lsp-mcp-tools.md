@@ -40,4 +40,7 @@ Integrate Language Server Protocol (LSP) clients and Model Context Protocol (MCP
 - External server lifecycle management adds complexity
 
 ## Status
-- Declared: planned
+- Declared: proposed
+
+## Notes
+
