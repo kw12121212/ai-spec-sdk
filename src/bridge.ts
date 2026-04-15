@@ -34,6 +34,7 @@ import {
   validateScopeStrings,
   getAllScopes,
   getToolMapping,
+  getEffectiveAllowedScopes,
   type ScopeConfig,
 } from "./permission-scopes.js";
 import {
@@ -1002,22 +1003,46 @@ export class BridgeServer {
       parentSessionId,
     );
 
-    if (controlParams.allowedScopes !== undefined) {
-      session.allowedScopes = controlParams.allowedScopes;
-      this.sessionStore.persist(session);
+    const parentAllowed = getEffectiveAllowedScopes({
+      allowedScopes: parentSession.allowedScopes,
+      roles: parentSession.roles
+    });
+
+    const childRequested = getEffectiveAllowedScopes({
+      allowedScopes: controlParams.allowedScopes,
+      roles: controlParams.roles
+    });
+
+    if (parentAllowed !== undefined) {
+      if (childRequested !== undefined) {
+        const invalid = childRequested.filter(s => !parentAllowed.includes(s));
+        if (invalid.length > 0) {
+          throw new BridgeError(-32602, "Child session allowedScopes cannot exceed parent allowedScopes");
+        }
+        if (controlParams.allowedScopes !== undefined) session.allowedScopes = controlParams.allowedScopes;
+        if (controlParams.roles !== undefined) session.roles = controlParams.roles;
+      } else {
+        if (parentSession.allowedScopes !== undefined) session.allowedScopes = parentSession.allowedScopes;
+        if (parentSession.roles !== undefined) session.roles = parentSession.roles;
+      }
+    } else {
+      if (controlParams.allowedScopes !== undefined) session.allowedScopes = controlParams.allowedScopes;
+      if (controlParams.roles !== undefined) session.roles = controlParams.roles;
     }
-    if (controlParams.blockedScopes !== undefined) {
-      session.blockedScopes = controlParams.blockedScopes;
-      this.sessionStore.persist(session);
+
+    const parentBlocked = parentSession.blockedScopes || [];
+    const childBlocked = controlParams.blockedScopes || [];
+    if (parentBlocked.length > 0 || childBlocked.length > 0) {
+      session.blockedScopes = Array.from(new Set([...parentBlocked, ...childBlocked]));
     }
-    if (controlParams.roles !== undefined) {
-      session.roles = controlParams.roles;
-      this.sessionStore.persist(session);
+
+    const parentPolicies = parentSession.policies || [];
+    const childPolicies = controlParams.policies || [];
+    if (parentPolicies.length > 0 || childPolicies.length > 0) {
+      session.policies = [...parentPolicies, ...childPolicies];
     }
-    if (controlParams.policies !== undefined) {
-      session.policies = controlParams.policies;
-      this.sessionStore.persist(session);
-    }
+
+    this.sessionStore.persist(session);
 
     this.auditLog.write(
       this.auditLog.createEntry(session.id, "session_spawned", "lifecycle", {
@@ -2365,6 +2390,10 @@ export class BridgeServer {
       cancelledAt: session.cancelledAt ?? null,
       cancelReason: session.cancelReason ?? null,
       timeoutMs: session.timeoutMs ?? null,
+      allowedScopes: session.allowedScopes,
+      blockedScopes: session.blockedScopes,
+      roles: session.roles,
+      policies: session.policies,
     };
   }
 

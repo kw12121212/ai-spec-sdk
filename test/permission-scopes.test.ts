@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test";
+import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import {
   resolveScopes,
   getAllScopes,
@@ -6,6 +6,7 @@ import {
   validateScopeStrings,
   isScopeDenied,
 } from "../src/permission-scopes.js";
+import { registerPolicy } from "../src/permission-policy.js";
 
 // ---- Scope Resolution Tests ----
 
@@ -325,5 +326,150 @@ describe("Bridge: template scope support", () => {
     expect(result.name).toBe("plain");
     expect(result.allowedScopes).toBeUndefined();
     expect(result.blockedScopes).toBeUndefined();
+  });
+});
+
+describe("Bridge: session.spawn inheritance", () => {
+  const workspace = process.cwd();
+  let fallbackMock: any;
+  let originalKey: string | undefined;
+
+  beforeAll(() => {
+    originalKey = process.env.ANTHROPIC_API_KEY;
+    process.env.ANTHROPIC_API_KEY = "sk-ant-test-key";
+    fallbackMock = (globalThis as any).__AI_SPEC_SDK_QUERY__;
+    (globalThis as any).__AI_SPEC_SDK_QUERY__ = async function* () {
+      yield { type: "system", subtype: "init", session_id: "test-sdk" };
+      yield { result: "done" };
+    };
+
+    registerPolicy("some-parent-policy", () => ({
+      name: "some-parent-policy",
+      async check() { return "pass"; }
+    }));
+    registerPolicy("some-child-policy", () => ({
+      name: "some-child-policy",
+      async check() { return "pass"; }
+    }));
+  });
+
+  afterAll(() => {
+    (globalThis as any).__AI_SPEC_SDK_QUERY__ = fallbackMock;
+    if (originalKey === undefined) {
+      delete process.env.ANTHROPIC_API_KEY;
+    } else {
+      process.env.ANTHROPIC_API_KEY = originalKey;
+    }
+  });
+
+  test("child inherits parent allowedScopes when none requested", async () => {
+    const bridge = createBridge();
+    const parentResp = await call(bridge, "session.start", {
+      workspace,
+      prompt: "parent",
+      allowedScopes: ["file:read", "file:write"]
+    });
+    const parentId = (parentResp.result as Record<string, unknown>).sessionId as string;
+
+    const childResp = await call(bridge, "session.spawn", {
+      parentSessionId: parentId,
+      prompt: "child"
+    });
+    expect(childResp.error).toBeUndefined();
+    const childId = (childResp.result as Record<string, unknown>).sessionId as string;
+
+    const statusResp = await call(bridge, "session.status", { sessionId: childId });
+    const status = statusResp.result as Record<string, unknown>;
+    expect(status.allowedScopes).toEqual(["file:read", "file:write"]);
+  });
+
+  test("child can request a subset of parent allowedScopes", async () => {
+    const bridge = createBridge();
+    const parentResp = await call(bridge, "session.start", {
+      workspace,
+      prompt: "parent",
+      allowedScopes: ["file:read", "file:write", "network"]
+    });
+    const parentId = (parentResp.result as Record<string, unknown>).sessionId as string;
+
+    const childResp = await call(bridge, "session.spawn", {
+      parentSessionId: parentId,
+      prompt: "child",
+      allowedScopes: ["file:read"]
+    });
+    expect(childResp.error).toBeUndefined();
+    const childId = (childResp.result as Record<string, unknown>).sessionId as string;
+
+    const statusResp = await call(bridge, "session.status", { sessionId: childId });
+    const status = statusResp.result as Record<string, unknown>;
+    expect(status.allowedScopes).toEqual(["file:read"]);
+  });
+
+  test("-32602 error thrown when child requests allowedScopes exceeding parent", async () => {
+    const bridge = createBridge();
+    const parentResp = await call(bridge, "session.start", {
+      workspace,
+      prompt: "parent",
+      allowedScopes: ["file:read"]
+    });
+    const parentId = (parentResp.result as Record<string, unknown>).sessionId as string;
+
+    const childResp = await call(bridge, "session.spawn", {
+      parentSessionId: parentId,
+      prompt: "child",
+      allowedScopes: ["file:write"]
+    });
+    expect(childResp.error).toBeDefined();
+    expect(childResp.error!.code).toBe(-32602);
+    expect(childResp.error!.message).toContain("exceed parent allowedScopes");
+  });
+
+  test("blockedScopes are unioned between parent and child", async () => {
+    const bridge = createBridge();
+    const parentResp = await call(bridge, "session.start", {
+      workspace,
+      prompt: "parent",
+      blockedScopes: ["network"]
+    });
+    const parentId = (parentResp.result as Record<string, unknown>).sessionId as string;
+
+    const childResp = await call(bridge, "session.spawn", {
+      parentSessionId: parentId,
+      prompt: "child",
+      blockedScopes: ["system"]
+    });
+    expect(childResp.error).toBeUndefined();
+    const childId = (childResp.result as Record<string, unknown>).sessionId as string;
+
+    const statusResp = await call(bridge, "session.status", { sessionId: childId });
+    const status = statusResp.result as Record<string, unknown>;
+    expect(status.blockedScopes).toContain("network");
+    expect(status.blockedScopes).toContain("system");
+    expect((status.blockedScopes as string[]).length).toBe(2);
+  });
+
+  test("parent policies execute before child policies", async () => {
+    const bridge = createBridge();
+    const parentResp = await call(bridge, "session.start", {
+      workspace,
+      prompt: "parent",
+      policies: [{ name: "some-parent-policy" }]
+    });
+    const parentId = (parentResp.result as Record<string, unknown>).sessionId as string;
+
+    const childResp = await call(bridge, "session.spawn", {
+      parentSessionId: parentId,
+      prompt: "child",
+      policies: [{ name: "some-child-policy" }]
+    });
+    expect(childResp.error).toBeUndefined();
+    const childId = (childResp.result as Record<string, unknown>).sessionId as string;
+
+    const statusResp = await call(bridge, "session.status", { sessionId: childId });
+    const status = statusResp.result as Record<string, unknown>;
+    const policies = status.policies as Array<{ name: string }>;
+    expect(policies).toBeDefined();
+    expect(policies[0].name).toBe("some-parent-policy");
+    expect(policies[1].name).toBe("some-child-policy");
   });
 });

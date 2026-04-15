@@ -73,6 +73,16 @@ export function validateScopeStrings(
   }
 }
 
+export function getEffectiveAllowedScopes(config: ScopeConfig): string[] | undefined {
+  let effectiveAllowed: string[] | undefined = config.allowedScopes;
+  if (config.roles !== undefined) {
+    const roleScopes = roleStore.resolveRoles(config.roles);
+    effectiveAllowed = effectiveAllowed ? [...effectiveAllowed, ...roleScopes] : roleScopes;
+  }
+  // Deduplicate array if it exists
+  return effectiveAllowed ? Array.from(new Set(effectiveAllowed)) : undefined;
+}
+
 export function isScopeDenied(
   toolName: string,
   config: ScopeConfig,
@@ -93,11 +103,7 @@ export function isScopeDenied(
   }
 
   // Combine allowedScopes and roles
-  let effectiveAllowed: string[] | undefined = config.allowedScopes;
-  if (config.roles !== undefined) {
-    const roleScopes = roleStore.resolveRoles(config.roles);
-    effectiveAllowed = effectiveAllowed ? [...effectiveAllowed, ...roleScopes] : roleScopes;
-  }
+  const effectiveAllowed = getEffectiveAllowedScopes(config);
 
   // allowedScopes: all required scopes must be in the allowed set
   if (effectiveAllowed !== undefined) {
