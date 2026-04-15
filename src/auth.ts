@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import type { StoredKey } from "./key-store.js";
+import { roleStore } from "./role-store.js";
 
 export function generateKey(): { token: string; hash: string } {
   const token = crypto.randomBytes(32).toString("hex");
@@ -81,5 +82,12 @@ export const METHOD_SCOPES: Record<string, string | null> = {
 export function checkScope(key: StoredKey, method: string): boolean {
   const required = method in METHOD_SCOPES ? METHOD_SCOPES[method] : "admin";
   if (required === null) return true;
-  return key.scopes.includes("admin") || key.scopes.includes(required as string);
+  
+  const effectiveScopes = new Set(key.scopes);
+  if (key.roles && key.roles.length > 0) {
+    const roleScopes = roleStore.resolveRoles(key.roles);
+    for (const s of roleScopes) effectiveScopes.add(s);
+  }
+
+  return effectiveScopes.has("admin") || effectiveScopes.has(required as string);
 }

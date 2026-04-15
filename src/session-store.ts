@@ -37,6 +37,7 @@ export interface Session {
   timeoutMs?: number;
   allowedScopes?: string[];
   blockedScopes?: string[];
+  roles?: string[];
   policies?: PolicyDescriptor[];
 }
 

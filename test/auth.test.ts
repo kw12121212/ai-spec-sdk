@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import crypto from "node:crypto";
 import { checkScope, METHOD_SCOPES, verifyKey } from "../src/auth.js";
 import type { StoredKey } from "../src/key-store.js";
+import { roleStore } from "../src/role-store.js";
 
 function makeKey(overrides: Partial<StoredKey> = {}): StoredKey {
   return {
@@ -62,9 +63,37 @@ test("checkScope passes with a matching scope", () => {
   assert.equal(checkScope(key, "session.start"), true);
 });
 
+test("checkScope passes with a matching role", () => {
+  const originalResolve = roleStore.resolveRoles;
+  roleStore.resolveRoles = (roles) => {
+    if (roles.includes("operator")) return ["session:write"];
+    return [];
+  };
+  try {
+    const key = makeKey({ scopes: ["session:read"], roles: ["operator"] });
+    assert.equal(checkScope(key, "session.start"), true);
+  } finally {
+    roleStore.resolveRoles = originalResolve;
+  }
+});
+
 test("checkScope passes with admin scope", () => {
   const key = makeKey({ scopes: ["admin"] });
   assert.equal(checkScope(key, "workflow.run"), true);
+});
+
+test("checkScope passes with admin role", () => {
+  const originalResolve = roleStore.resolveRoles;
+  roleStore.resolveRoles = (roles) => {
+    if (roles.includes("superadmin")) return ["admin"];
+    return [];
+  };
+  try {
+    const key = makeKey({ scopes: ["session:read"], roles: ["superadmin"] });
+    assert.equal(checkScope(key, "workflow.run"), true);
+  } finally {
+    roleStore.resolveRoles = originalResolve;
+  }
 });
 
 test("checkScope fails with insufficient scope", () => {

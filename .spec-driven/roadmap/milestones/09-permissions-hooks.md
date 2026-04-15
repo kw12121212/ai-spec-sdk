@@ -27,7 +27,7 @@ Implement a fine-grained permission model with pluggable policies and enhanced t
 - `permission-scopes` - Declared: complete - define tool execution scopes
 - `policy-interface` - Declared: complete - pluggable permission policy system
 - `approval-chains` - Declared: complete - multi-level authorization workflows
-- `rbac-system` - Declared: planned - role-based access control
+- `rbac-system` - Declared: complete - role-based access control
 - `permission-inheritance` - Declared: planned - parent-child permission propagation
 - `permission-audit` - Declared: planned - audit logging for permission events
 
@@ -45,6 +45,7 @@ Implement a fine-grained permission model with pluggable policies and enhanced t
 - Declared: proposed
 
 ## Notes
+
 
 
 

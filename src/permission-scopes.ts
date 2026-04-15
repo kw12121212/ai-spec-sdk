@@ -1,3 +1,5 @@
+import { roleStore } from "./role-store.js";
+
 export type ToolScope =
   | "file:read"
   | "file:write"
@@ -55,6 +57,7 @@ export function getToolMapping(): ReadonlyMap<string, readonly ToolScope[]> {
 export interface ScopeConfig {
   allowedScopes?: string[];
   blockedScopes?: string[];
+  roles?: string[];
 }
 
 export function validateScopeStrings(
@@ -74,7 +77,7 @@ export function isScopeDenied(
   toolName: string,
   config: ScopeConfig,
 ): { denied: false } | { denied: true; requiredScopes: readonly ToolScope[] } {
-  if (config.allowedScopes === undefined && config.blockedScopes === undefined) {
+  if (config.allowedScopes === undefined && config.blockedScopes === undefined && config.roles === undefined) {
     return { denied: false };
   }
 
@@ -89,10 +92,17 @@ export function isScopeDenied(
     }
   }
 
+  // Combine allowedScopes and roles
+  let effectiveAllowed: string[] | undefined = config.allowedScopes;
+  if (config.roles !== undefined) {
+    const roleScopes = roleStore.resolveRoles(config.roles);
+    effectiveAllowed = effectiveAllowed ? [...effectiveAllowed, ...roleScopes] : roleScopes;
+  }
+
   // allowedScopes: all required scopes must be in the allowed set
-  if (config.allowedScopes !== undefined) {
+  if (effectiveAllowed !== undefined) {
     for (const scope of requiredScopes) {
-      if (!config.allowedScopes.includes(scope)) {
+      if (!effectiveAllowed.includes(scope)) {
         return { denied: true, requiredScopes };
       }
     }

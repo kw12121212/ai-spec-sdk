@@ -60,6 +60,19 @@ test("addKey accumulates multiple keys", () => {
   }
 });
 
+test("addKey and loadKeys round-trip with roles", () => {
+  const { keysFile, cleanup } = tempKeysFile();
+  try {
+    const key = sampleKey("k1", { roles: ["admin"] });
+    addKey(key, keysFile);
+    const loaded = loadKeys(keysFile);
+    assert.equal(loaded.length, 1);
+    assert.deepEqual(loaded[0], key);
+  } finally {
+    cleanup();
+  }
+});
+
 test("saved file does not contain raw token — only the fields of StoredKey", () => {
   const { keysFile, cleanup } = tempKeysFile();
   try {

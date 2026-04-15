@@ -137,6 +137,13 @@ if (subcommand === "keygen") {
   const expiresRaw = getArg("--expires");
   const scopes = scopesRaw.split(",").map((s) => s.trim()).filter(Boolean);
 
+  const roles: string[] = [];
+  for (let i = 0; i < process.argv.length; i++) {
+    if (process.argv[i] === "--role" && i + 1 < process.argv.length) {
+      roles.push(process.argv[i + 1]);
+    }
+  }
+
   const { token, hash } = generateKey();
   const key: StoredKey = {
     id: crypto.randomUUID(),
@@ -144,6 +151,7 @@ if (subcommand === "keygen") {
     hash,
     createdAt: new Date().toISOString(),
     scopes,
+    ...(roles.length > 0 ? { roles } : {}),
     ...(expiresRaw ? { expiresAt: new Date(expiresRaw).toISOString() } : {}),
   };
 
@@ -153,6 +161,7 @@ if (subcommand === "keygen") {
   process.stdout.write(`  ID:     ${key.id}\n`);
   process.stdout.write(`  Name:   ${name}\n`);
   process.stdout.write(`  Scopes: ${scopes.join(", ")}\n`);
+  if (roles.length > 0) process.stdout.write(`  Roles:  ${roles.join(", ")}\n`);
   if (key.expiresAt) process.stdout.write(`  Expires: ${key.expiresAt}\n`);
   process.stdout.write(`  Token:  ${token}\n`);
   process.stdout.write(`\nSave this token — it will not be shown again.\n`);
@@ -169,7 +178,8 @@ if (subcommand === "keys") {
     } else {
       for (const k of keys) {
         const expiry = k.expiresAt ? `  expires: ${k.expiresAt}` : "";
-        process.stdout.write(`${k.id}  ${k.name}  [${k.scopes.join(", ")}]  created: ${k.createdAt}${expiry}\n`);
+        const rolesOutput = k.roles && k.roles.length > 0 ? `  roles: [${k.roles.join(", ")}]` : "";
+        process.stdout.write(`${k.id}  ${k.name}  [${k.scopes.join(", ")}]${rolesOutput}  created: ${k.createdAt}${expiry}\n`);
       }
     }
     process.exit(0);

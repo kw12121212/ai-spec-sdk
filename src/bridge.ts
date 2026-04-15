@@ -43,6 +43,7 @@ import {
   getRegisteredPolicyNames,
   type PolicyDescriptor,
 } from "./permission-policy.js";
+import { validateRoleStrings } from "./role-store.js";
 import { ApprovalStore } from "./approval-store.js";
 
 const METHOD_NOT_FOUND = -32601;
@@ -75,6 +76,7 @@ interface AgentControlParams {
   systemPrompt?: string;
   allowedScopes?: string[];
   blockedScopes?: string[];
+  roles?: string[];
   policies?: PolicyDescriptor[];
 }
 
@@ -161,6 +163,21 @@ function validateAgentControlParams(raw: Record<string, unknown>): AgentControlP
       throw new BridgeError(-32602, (err as Error).message);
     }
     result.blockedScopes = raw["blockedScopes"] as string[];
+  }
+
+  if (raw["roles"] !== undefined) {
+    if (
+      !Array.isArray(raw["roles"]) ||
+      !(raw["roles"] as unknown[]).every((t) => typeof t === "string")
+    ) {
+      throw new BridgeError(-32602, "'roles' must be an array of strings");
+    }
+    try {
+      validateRoleStrings(raw["roles"] as string[], "roles");
+    } catch (err) {
+      throw new BridgeError(-32602, (err as Error).message);
+    }
+    result.roles = raw["roles"] as string[];
   }
 
   if (raw["policies"] !== undefined) {
@@ -764,7 +781,7 @@ export class BridgeServer {
     requestId: unknown,
   ): Promise<unknown> {
     const { workspace, prompt, options = {}, proxy, template, balancerId } = params;
-    const { model, allowedTools, disallowedTools, permissionMode, maxTurns, systemPrompt, stream, timeoutMs, allowedScopes, blockedScopes, policies } = params;
+    const { model, allowedTools, disallowedTools, permissionMode, maxTurns, systemPrompt, stream, timeoutMs, allowedScopes, blockedScopes, roles, policies } = params;
 
     if (!workspace || typeof workspace !== "string") {
       throw new BridgeError(-32602, "'workspace' must be provided");
@@ -824,6 +841,7 @@ export class BridgeServer {
       ...(systemPrompt !== undefined && { systemPrompt }),
       ...(allowedScopes !== undefined && { allowedScopes }),
       ...(blockedScopes !== undefined && { blockedScopes }),
+      ...(roles !== undefined && { roles }),
       ...(policies !== undefined && { policies }),
     };
 
@@ -852,6 +870,10 @@ export class BridgeServer {
     }
     if (controlParams.blockedScopes !== undefined) {
       session.blockedScopes = controlParams.blockedScopes;
+      this.sessionStore.persist(session);
+    }
+    if (controlParams.roles !== undefined) {
+      session.roles = controlParams.roles;
       this.sessionStore.persist(session);
     }
     if (controlParams.policies !== undefined) {
@@ -911,7 +933,7 @@ export class BridgeServer {
     requestId: unknown,
   ): Promise<unknown> {
     const { parentSessionId, prompt, options = {}, proxy, workspace } = params;
-    const { model, allowedTools, disallowedTools, permissionMode, maxTurns, systemPrompt, stream, allowedScopes, blockedScopes, policies } = params;
+    const { model, allowedTools, disallowedTools, permissionMode, maxTurns, systemPrompt, stream, allowedScopes, blockedScopes, roles, policies } = params;
 
     if (!parentSessionId || typeof parentSessionId !== "string") {
       throw new BridgeError(-32602, "'parentSessionId' must be provided");
@@ -961,6 +983,7 @@ export class BridgeServer {
       systemPrompt,
       allowedScopes,
       blockedScopes,
+      roles,
       policies,
     });
 
@@ -985,6 +1008,10 @@ export class BridgeServer {
     }
     if (controlParams.blockedScopes !== undefined) {
       session.blockedScopes = controlParams.blockedScopes;
+      this.sessionStore.persist(session);
+    }
+    if (controlParams.roles !== undefined) {
+      session.roles = controlParams.roles;
       this.sessionStore.persist(session);
     }
     if (controlParams.policies !== undefined) {
@@ -1028,7 +1055,7 @@ export class BridgeServer {
     requestId: unknown,
   ): Promise<unknown> {
     const { sessionId, prompt, options = {}, proxy } = params;
-    const { model, allowedTools, disallowedTools, permissionMode, maxTurns, systemPrompt, stream, timeoutMs, allowedScopes, blockedScopes, policies } = params;
+    const { model, allowedTools, disallowedTools, permissionMode, maxTurns, systemPrompt, stream, timeoutMs, allowedScopes, blockedScopes, roles, policies } = params;
 
     if (!sessionId || typeof sessionId !== "string") {
       throw new BridgeError(-32602, "'sessionId' must be provided");
@@ -1061,7 +1088,7 @@ export class BridgeServer {
       );
     }
 
-    const controlParams = validateAgentControlParams({ model, allowedTools, disallowedTools, permissionMode, maxTurns, systemPrompt, allowedScopes, blockedScopes, policies });
+    const controlParams = validateAgentControlParams({ model, allowedTools, disallowedTools, permissionMode, maxTurns, systemPrompt, allowedScopes, blockedScopes, roles, policies });
 
     if (!session.sdkSessionId) {
       throw new BridgeError(SDK_SESSION_ID_UNAVAILABLE, "Session SDK ID not available", {
@@ -1085,6 +1112,10 @@ export class BridgeServer {
     }
     if (controlParams.blockedScopes !== undefined) {
       session.blockedScopes = controlParams.blockedScopes;
+      this.sessionStore.persist(session);
+    }
+    if (controlParams.roles !== undefined) {
+      session.roles = controlParams.roles;
       this.sessionStore.persist(session);
     }
     if (controlParams.policies !== undefined) {
@@ -1308,6 +1339,7 @@ export class BridgeServer {
             const scopeConfig: ScopeConfig = {
               allowedScopes: currentSession?.allowedScopes,
               blockedScopes: currentSession?.blockedScopes,
+              roles: currentSession?.roles,
             };
             const scopeResult = isScopeDenied(toolName ?? "unknown", scopeConfig);
             if (scopeResult.denied) {

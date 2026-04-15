@@ -63,12 +63,18 @@ The following are exempt from authentication and MUST be callable without a key 
 API keys MUST be stored in `~/.ai-spec-sdk/keys.json` as a JSON array. Each entry MUST contain: `id` (unique string), `name` (human label), `hash` (SHA-256 hex of the raw token), `createdAt` (ISO timestamp), `scopes` (array of scope strings), and optionally `expiresAt` (ISO timestamp). Raw key tokens MUST NOT be stored.
 
 ### Requirement: Key Generation CLI
-Running `ai-spec-bridge keygen` MUST generate a new 256-bit random API key, print the raw token exactly once to stdout, store the SHA-256 hash in `keys.json`, and never print or store the raw token again.
+The system MUST generate a new 256-bit random API key, print the raw token exactly once to stdout, store the SHA-256 hash in `keys.json`, and never print or store the raw token again when running `ai-spec-bridge keygen`. It MUST accept an optional `--role <role_name>` flag, which can be provided multiple times to assign roles to the generated key.
 
 #### Scenario: keygen prints token once
 - GIVEN the operator runs `ai-spec-bridge keygen`
 - WHEN the command completes
 - THEN the raw token is printed to stdout exactly once and is not stored in any file
+
+#### Scenario: keygen with role
+- GIVEN the operator runs `ai-spec-bridge keygen --role operator`
+- WHEN the command completes
+- THEN the raw token is printed to stdout
+- AND the stored key entry contains `roles: ["operator"]`
 
 ### Requirement: Key Listing CLI
 Running `ai-spec-bridge keys list` MUST print each stored key's `id`, `name`, `scopes`, `createdAt`, and `expiresAt` (if set). Raw tokens and hashes MUST NOT appear in the output.

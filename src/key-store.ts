@@ -9,6 +9,7 @@ export interface StoredKey {
   createdAt: string; // ISO timestamp
   expiresAt?: string; // ISO timestamp
   scopes: string[];
+  roles?: string[];
 }
 
 export const DEFAULT_KEYS_FILE = path.join(os.homedir(), ".ai-spec-sdk", "keys.json");

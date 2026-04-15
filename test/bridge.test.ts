@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { BridgeServer } from "../src/bridge.js";
 import { registerPolicy } from "../src/permission-policy.js";
+import { roleStore } from "../src/role-store.js";
 
 test("bridge.capabilities returns stdio JSON-RPC capabilities", async () => {
   const notifications: unknown[] = [];
@@ -1343,6 +1344,45 @@ test("session.start rejects timeoutMs < 1", async () => {
     assert.ok(response.error);
     assert.equal(response.error!.code, -32602);
   } finally {
+    fs.rmSync(wsDir, { recursive: true, force: true });
+  }
+});
+
+test("session.start with roles parameter is stored and applied", async () => {
+  const wsDir = fs.mkdtempSync(path.join(os.tmpdir(), "roles-start-test-"));
+  const server = new BridgeServer();
+
+  const originalResolve = roleStore.resolveRoles;
+  const originalHas = roleStore.hasRole;
+  roleStore.resolveRoles = (roles) => {
+    if (roles.includes("test-role")) return ["file:write"];
+    return [];
+  };
+  roleStore.hasRole = (role) => role === "test-role" || originalHas.call(roleStore, role);
+
+  try {
+    globalThis.__AI_SPEC_SDK_QUERY__ = async function* () {
+      yield { type: "system", subtype: "init", session_id: "sdk-roles-1" };
+      yield {
+        type: "assistant",
+        message: { content: [{ type: "tool_use", id: "1", name: "Write", input: {} }] },
+      };
+      yield { type: "result", subtype: "success", result: "done" };
+    };
+
+    const startResp = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 1300,
+      method: "session.start",
+      params: { workspace: wsDir, prompt: "test roles start", roles: ["test-role"], allowedScopes: [] },
+    });
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+
+    assert.ok(!startResp.error);
+    assert.equal((startResp.result as any).status, "completed");
+  } finally {
+    roleStore.resolveRoles = originalResolve;
+    roleStore.hasRole = originalHas;
     fs.rmSync(wsDir, { recursive: true, force: true });
   }
 });
