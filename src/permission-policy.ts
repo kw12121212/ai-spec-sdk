@@ -1,4 +1,4 @@
-export type PolicyResult = "allow" | "deny" | "pass";
+export type PolicyResult = "allow" | "deny" | "pass" | "approval_required";
 
 export interface PolicyContext {
   toolName: string;
@@ -45,9 +45,10 @@ export function resolvePolicies(descriptors: PolicyDescriptor[]): PermissionPoli
 }
 
 export interface ChainRunResult {
-  decision: "allow" | "deny" | "pass";
+  decision: "allow" | "deny" | "pass" | "approval_required";
   deniedBy?: string;
   allowedBy?: string;
+  requiredBy?: string;
   audits: Array<{
     policyName: string;
     decision: PolicyResult;
@@ -70,7 +71,7 @@ export class PolicyChain {
       const result = await policy.check(context);
       const durationMs = performance.now() - start;
 
-      if (result !== "pass") {
+      if (result !== "pass" && result !== "approval_required") {
         audits.push({ policyName: policy.name, decision: result, durationMs });
       }
 
@@ -79,6 +80,10 @@ export class PolicyChain {
       }
       if (result === "allow") {
         return { decision: "allow", allowedBy: policy.name, audits };
+      }
+      if (result === "approval_required") {
+        audits.push({ policyName: policy.name, decision: result, durationMs });
+        return { decision: "approval_required", requiredBy: policy.name, audits };
       }
       // result === "pass": continue to next policy
     }

@@ -43,6 +43,7 @@ import {
   getRegisteredPolicyNames,
   type PolicyDescriptor,
 } from "./permission-policy.js";
+import { ApprovalStore } from "./approval-store.js";
 
 const METHOD_NOT_FOUND = -32601;
 const INTERNAL_ERROR = -32603;
@@ -360,6 +361,7 @@ export class BridgeServer {
   private auditLog: AuditLog;
   private abortControllers: Map<string, AbortController>;
   private timeoutIds: Map<string, NodeJS.Timeout>;
+  private approvalStore: ApprovalStore;
 
   constructor({ notify = () => {}, sessionsDir, workspacesDir, logger, transport = "stdio", runtimeInfoOptions, auditDir }: BridgeServerOptions = {}) {
     this.notify = notify;
@@ -392,6 +394,7 @@ export class BridgeServer {
     this.templateStore = new TemplateStore(sessionsDir ? path.join(sessionsDir, "templates") : undefined);
     this.abortControllers = new Map();
     this.timeoutIds = new Map();
+    this.approvalStore = new ApprovalStore();
 
     const activeSessionIds = new Set(this.sessionStore.list({ status: "all" }).map((s) => s.id));
     const removedCount = this.auditLog.cleanup(30, activeSessionIds);
@@ -561,6 +564,10 @@ export class BridgeServer {
         return this.registerWorkspace(params);
       case "workspace.list":
         return { workspaces: this.workspaceStore.list() };
+      case "bridge.approveTool":
+        return this.bridgeApproveTool(params);
+      case "bridge.denyTool":
+        return this.bridgeDenyTool(params);
       case "session.approveTool":
         return this.resolveApproval(params, { behavior: "allow" });
       case "session.rejectTool":
@@ -1377,6 +1384,39 @@ export class BridgeServer {
                 return;
               }
 
+              if (chainResult.decision === "approval_required") {
+                const approvalId = this.approvalStore.create(
+                  session.id,
+                  toolName ?? "unknown",
+                  toolInput,
+                  (approved: boolean) => {
+                    if (approved) {
+                      proceedAfterPolicyCheck();
+                    } else {
+                      this.sessionStore.stop(session.id);
+                    }
+                  },
+                  (reason?: any) => {
+                    this.logger.error("Tool approval rejected", { reason });
+                    this.sessionStore.stop(session.id);
+                  }
+                );
+
+                this.notify({
+                  jsonrpc: "2.0",
+                  method: "bridge/tool_approval_required",
+                  params: {
+                    sessionId: session.id,
+                    approvalId,
+                    toolName: toolName ?? "unknown",
+                    requiredBy: chainResult.requiredBy,
+                  },
+                });
+
+                this.sessionStore.transitionExecutionState(session.id, "waiting_for_input", "tool_approval_needed");
+                return;
+              }
+
               proceedAfterPolicyCheck();
             });
           } else {
@@ -1580,7 +1620,7 @@ export class BridgeServer {
         };
       }
 
-      if (queryResult.status === "stopped") {
+      if (queryResult.status === "stopped" || currentSession?.stopRequested || currentSession?.status === "stopped") {
         const stopped = this.sessionStore.stop(session.id);
         this.emit(
           "bridge/session_event",
@@ -1644,6 +1684,16 @@ export class BridgeServer {
       if (pending.sessionId === sessionId) {
         this.pendingApprovals.delete(reqId);
         pending.resolve({ behavior: "deny", message: "Session stopped" });
+      }
+    }
+
+    // Also auto-deny our new ApprovalStore items
+    const allApprovals = (this.approvalStore as any).approvals as Map<string, any>;
+    if (allApprovals) {
+      for (const [approvalId, pending] of allApprovals) {
+        if (pending.sessionId === sessionId) {
+          this.approvalStore.reject(approvalId, new Error("Session stopped"));
+        }
       }
     }
 
@@ -2342,6 +2392,50 @@ export class BridgeServer {
     const filtered = buf.filter((e) => e.seq >= sinceSeq).slice(0, resolvedLimit);
 
     return { sessionId, events: filtered, total: buf.length };
+  }
+
+  private bridgeApproveTool(params: Record<string, unknown>): unknown {
+    const { approvalId } = params;
+    if (!approvalId || typeof approvalId !== "string") {
+      throw new BridgeError(-32602, "'approvalId' must be provided");
+    }
+
+    const pending = this.approvalStore.get(approvalId);
+    if (!pending) {
+      throw new BridgeError(APPROVAL_NOT_FOUND, "Approval not found", { approvalId });
+    }
+
+    this.approvalStore.resolve(approvalId, true);
+    
+    this.emit("bridge/session_event", {
+      sessionId: pending.sessionId,
+      type: "tool_approved",
+      approvalId,
+    });
+
+    return { success: true, approvalId };
+  }
+
+  private bridgeDenyTool(params: Record<string, unknown>): unknown {
+    const { approvalId } = params;
+    if (!approvalId || typeof approvalId !== "string") {
+      throw new BridgeError(-32602, "'approvalId' must be provided");
+    }
+
+    const pending = this.approvalStore.get(approvalId);
+    if (!pending) {
+      throw new BridgeError(APPROVAL_NOT_FOUND, "Approval not found", { approvalId });
+    }
+
+    this.approvalStore.resolve(approvalId, false);
+    
+    this.emit("bridge/session_event", {
+      sessionId: pending.sessionId,
+      type: "tool_denied",
+      approvalId,
+    });
+
+    return { success: true, approvalId };
   }
 
   private resolveApproval(params: Record<string, unknown>, result: PermissionResult): unknown {

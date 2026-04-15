@@ -126,6 +126,8 @@ export function getCapabilities(transport = "stdio"): Capabilities {
       "bridge.ping",
       "bridge.info",
       "bridge.setLogLevel",
+      "bridge.approveTool",
+      "bridge.denyTool",
       "workflow.run",
       "skills.list",
       "session.start",

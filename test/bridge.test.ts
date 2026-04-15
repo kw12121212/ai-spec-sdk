@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { BridgeServer } from "../src/bridge.js";
+import { registerPolicy } from "../src/permission-policy.js";
 
 test("bridge.capabilities returns stdio JSON-RPC capabilities", async () => {
   const notifications: unknown[] = [];
@@ -1596,3 +1597,152 @@ async function waitForSessionStarted(
 
   return (started()!["params"] as Record<string, unknown>)["sessionId"] as string;
 }
+
+test("bridge.approveTool resumes a paused tool execution", async () => {
+  const wsDir = fs.mkdtempSync(path.join(os.tmpdir(), "approve-tool-"));
+  registerPolicy("test-approve", () => ({
+    name: "test-approve",
+    check: async () => "approval_required"
+  }));
+
+  const notifications: unknown[] = [];
+  const server = new BridgeServer({
+    notify: (message) => notifications.push(message),
+  });
+
+  let queryFinished = false;
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* () {
+    yield { type: "system", subtype: "init", session_id: "sdk-approve-1" };
+    yield { type: "assistant", message: { content: [{ type: "tool_use", name: "Write", id: "tu-1", input: {} }] } };
+    
+    // Simulate the generator yielding to wait for tool result or something, 
+    // although the policy chain runs async
+    await new Promise((r) => setTimeout(r, 50));
+    yield { type: "result", subtype: "success", result: "done" };
+    queryFinished = true;
+  };
+
+  try {
+    const startPromise = server.handleMessage({
+      jsonrpc: "2.0",
+      id: 2001,
+      method: "session.start",
+      params: { 
+        workspace: wsDir, 
+        prompt: "test",
+        policies: [{ name: "test-approve" }]
+      },
+    });
+
+    const sessionId = await waitForSessionStarted(notifications as Array<Record<string, unknown>>);
+
+    // Wait for the tool_approval_required notification
+    const getApprovalId = async () => {
+      while (true) {
+        const notif = notifications.find(
+          (n) => (n as Record<string, unknown>)["method"] === "bridge/tool_approval_required"
+        );
+        if (notif) return ((notif as Record<string, unknown>)["params"] as Record<string, unknown>)["approvalId"] as string;
+        await new Promise((r) => setTimeout(r, 10));
+      }
+    };
+
+    const approvalId = await getApprovalId();
+    assert.ok(approvalId, "Should get an approvalId");
+
+    // Session should be in waiting_for_input state
+    const statusResp = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 2002,
+      method: "session.status",
+      params: { sessionId },
+    });
+    assert.equal((statusResp.result as Record<string, unknown>)["executionState"], "waiting_for_input");
+
+    // Approve it
+    const approveResp = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 2003,
+      method: "bridge.approveTool",
+      params: { approvalId },
+    });
+    assert.ok(!approveResp.error);
+
+    // After approval, the query should finish
+    await startPromise;
+    assert.ok(queryFinished);
+
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    fs.rmSync(wsDir, { recursive: true, force: true });
+  }
+});
+
+test("bridge.denyTool denies a paused tool execution and stops the session", async () => {
+  const wsDir = fs.mkdtempSync(path.join(os.tmpdir(), "deny-tool-"));
+  registerPolicy("test-deny", () => ({
+    name: "test-deny",
+    check: async () => "approval_required"
+  }));
+
+  const notifications: unknown[] = [];
+  const server = new BridgeServer({
+    notify: (message) => notifications.push(message),
+  });
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* () {
+    yield { type: "system", subtype: "init", session_id: "sdk-deny-1" };
+    yield { type: "assistant", message: { content: [{ type: "tool_use", name: "Write", id: "tu-2", input: {} }] } };
+    
+    // Keep yielding text so shouldStop inside runClaudeQuery has a chance to abort
+    for (let i = 0; i < 10; i++) {
+      await new Promise((r) => setTimeout(r, 20));
+      yield { type: "assistant", message: { content: [{ type: "text", text: "..." }] } };
+    }
+    yield { type: "result", subtype: "success", result: "done" };
+  };
+
+  try {
+    const startPromise = server.handleMessage({
+      jsonrpc: "2.0",
+      id: 2101,
+      method: "session.start",
+      params: { 
+        workspace: wsDir, 
+        prompt: "test",
+        policies: [{ name: "test-deny" }]
+      },
+    });
+
+    const sessionId = await waitForSessionStarted(notifications as Array<Record<string, unknown>>);
+
+    const getApprovalId = async () => {
+      while (true) {
+        const notif = notifications.find(
+          (n) => (n as Record<string, unknown>)["method"] === "bridge/tool_approval_required"
+        );
+        if (notif) return ((notif as Record<string, unknown>)["params"] as Record<string, unknown>)["approvalId"] as string;
+        await new Promise((r) => setTimeout(r, 10));
+      }
+    };
+
+    const approvalId = await getApprovalId();
+    
+    // Deny it
+    const denyResp = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 2103,
+      method: "bridge.denyTool",
+      params: { approvalId },
+    });
+    assert.ok(!denyResp.error);
+
+    const startResult = await startPromise;
+    assert.equal((startResult.result as Record<string, unknown>)["status"], "stopped");
+
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    fs.rmSync(wsDir, { recursive: true, force: true });
+  }
+});

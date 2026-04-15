@@ -139,6 +139,11 @@ The bridge MUST define a `PermissionPolicy` interface with an async `check(conte
 - AND a `bridge/policy_denied` notification is emitted with `sessionId`, `toolName`, and `policyName`
 - AND a `policy_denied` audit entry is written
 
+#### Scenario: policy requires approval
+- GIVEN a policy that returns `approval_required` for a specific tool and input
+- WHEN the policy is evaluated in a chain
+- THEN the chain evaluation MUST halt and return the `approval_required` decision along with any context provided by the policy.
+
 #### Scenario: policy passes (no opinion)
 - GIVEN a session with a policy that returns `pass` for all tools
 - WHEN the agent uses any tool
@@ -160,7 +165,7 @@ The `session.start`, `session.spawn`, and `session.resume` methods MUST accept a
 - THEN a `-32602` error is returned indicating the policy name is not registered
 
 ### Requirement: Policy Chain Execution Order
-When multiple policies are registered for a session, they MUST execute sequentially in registration order. If any policy returns `deny`, the chain MUST short-circuit: no further policies execute and the tool is blocked. If a policy returns `allow`, the chain short-circuits in the allow direction and the tool proceeds to the scope check.
+When multiple policies are registered for a session, they MUST execute sequentially in registration order. If any policy returns `deny` or `approval_required`, the chain MUST short-circuit: no further policies execute and the tool is blocked or paused. If a policy returns `allow`, the chain short-circuits in the allow direction and the tool proceeds to the scope check.
 
 #### Scenario: deny short-circuits chain
 - GIVEN a session with policies [policyA, policyB] where policyA returns `deny`

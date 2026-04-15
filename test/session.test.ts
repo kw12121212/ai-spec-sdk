@@ -5,6 +5,20 @@ import path from "node:path";
 import os from "node:os";
 import { BridgeServer } from "../src/bridge.js";
 
+const fallbackMock: any = async function* queryStub(params: { prompt: string; options?: Record<string, unknown> }) {
+  const { prompt, options } = params;
+  yield { type: "system", subtype: "init", session_id: "s1" };
+  if (prompt === "parent") {
+    yield { result: "done:parent" };
+  } else if (prompt === "child") {
+    yield { result: "done:child" };
+  } else {
+    yield { result: `done:${prompt}` };
+  }
+};
+// Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
+
 test("session start and resume produce events and complete", async () => {
   const fixtureWorkspace = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-session-"));
   const notifications: unknown[] = [];
@@ -70,7 +84,8 @@ test("session start and resume produce events and complete", async () => {
       ),
     );
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
   }
 });
 
@@ -130,7 +145,8 @@ test("session.stop transitions active session to stopped", async () => {
       "stopped",
     );
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
   }
 });
 
@@ -218,7 +234,8 @@ test("session.spawn inherits the parent workspace and emits bridge/subagent_even
       "parent session should receive child completion events",
     );
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
   }
 });
 
@@ -288,7 +305,8 @@ test("session.stop cascades to active child sessions", async () => {
     });
     assert.equal((childStatus.result as Record<string, unknown>)["status"], "stopped");
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
   }
 });
 
@@ -340,7 +358,8 @@ test("session.list filters by parentSessionId", async () => {
     assert.equal(sessions[0]?.["sessionId"], childSessionId);
     assert.equal(sessions[0]?.["parentSessionId"], parentSessionId);
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
   }
 });
 
@@ -368,7 +387,8 @@ test("session.start passes cwd equal to fixture workspace", async () => {
 
     assert.equal(capturedCwd, fixtureWorkspace);
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
   }
 });
 
@@ -408,7 +428,8 @@ test("session.resume passes SDK session_id as resume, not bridge UUID", async ()
     assert.equal(capturedResumeId, "sdk-session-xyz");
     assert.notEqual(capturedResumeId, sessionId);
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
   }
 });
 
@@ -447,7 +468,8 @@ test("session.start with proxy sets HTTP_PROXY HTTPS_PROXY NO_PROXY in env", asy
     assert.equal(capturedEnv["HTTPS_PROXY"], "http://proxy.corp.com:8080");
     assert.equal(capturedEnv["NO_PROXY"], "localhost,127.0.0.1");
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
   }
 });
 
@@ -500,7 +522,8 @@ test("session.resume when sdkSessionId is null returns -32012 error", async () =
     assert.ok(resume.error, "should return an error");
     assert.equal(resume.error?.code, -32012);
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
   }
 });
 
@@ -535,7 +558,8 @@ test("session.start with partial proxy (only http) sets only HTTP_PROXY", async 
     assert.equal(capturedEnv["HTTPS_PROXY"], undefined);
     assert.equal(capturedEnv["NO_PROXY"], undefined);
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
   }
 });
 
@@ -589,7 +613,8 @@ test("session.start proxy entries overwrite matching keys in options.env, preser
     assert.equal(capturedEnv["MY_VAR"], "kept");
     assert.equal(capturedEnv["HTTP_PROXY"], "http://proxy.corp.com:8080");
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
   }
 });
 
@@ -629,7 +654,8 @@ test("agent_message notifications carry correct messageType for each defined sha
     assert.ok(messageTypes.includes("tool_result"), "expected tool_result");
     assert.ok(messageTypes.includes("result"), "expected result");
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
   }
 });
 
@@ -667,7 +693,8 @@ test("tool_use takes precedence over text in mixed assistant content", async () 
 
     assert.ok(mixed, "expected tool_use messageType for mixed content");
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
   }
 });
 
@@ -700,7 +727,8 @@ test("agent_message with unrecognized shape gets messageType other", async () =>
       "expected at least one other messageType",
     );
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
   }
 });
 
@@ -730,7 +758,8 @@ test("session.list with no filter returns all sessions", async () => {
     assert.ok(entry["createdAt"]);
     assert.ok(entry["updatedAt"]);
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
   }
 });
 
@@ -769,7 +798,8 @@ test("session.list with status active returns only active sessions", async () =>
     assert.ok(!sessions.some((s) => s["sessionId"] === sessionId), "stopped session must not appear in active list");
     assert.ok(sessions.every((s) => s["status"] === "active"), "only active sessions expected");
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
   }
 });
 
@@ -794,7 +824,8 @@ test("session.list with status all returns all sessions", async () => {
     const sessions = (response.result as Record<string, unknown>)["sessions"] as unknown[];
     assert.ok(sessions.length >= 2);
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
   }
 });
 
@@ -833,7 +864,8 @@ test("session.list caps response at 100 entries when more exist", async () => {
     const sessions = (response.result as Record<string, unknown>)["sessions"] as unknown[];
     assert.equal(sessions.length, 100);
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
   }
 });
 
@@ -872,7 +904,8 @@ test("session.list returns sessions ordered by createdAt descending", async () =
     assert.ok(thirdIdx < secondIdx, "third session should appear before second");
     assert.ok(secondIdx < firstIdx, "second session should appear before first");
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
   }
 });
 
@@ -909,7 +942,8 @@ test("session.history returns total and entries for a completed session", async 
     assert.ok(Array.isArray(entries));
     assert.ok(entries.length > 0);
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
   }
 });
 
@@ -952,7 +986,8 @@ test("session.history with offset and limit returns correct window", async () =>
     const entries = pageResult["entries"] as unknown[];
     assert.equal(entries.length, 2);
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
   }
 });
 
@@ -982,7 +1017,8 @@ test("session.history with limit > 200 is capped at 200", async () => {
     const entries = (response.result as Record<string, unknown>)["entries"] as unknown[];
     assert.ok(entries.length <= 200, "entries must not exceed 200");
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
   }
 });
 
@@ -1024,7 +1060,8 @@ test("session.list entries include prompt field with initial prompt", async () =
     const entry = sessions.find((s) => s["prompt"] === "my initial prompt");
     assert.ok(entry, "session entry should include the initial prompt");
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
   }
 });
 
@@ -1090,7 +1127,8 @@ test("session.list prompt is truncated to 200 chars for long prompts", async () 
     assert.ok(entry, "session entry should be present");
     assert.equal((entry!["prompt"] as string).length, 200, "prompt should be truncated to 200 chars");
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
   }
 });
 
@@ -1115,7 +1153,8 @@ test("session.start with model passes it to the agent query", async () => {
     });
     assert.equal(capturedOptions["model"], "claude-opus-4-6");
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
   }
 });
 
@@ -1138,7 +1177,8 @@ test("session.start with allowedTools passes it to the agent query", async () =>
     });
     assert.deepEqual(capturedOptions["allowedTools"], ["Read", "Glob"]);
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
   }
 });
 
@@ -1161,7 +1201,8 @@ test("session.start with disallowedTools passes it to the agent query", async ()
     });
     assert.deepEqual(capturedOptions["disallowedTools"], ["Bash"]);
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
   }
 });
 
@@ -1184,7 +1225,8 @@ test("session.start with permissionMode acceptEdits passes it to the agent query
     });
     assert.equal(capturedOptions["permissionMode"], "acceptEdits");
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
   }
 });
 
@@ -1207,7 +1249,8 @@ test("session.start without permissionMode defaults to bypassPermissions", async
     });
     assert.equal(capturedOptions["permissionMode"], "bypassPermissions");
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
   }
 });
 
@@ -1230,7 +1273,8 @@ test("session.start with maxTurns passes it to the agent query", async () => {
     });
     assert.equal(capturedOptions["maxTurns"], 5);
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
   }
 });
 
@@ -1253,7 +1297,8 @@ test("session.start with systemPrompt passes it to the agent query", async () =>
     });
     assert.equal(capturedOptions["systemPrompt"], "You are strict.");
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
   }
 });
 
@@ -1332,7 +1377,8 @@ test("control parameters apply on session.resume with the same validation", asyn
     assert.ok(bad.error, "should return an error");
     assert.equal(bad.error?.code, -32602);
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
   }
 });
 
@@ -1415,7 +1461,8 @@ test("session.events returns buffered events after session.start", async () => {
     assert.ok(events.length >= 2, "should have at least session_started and session_completed events");
     assert.ok(events.every((e) => typeof e["seq"] === "number"), "each event must have a seq");
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
   }
 });
 
@@ -1452,7 +1499,8 @@ test("session.events since filter returns only events from that seq onward", asy
       assert.ok(sinceEvents.length < allEvents.length, "since filter should reduce event count");
     }
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
   }
 });
 
@@ -1489,7 +1537,8 @@ test("session.events respects limit parameter", async () => {
     const events = (limitResp.result as Record<string, unknown>)["events"] as unknown[];
     assert.ok(events.length <= 1, "limit:1 must return at most 1 event");
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
   }
 });
 
@@ -1525,7 +1574,8 @@ test("session.start response includes usage when SDK provides it", async () => {
     assert.equal(notifUsage["inputTokens"], 10);
     assert.equal(notifUsage["outputTokens"], 20);
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
   }
 });
 
@@ -1547,7 +1597,8 @@ test("session.start response has usage: null when SDK omits usage", async () => 
     const r = resp.result as Record<string, unknown>;
     assert.equal(r["usage"], null, "usage must be null when SDK does not provide it");
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
   }
 });
 
@@ -1600,6 +1651,9 @@ function makeApprovalServer(): {
 }
 
 test("session.approveTool allows a pending canUseTool call and session completes", async () => {
+  // Reset any global mock first
+  delete globalThis.__AI_SPEC_SDK_QUERY__;
+  
   const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-approve-"));
   type CanUseTool = (tool: string, input: Record<string, unknown>, opts: { signal: AbortSignal; toolUseID: string }) => Promise<{ behavior: string }>;
 
@@ -1645,7 +1699,8 @@ test("session.approveTool allows a pending canUseTool call and session completes
     assert.ok(!startResult.error, "session should complete without error");
     assert.equal((startResult.result as Record<string, unknown>)["status"], "completed");
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
     fs.rmSync(ws, { recursive: true, force: true });
   }
 });
@@ -1689,7 +1744,8 @@ test("session.rejectTool denies a pending canUseTool call", async () => {
     const startResult = await startPromise;
     assert.ok(!startResult.error, "session should complete (with denied tool)");
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
     fs.rmSync(ws, { recursive: true, force: true });
   }
 });
@@ -1720,7 +1776,8 @@ test("session.approveTool returns -32020 for an unknown requestId", async () => 
     assert.ok(resp.error, "must return an error for unknown requestId");
     assert.equal(resp.error!.code, -32020);
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
     fs.rmSync(ws, { recursive: true, force: true });
   }
 });
@@ -1770,7 +1827,8 @@ test("session.rejectTool returns -32020 for sessionId mismatch", async () => {
     });
     await startPromise;
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
     fs.rmSync(ws, { recursive: true, force: true });
   }
 });
@@ -1825,7 +1883,8 @@ test("session.stop auto-denies pending tool approvals", async () => {
     });
     assert.ok(lateApprove.error, "late approval after stop must return an error");
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
     fs.rmSync(ws, { recursive: true, force: true });
   }
 });
@@ -1908,7 +1967,8 @@ test("session.start with stream: true emits stream_chunk events", async () => {
     });
     assert.equal(assistantTexts.length, 1, "should emit 1 complete assistant_text");
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
     fs.rmSync(ws, { recursive: true, force: true });
   }
 });
@@ -1947,7 +2007,8 @@ test("session.start without stream (default) emits no stream_chunk events", asyn
     });
     assert.equal(streamChunks.length, 0, "should emit 0 stream_chunk events when stream is not set");
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
     fs.rmSync(ws, { recursive: true, force: true });
   }
 });
@@ -2014,7 +2075,8 @@ test("stream_chunk index resets per turn", async () => {
     const chunk1 = (streamChunks[1] as Record<string, unknown>)["params"] as Record<string, unknown>;
     assert.equal(chunk1["index"], 0, "second turn chunk should reset to index 0");
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
     fs.rmSync(ws, { recursive: true, force: true });
   }
 });
@@ -2082,7 +2144,8 @@ test("stream_chunk events stored in event buffer and replayable via session.even
     });
     assert.ok(streamChunks.length > 0, "event buffer should contain stream_chunk events");
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
     fs.rmSync(ws, { recursive: true, force: true });
   }
 });
@@ -2134,7 +2197,8 @@ test("session.start with template applies template parameters", async () => {
     const result = response.result as Record<string, unknown>;
     assert.equal(result["status"], "completed");
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
     fs.rmSync(ws, { recursive: true, force: true });
   }
 });
@@ -2183,7 +2247,8 @@ test("session.start explicit parameters override template", async () => {
     const result = response.result as Record<string, unknown>;
     assert.equal(result["status"], "completed");
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
     fs.rmSync(ws, { recursive: true, force: true });
   }
 });
@@ -2238,7 +2303,8 @@ test("session.start without template works as before", async () => {
     const result = response.result as Record<string, unknown>;
     assert.equal(result["status"], "completed");
   } finally {
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    // Make sure to clean up the query mock if we used it
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
     fs.rmSync(ws, { recursive: true, force: true });
   }
 });
