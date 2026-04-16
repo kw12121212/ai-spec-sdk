@@ -24,7 +24,7 @@ Enable collaborative agent workflows through task templates, team registries, an
 - Resource quotas are enforced at team level
 
 ## Planned Changes
-- `task-template-registry` - Declared: planned - save and version task templates
+- `task-template-registry` - Declared: complete - save and version task templates
 - `team-registry` - Declared: planned - team management and membership
 - `cron-scheduler` - Declared: planned - scheduled task execution
 - `task-queue` - Declared: planned - priority queue with retry logic
@@ -45,4 +45,5 @@ Enable collaborative agent workflows through task templates, team registries, an
 - Declared: proposed
 
 ## Notes
+
 

@@ -52,6 +52,7 @@
 
 ## workflow
 - [spec-driven-workflows.md](workflow/spec-driven-workflows.md) - spec-driven-workflows
+- [task-templates.md](workflow/task-templates.md) - task-templates
 
 ## webhook
 - [webhook-delivery.md](webhook/webhook-delivery.md) - webhook-delivery

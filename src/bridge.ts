@@ -19,6 +19,7 @@ import { defaultLogger, VALID_LOG_LEVELS, type Logger, type LogLevel } from "./l
 import { buildRuntimeInfo, type RuntimeInfoOptions } from "./runtime-info.js";
 import { WebhookManager } from "./webhooks.js";
 import { TemplateStore } from "./template-store.js";
+import { TaskTemplateStore } from "./task-template-store.js";
 import { AuditLog } from "./audit-log.js";
 import { providerRegistry } from "./llm-provider/provider-registry.js";
 import { balancerRegistry } from "./llm-provider/balancer-registry.js";
@@ -376,6 +377,7 @@ export class BridgeServer {
   private pendingApprovals: Map<string, PendingApproval>;
   private webhookManager: WebhookManager;
   private templateStore: TemplateStore;
+  private taskTemplateStore: TaskTemplateStore;
   private auditLog: AuditLog;
   private abortControllers: Map<string, AbortController>;
   private timeoutIds: Map<string, NodeJS.Timeout>;
@@ -410,6 +412,7 @@ export class BridgeServer {
     this.pendingApprovals = new Map();
     this.webhookManager = new WebhookManager(sessionsDir);
     this.templateStore = new TemplateStore(sessionsDir ? path.join(sessionsDir, "templates") : undefined);
+    this.taskTemplateStore = new TaskTemplateStore(sessionsDir ? path.join(sessionsDir, "task-templates") : undefined);
     this.abortControllers = new Map();
     this.timeoutIds = new Map();
     this.approvalStore = new ApprovalStore();
@@ -643,6 +646,16 @@ export class BridgeServer {
         return this.templateList();
       case "template.delete":
         return this.templateDelete(params);
+      case "taskTemplate.create":
+        return this.taskTemplateCreate(params);
+      case "taskTemplate.get":
+        return this.taskTemplateGet(params);
+      case "taskTemplate.update":
+        return this.taskTemplateUpdate(params);
+      case "taskTemplate.list":
+        return this.taskTemplateList();
+      case "taskTemplate.delete":
+        return this.taskTemplateDelete(params);
       case "audit.query":
         return this.auditQuery(params);
       case "provider.register":
@@ -3577,6 +3590,69 @@ For example: __custom_tool__:custom.build --verbose`;
       throw new BridgeError(-32602, "'name' must be a string");
     }
     const removed = this.templateStore.delete(name);
+    return { removed };
+  }
+
+  private taskTemplateCreate(params: Record<string, unknown>): unknown {
+    const { name, description, systemPrompt, tools, parameters } = params;
+
+    if (!name || typeof name !== "string") {
+      throw new BridgeError(-32602, "'name' must be a string");
+    }
+
+    try {
+      const template = this.taskTemplateStore.create({
+        name,
+        description: typeof description === "string" ? description : undefined,
+        systemPrompt: typeof systemPrompt === "string" ? systemPrompt : undefined,
+        tools: Array.isArray(tools) ? tools : undefined,
+        parameters: typeof parameters === "object" && parameters !== null ? parameters : undefined,
+      });
+      return template;
+    } catch (e: any) {
+      throw new BridgeError(-32603, e.message);
+    }
+  }
+
+  private taskTemplateGet(params: Record<string, unknown>): unknown {
+    const { name } = params;
+    if (!name || typeof name !== "string") {
+      throw new BridgeError(-32602, "'name' must be a string");
+    }
+    return this.taskTemplateStore.get(name);
+  }
+
+  private taskTemplateUpdate(params: Record<string, unknown>): unknown {
+    const { name, description, systemPrompt, tools, parameters } = params;
+
+    if (!name || typeof name !== "string") {
+      throw new BridgeError(-32602, "'name' must be a string");
+    }
+
+    try {
+      const template = this.taskTemplateStore.update({
+        name,
+        description: typeof description === "string" ? description : undefined,
+        systemPrompt: typeof systemPrompt === "string" ? systemPrompt : undefined,
+        tools: Array.isArray(tools) ? tools : undefined,
+        parameters: typeof parameters === "object" && parameters !== null ? parameters : undefined,
+      });
+      return template;
+    } catch (e: any) {
+      throw new BridgeError(-32603, e.message);
+    }
+  }
+
+  private taskTemplateList(): unknown {
+    return { templates: this.taskTemplateStore.list() };
+  }
+
+  private taskTemplateDelete(params: Record<string, unknown>): unknown {
+    const { name } = params;
+    if (!name || typeof name !== "string") {
+      throw new BridgeError(-32602, "'name' must be a string");
+    }
+    const removed = this.taskTemplateStore.delete(name);
     return { removed };
   }
 }
