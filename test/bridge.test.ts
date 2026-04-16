@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { BridgeServer } from "../src/bridge.js";
+import { AuditLog, type AuditEntry } from "../src/audit-log.js";
 import { registerPolicy } from "../src/permission-policy.js";
 import { roleStore } from "../src/role-store.js";
 
@@ -1784,5 +1785,134 @@ test("bridge.denyTool denies a paused tool execution and stops the session", asy
   } finally {
     delete globalThis.__AI_SPEC_SDK_QUERY__;
     fs.rmSync(wsDir, { recursive: true, force: true });
+  }
+});
+
+test("audit log scope_denied entry is created when tool execution is denied by scope", async () => {
+  const wsDir = fs.mkdtempSync(path.join(os.tmpdir(), "audit-scope-"));
+  const auditDir = fs.mkdtempSync(path.join(os.tmpdir(), "audit-dir-"));
+
+  const notifications: unknown[] = [];
+  const server = new BridgeServer({
+    auditDir,
+    notify: (message) => notifications.push(message),
+  });
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* () {
+    yield { type: "system", subtype: "init", session_id: "sdk-audit-scope" };
+    yield { type: "assistant", message: { content: [{ type: "tool_use", name: "Bash", id: "tu-1", input: { command: "echo test" } }] } };
+    await new Promise((r) => setTimeout(r, 10)); // let bridge process it
+    yield { type: "result", subtype: "success", result: "done" };
+  };
+
+  try {
+    const response = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 3000,
+      method: "session.start",
+      params: { workspace: wsDir, prompt: "test scope audit", allowedScopes: ["file:read"] }, // Bash requires 'system'
+    });
+
+    assert.ok(!response.error);
+    const sessionId = (response.result as Record<string, unknown>)["sessionId"] as string;
+    
+    // Wait for the session to be stopped
+    await new Promise((r) => setTimeout(r, 50));
+    
+    const auditLog = new AuditLog(auditDir);
+    const scopeDeniedEntries = auditLog.query({ sessionId, eventType: "scope_denied" }).entries;
+    assert.equal(scopeDeniedEntries.length, 1);
+    
+    const entry = scopeDeniedEntries[0];
+    assert.equal(entry.category, "security");
+    assert.equal(entry.payload.toolName, "Bash");
+    assert.deepEqual(entry.payload.requiredScopes, ["system"]);
+    assert.deepEqual(entry.payload.allowedScopes, ["file:read"]);
+    assert.equal(entry.payload.blockedScopes, null);
+    
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    fs.rmSync(wsDir, { recursive: true, force: true });
+    fs.rmSync(auditDir, { recursive: true, force: true });
+  }
+});
+
+test("audit log policy_decision entry is created for allow and deny policy decisions", async () => {
+  const wsDir = fs.mkdtempSync(path.join(os.tmpdir(), "audit-policy-"));
+  const auditDir = fs.mkdtempSync(path.join(os.tmpdir(), "audit-dir-"));
+
+  registerPolicy("audit-allow", () => ({ name: "audit-allow", async check() { return "allow"; } }));
+  registerPolicy("audit-deny", () => ({ name: "audit-deny", async check() { return "deny"; } }));
+  registerPolicy("audit-pass", () => ({ name: "audit-pass", async check() { return "pass"; } }));
+
+  const notifications: unknown[] = [];
+  const server = new BridgeServer({
+    auditDir,
+    notify: (message) => notifications.push(message),
+  });
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* () {
+    yield { type: "system", subtype: "init", session_id: "sdk-audit-policy" };
+    // This will hit the pass -> allow chain and proceed
+    yield { type: "assistant", message: { content: [{ type: "tool_use", name: "Read", id: "tu-1", input: { path: "test" } }] } };
+    await new Promise((r) => setTimeout(r, 10));
+    
+    // The next one will hit the pass -> deny chain
+    yield { type: "assistant", message: { content: [{ type: "tool_use", name: "Write", id: "tu-2", input: { path: "test", content: "data" } }] } };
+    await new Promise((r) => setTimeout(r, 10));
+    yield { type: "result", subtype: "success", result: "done" };
+  };
+
+  try {
+    const response1 = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 3001,
+      method: "session.start",
+      params: { 
+        workspace: wsDir, 
+        prompt: "test allow audit", 
+        policies: [{ name: "audit-pass" }, { name: "audit-allow" }]
+      },
+    });
+
+    const response2 = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 3002,
+      method: "session.start",
+      params: { 
+        workspace: wsDir, 
+        prompt: "test deny audit", 
+        policies: [{ name: "audit-pass" }, { name: "audit-deny" }]
+      },
+    });
+
+    const sessionId1 = (response1.result as Record<string, unknown>)["sessionId"] as string;
+    const sessionId2 = (response2.result as Record<string, unknown>)["sessionId"] as string;
+    
+    await new Promise((r) => setTimeout(r, 50));
+    
+    const auditLog = new AuditLog(auditDir);
+    
+    // Check allow session
+    const allowEntries = auditLog.query({ sessionId: sessionId1, eventType: "policy_decision" }).entries;
+    // We yield 2 tool_uses for sessionId1 in the generator, so we get 2 policy_decision entries!
+    assert.equal(allowEntries.length, 2);
+    assert.equal(allowEntries[0].payload.decision, "allow");
+    assert.equal(allowEntries[0].payload.policyName, "audit-allow");
+    assert.equal(allowEntries[0].category, "security");
+    assert.equal(typeof allowEntries[0].payload.durationMs, "number");
+    
+    // Check deny session
+    const denyEntries = auditLog.query({ sessionId: sessionId2, eventType: "policy_decision" }).entries;
+    // The second session runs the generator, hits the first tool_use (Read), and because the second policy is "deny", it denies! Wait, "deny" short-circuits. So it only gets 1 tool_use before it stops.
+    assert.equal(denyEntries.length, 1);
+    assert.equal(denyEntries[0].payload.decision, "deny");
+    assert.equal(denyEntries[0].payload.policyName, "audit-deny");
+    assert.equal(denyEntries[0].category, "security");
+
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    fs.rmSync(wsDir, { recursive: true, force: true });
+    fs.rmSync(auditDir, { recursive: true, force: true });
   }
 });
