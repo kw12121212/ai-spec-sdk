@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, expect } from "bun:test";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
@@ -28,16 +27,16 @@ operator:
     );
 
     const store = new RoleStore({ rolesFile });
-    assert.equal(store.hasRole("developer"), true);
-    assert.equal(store.hasRole("operator"), true);
-    assert.equal(store.hasRole("unknown"), false);
+    expect(store.hasRole("developer")).toBe(true);
+    expect(store.hasRole("operator")).toBe(true);
+    expect(store.hasRole("unknown")).toBe(false);
 
     const resolved = store.resolveRoles(["developer", "operator"]);
-    assert.ok(resolved.includes("file:read"));
-    assert.ok(resolved.includes("file:write"));
-    assert.ok(resolved.includes("session:read"));
-    assert.ok(resolved.includes("session:write"));
-    assert.equal(resolved.length, 4);
+    expect(resolved.includes("file:read")).toBeTruthy();
+    expect(resolved.includes("file:write")).toBeTruthy();
+    expect(resolved.includes("session:read")).toBeTruthy();
+    expect(resolved.includes("session:write")).toBeTruthy();
+    expect(resolved.length).toBe(4);
   } finally {
     cleanup();
   }
@@ -47,7 +46,7 @@ test("RoleStore handles missing roles.yaml", () => {
   const { rolesFile, cleanup } = tempRolesFile();
   try {
     const store = new RoleStore({ rolesFile });
-    assert.equal(store.getRolesMap().size, 0);
+    expect(store.getRolesMap().size).toBe(0);
   } finally {
     cleanup();
   }
@@ -58,7 +57,7 @@ test("RoleStore handles malformed roles.yaml", () => {
   try {
     fs.writeFileSync(rolesFile, "this is not valid yaml for roles\\n  - some list", "utf8");
     const store = new RoleStore({ rolesFile });
-    assert.equal(store.getRolesMap().size, 0);
+    expect(store.getRolesMap().size).toBe(0);
   } finally {
     cleanup();
   }

@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, expect } from "bun:test";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
@@ -9,14 +8,14 @@ test("TeamStore create returns team with creator as owner", () => {
   const store = new TeamStore();
   const team = store.create({ name: "engineering" });
 
-  assert.equal(team.name, "engineering");
-  assert.equal(team.version, 1);
-  assert.equal(team.members.length, 1);
-  assert.equal(team.members[0].userId, "creator");
-  assert.equal(team.members[0].role, "owner");
-  assert.equal(team.workspaces.length, 0);
-  assert.ok(typeof team.createdAt === "string");
-  assert.ok(typeof team.updatedAt === "string");
+  expect(team.name).toBe("engineering");
+  expect(team.version).toBe(1);
+  expect(team.members.length).toBe(1);
+  expect(team.members[0].userId).toBe("creator");
+  expect(team.members[0].role).toBe("owner");
+  expect(team.workspaces.length).toBe(0);
+  expect(typeof team.createdAt === "string").toBeTruthy();
+  expect(typeof team.updatedAt === "string").toBeTruthy();
 });
 
 test("TeamStore create with initial members and workspaces", () => {
@@ -31,28 +30,28 @@ test("TeamStore create with initial members and workspaces", () => {
     workspaces: ["/projects/platform", "/projects/infra"],
   });
 
-  assert.equal(team.members.length, 3);
-  assert.equal(team.members[0].userId, "creator");
-  assert.equal(team.members[0].role, "owner");
-  assert.equal(team.members[1].userId, "alice");
-  assert.equal(team.members[1].role, "admin");
-  assert.equal(team.members[2].userId, "bob");
-  assert.equal(team.members[2].role, "member");
-  assert.deepEqual(team.workspaces, ["/projects/platform", "/projects/infra"]);
-  assert.equal(team.description, "Platform team");
+  expect(team.members.length).toBe(3);
+  expect(team.members[0].userId).toBe("creator");
+  expect(team.members[0].role).toBe("owner");
+  expect(team.members[1].userId).toBe("alice");
+  expect(team.members[1].role).toBe("admin");
+  expect(team.members[2].userId).toBe("bob");
+  expect(team.members[2].role).toBe("member");
+  expect(team.workspaces).toEqual(["/projects/platform", "/projects/infra"]);
+  expect(team.description).toBe("Platform team");
 });
 
 test("TeamStore create rejects duplicate name", () => {
   const store = new TeamStore();
   store.create({ name: "eng" });
-  assert.throws(() => store.create({ name: "eng" }), /already exists/);
+  expect(() => store.create({ name: "eng" })).toThrow(/already exists/);
 });
 
 test("TeamStore get returns team or null", () => {
   const store = new TeamStore();
   store.create({ name: "found" });
-  assert.equal(store.get("found")!.name, "found");
-  assert.equal(store.get("missing"), null);
+  expect(store.get("found")!.name).toBe("found");
+  expect(store.get("missing")).toBe(null);
 });
 
 test("TeamStore update changes description and workspaces", () => {
@@ -60,9 +59,9 @@ test("TeamStore update changes description and workspaces", () => {
   store.create({ name: "dev", description: "old" });
 
   const updated = store.update({ name: "dev", description: "new", workspaces: ["/a"] });
-  assert.equal(updated.description, "new");
-  assert.deepEqual(updated.workspaces, ["/a"]);
-  assert.equal(updated.version, 2);
+  expect(updated.description).toBe("new");
+  expect(updated.workspaces).toEqual(["/a"]);
+  expect(updated.version).toBe(2);
 });
 
 test("TeamStore update preserves fields not provided", () => {
@@ -70,13 +69,13 @@ test("TeamStore update preserves fields not provided", () => {
   store.create({ name: "keep", description: "original", workspaces: ["/x"] });
 
   const updated = store.update({ name: "keep", description: "changed" });
-  assert.equal(updated.description, "changed");
-  assert.deepEqual(updated.workspaces, ["/x"]);
+  expect(updated.description).toBe("changed");
+  expect(updated.workspaces).toEqual(["/x"]);
 });
 
 test("TeamStore update rejects non-existent team", () => {
   const store = new TeamStore();
-  assert.throws(() => store.update({ name: "nope" }), /not found/);
+  expect(() => store.update({ name: "nope" })).toThrow(/not found/);
 });
 
 test("TeamStore list returns teams sorted by name", () => {
@@ -86,18 +85,18 @@ test("TeamStore list returns teams sorted by name", () => {
   store.create({ name: "mid" });
 
   const list = store.list();
-  assert.equal(list.length, 3);
-  assert.equal(list[0].name, "alpha");
-  assert.equal(list[1].name, "mid");
-  assert.equal(list[2].name, "zebra");
+  expect(list.length).toBe(3);
+  expect(list[0].name).toBe("alpha");
+  expect(list[1].name).toBe("mid");
+  expect(list[2].name).toBe("zebra");
 });
 
 test("TeamStore delete removes team", () => {
   const store = new TeamStore();
   store.create({ name: "gone" });
-  assert.equal(store.delete("gone"), true);
-  assert.equal(store.get("gone"), null);
-  assert.equal(store.delete("gone"), false);
+  expect(store.delete("gone")).toBe(true);
+  expect(store.get("gone")).toBe(null);
+  expect(store.delete("gone")).toBe(false);
 });
 
 test("TeamStore addMember adds a new member", () => {
@@ -105,27 +104,27 @@ test("TeamStore addMember adds a new member", () => {
   store.create({ name: "team" });
 
   const team = store.addMember("team", "charlie", "member");
-  assert.equal(team.members.length, 2);
-  assert.equal(team.members[1].userId, "charlie");
-  assert.equal(team.members[1].role, "member");
+  expect(team.members.length).toBe(2);
+  expect(team.members[1].userId).toBe("charlie");
+  expect(team.members[1].role).toBe("member");
 });
 
 test("TeamStore addMember rejects duplicate member", () => {
   const store = new TeamStore();
   store.create({ name: "team" });
   store.addMember("team", "alice", "admin");
-  assert.throws(() => store.addMember("team", "alice", "member"), /already exists/);
+  expect(() => store.addMember("team", "alice", "member")).toThrow(/already exists/);
 });
 
 test("TeamStore addMember rejects invalid role", () => {
   const store = new TeamStore();
   store.create({ name: "team" });
-  assert.throws(() => store.addMember("team", "x", "superuser" as any), /Invalid role/);
+  expect(() => store.addMember("team", "x", "superuser" as any)).toThrow(/Invalid role/);
 });
 
 test("TeamStore addMember rejects non-existent team", () => {
   const store = new TeamStore();
-  assert.throws(() => store.addMember("nope", "x", "member"), /not found/);
+  expect(() => store.addMember("nope", "x", "member")).toThrow(/not found/);
 });
 
 test("TeamStore removeMember removes a member", () => {
@@ -134,19 +133,19 @@ test("TeamStore removeMember removes a member", () => {
   store.addMember("team", "bob", "member");
 
   const team = store.removeMember("team", "bob");
-  assert.equal(team.members.length, 1);
-  assert.equal(team.members[0].userId, "creator");
+  expect(team.members.length).toBe(1);
+  expect(team.members[0].userId).toBe("creator");
 });
 
 test("TeamStore removeMember rejects non-existent member", () => {
   const store = new TeamStore();
   store.create({ name: "team" });
-  assert.throws(() => store.removeMember("team", "nobody"), /not found/);
+  expect(() => store.removeMember("team", "nobody")).toThrow(/not found/);
 });
 
 test("TeamStore removeMember rejects non-existent team", () => {
   const store = new TeamStore();
-  assert.throws(() => store.removeMember("nope", "x"), /not found/);
+  expect(() => store.removeMember("nope", "x")).toThrow(/not found/);
 });
 
 test("TeamStore persists team to disk on create", () => {
@@ -156,12 +155,12 @@ test("TeamStore persists team to disk on create", () => {
     store.create({ name: "persisted", description: "test" });
 
     const filePath = path.join(dir, "persisted.json");
-    assert.ok(fs.existsSync(filePath), "team file should exist on disk");
+    expect(fs.existsSync(filePath)).toBeTruthy();
 
     const parsed = JSON.parse(fs.readFileSync(filePath, "utf8")) as Record<string, unknown>;
-    assert.equal(parsed["name"], "persisted");
-    assert.equal(parsed["description"], "test");
-    assert.equal(parsed["version"], 1);
+    expect(parsed["name"]).toBe("persisted");
+    expect(parsed["description"]).toBe("test");
+    expect(parsed["version"]).toBe(1);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -175,10 +174,10 @@ test("TeamStore reloads teams from disk on construction", () => {
 
     const store2 = new TeamStore(dir);
     const loaded = store2.get("survives");
-    assert.ok(loaded, "team should be reloaded from disk");
-    assert.equal(loaded!.name, "survives");
-    assert.equal(loaded!.description, "reload test");
-    assert.equal(loaded!.version, 1);
+    expect(loaded).toBeTruthy();
+    expect(loaded!.name).toBe("survives");
+    expect(loaded!.description).toBe("reload test");
+    expect(loaded!.version).toBe(1);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -193,9 +192,9 @@ test("TeamStore persists on update", () => {
 
     const store2 = new TeamStore(dir);
     const loaded = store2.get("up");
-    assert.ok(loaded);
-    assert.equal(loaded!.description, "changed");
-    assert.equal(loaded!.version, 2);
+    expect(loaded).toBeTruthy();
+    expect(loaded!.description).toBe("changed");
+    expect(loaded!.version).toBe(2);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -206,10 +205,10 @@ test("TeamStore deletes file from disk on delete", () => {
   try {
     const store = new TeamStore(dir);
     store.create({ name: "rm" });
-    assert.ok(fs.existsSync(path.join(dir, "rm.json")));
+    expect(fs.existsSync(path.join(dir, "rm.json"))).toBeTruthy();
 
     store.delete("rm");
-    assert.ok(!fs.existsSync(path.join(dir, "rm.json")));
+    expect(!fs.existsSync(path.join(dir, "rm.json"))).toBeTruthy();
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -222,8 +221,8 @@ test("TeamStore skips corrupt files on load", () => {
     fs.writeFileSync(path.join(dir, "bad.json"), "not json{{{");
 
     const store = new TeamStore(dir);
-    assert.ok(store.get("good"));
-    assert.equal(store.get("bad"), null);
+    expect(store.get("good")).toBeTruthy();
+    expect(store.get("bad")).toBe(null);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

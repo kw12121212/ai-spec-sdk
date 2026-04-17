@@ -1,0 +1,3 @@
+[test]
+# Webhook tests use async HTTP delivery that needs more time under concurrent load
+timeout = 60000

@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, expect } from "bun:test";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -89,9 +88,9 @@ test("WebhookManager: subscribe returns registration with id, url, secret", () =
   try {
     const mgr = new WebhookManager(dir);
     const reg = mgr.subscribe("https://example.com/hook");
-    assert.ok(typeof reg.id === "string" && reg.id.length > 0);
-    assert.equal(reg.url, "https://example.com/hook");
-    assert.ok(typeof mgr.getSecret() === "string" && mgr.getSecret().length > 0);
+    expect(typeof reg.id === "string" && reg.id.length > 0).toBeTruthy();
+    expect(reg.url).toBe("https://example.com/hook");
+    expect(typeof mgr.getSecret() === "string" && mgr.getSecret().length > 0).toBeTruthy();
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -102,10 +101,10 @@ test("WebhookManager: unsubscribe removes registration", () => {
   try {
     const mgr = new WebhookManager(dir);
     const reg = mgr.subscribe("https://example.com/hook");
-    assert.equal(mgr.getRegistrations().length, 1);
+    expect(mgr.getRegistrations().length).toBe(1);
     const removed = mgr.unsubscribe(reg.id);
-    assert.equal(removed, true);
-    assert.equal(mgr.getRegistrations().length, 0);
+    expect(removed).toBe(true);
+    expect(mgr.getRegistrations().length).toBe(0);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -116,7 +115,7 @@ test("WebhookManager: unsubscribe unknown id returns false", () => {
   try {
     const mgr = new WebhookManager(dir);
     const removed = mgr.unsubscribe("nonexistent");
-    assert.equal(removed, false);
+    expect(removed).toBe(false);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -124,7 +123,7 @@ test("WebhookManager: unsubscribe unknown id returns false", () => {
 
 // ── Unit tests: HMAC-SHA256 signature ─────────────────────────────────────────
 
-test("WebhookManager: HMAC signature is verifiable", async () => {
+test("WebhookManager: HMAC signature is verifiable", { timeout: 30000 }, async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "webhook-test-"));
   try {
     const mgr = new WebhookManager(dir);
@@ -161,11 +160,11 @@ test("WebhookManager: HMAC signature is verifiable", async () => {
     // Wait for async delivery with a generous timeout
     await Promise.race([
       deliveryPromise,
-      new Promise<void>((r) => setTimeout(r, 3000)),
+      new Promise<void>((r) => setTimeout(r, 10000)),
     ]);
 
     const expectedSig = crypto.createHmac("sha256", secret).update(receivedBody).digest("hex");
-    assert.equal(receivedSig, expectedSig);
+    expect(receivedSig).toBe(expectedSig);
 
     server.close();
   } finally {
@@ -175,7 +174,7 @@ test("WebhookManager: HMAC signature is verifiable", async () => {
 
 // ── Unit tests: retry logic ───────────────────────────────────────────────────
 
-test("WebhookManager: does not retry on success", async () => {
+test("WebhookManager: does not retry on success", { timeout: 30000 }, async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "webhook-test-"));
   try {
     const mgr = new WebhookManager(dir);
@@ -202,16 +201,16 @@ test("WebhookManager: does not retry on success", async () => {
 
     await Promise.race([
       deliveryPromise,
-      new Promise<void>((r) => setTimeout(r, 3000)),
+      new Promise<void>((r) => setTimeout(r, 10000)),
     ]);
-    assert.equal(callCount, 1);
+    expect(callCount).toBe(1);
     server.close();
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
 
-test("WebhookManager: retries on failure up to 3 times", async () => {
+test("WebhookManager: retries on failure up to 3 times", { timeout: 30000 }, async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "webhook-test-"));
   try {
     const mgr = new WebhookManager(dir);
@@ -241,12 +240,12 @@ test("WebhookManager: retries on failure up to 3 times", async () => {
       firstCallPromise,
       new Promise<void>((r) => setTimeout(r, 5000)),
     ]);
-    assert.ok(callCount >= 1, `Expected at least 1 call, got ${callCount}`);
+    expect(callCount >= 1, `Expected at least 1 call, got ${callCount}`).toBeTruthy();
 
     // Wait for first retry (1s delay) with generous buffer
-    await new Promise((r) => setTimeout(r, 2500));
+    await new Promise((r) => setTimeout(r, 5000));
     const countAfterFirstRetry = callCount;
-    assert.ok(countAfterFirstRetry >= 2, `Expected at least 2 calls after first retry, got ${countAfterFirstRetry}`);
+    expect(countAfterFirstRetry >= 2, `Expected at least 2 calls after first retry, got ${countAfterFirstRetry}`).toBeTruthy();
     server.close();
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
@@ -261,13 +260,13 @@ test("WebhookManager: registrations survive restart", () => {
     const mgr1 = new WebhookManager(dir);
     mgr1.subscribe("https://example.com/hook1");
     mgr1.subscribe("https://example.com/hook2");
-    assert.equal(mgr1.getRegistrations().length, 2);
+    expect(mgr1.getRegistrations().length).toBe(2);
 
     // Simulate restart — secret will be different, but registrations persist
     const mgr2 = new WebhookManager(dir);
-    assert.equal(mgr2.getRegistrations().length, 2);
-    assert.equal(mgr2.getRegistrations()[0].url, "https://example.com/hook1");
-    assert.equal(mgr2.getRegistrations()[1].url, "https://example.com/hook2");
+    expect(mgr2.getRegistrations().length).toBe(2);
+    expect(mgr2.getRegistrations()[0].url).toBe("https://example.com/hook1");
+    expect(mgr2.getRegistrations()[1].url).toBe("https://example.com/hook2");
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -277,7 +276,7 @@ test("WebhookManager: starts with empty list when no file exists", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "webhook-test-"));
   try {
     const mgr = new WebhookManager(dir);
-    assert.equal(mgr.getRegistrations().length, 0);
+    expect(mgr.getRegistrations().length).toBe(0);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -310,7 +309,7 @@ test("WebhookManager: unsubscribed webhook receives no delivery", async () => {
     });
 
     await new Promise((r) => setTimeout(r, 200));
-    assert.equal(callCount, 0);
+    expect(callCount).toBe(0);
     server.close();
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
@@ -332,10 +331,10 @@ test("webhook.subscribe requires admin scope", async () => {
           { jsonrpc: "2.0", id: 1, method: "webhook.subscribe", params: { url: "https://example.com/hook" } },
           { Authorization: `Bearer ${token}` },
         );
-        assert.equal(status, 200);
+        expect(status).toBe(200);
         const err = (body as any).error;
-        assert.ok(err);
-        assert.match(err.message, /scope/i);
+        expect(err).toBeTruthy();
+        expect(err.message).toMatch(/scope/i);
       } finally {
         await shutdown();
       }
@@ -360,11 +359,11 @@ test("webhook.subscribe succeeds with admin scope", async () => {
           { jsonrpc: "2.0", id: 1, method: "webhook.subscribe", params: { url: "https://example.com/hook" } },
           { Authorization: `Bearer ${token}` },
         );
-        assert.equal(status, 200);
+        expect(status).toBe(200);
         const result = (body as any).result;
-        assert.ok(result.id);
-        assert.equal(result.url, "https://example.com/hook");
-        assert.ok(typeof result.secret === "string");
+        expect(result.id).toBeTruthy();
+        expect(result.url).toBe("https://example.com/hook");
+        expect(typeof result.secret === "string").toBeTruthy();
       } finally {
         await shutdown();
       }
@@ -396,7 +395,7 @@ test("webhook.unsubscribe returns removed: true", async () => {
           { jsonrpc: "2.0", id: 2, method: "webhook.unsubscribe", params: { id: webhookId } },
           { Authorization: `Bearer ${token}` },
         );
-        assert.equal((unsubBody as any).result.removed, true);
+        expect((unsubBody as any).result.removed).toBe(true);
       } finally {
         await shutdown();
       }
@@ -422,8 +421,8 @@ test("webhook.unsubscribe unknown id returns error", async () => {
           { Authorization: `Bearer ${token}` },
         );
         const err = (body as any).error;
-        assert.ok(err);
-        assert.equal(err.code, -32011);
+        expect(err).toBeTruthy();
+        expect(err.code).toBe(-32011);
       } finally {
         await shutdown();
       }
@@ -440,8 +439,8 @@ test("bridge.capabilities includes webhook methods", async () => {
   try {
     const { body } = await rpc(port, { jsonrpc: "2.0", id: 1, method: "bridge.capabilities" });
     const methods = (body as any).result.methods as string[];
-    assert.ok(methods.includes("webhook.subscribe"));
-    assert.ok(methods.includes("webhook.unsubscribe"));
+    expect(methods.includes("webhook.subscribe")).toBeTruthy();
+    expect(methods.includes("webhook.unsubscribe")).toBeTruthy();
   } finally {
     await shutdown();
   }

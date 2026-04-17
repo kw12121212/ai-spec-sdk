@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, expect } from "bun:test";
 import { QuotaRegistry, setQuotaRegistry } from "../../src/quota/registry.js";
 
 function createFreshRegistry(): QuotaRegistry {
@@ -20,27 +19,27 @@ const validRule = {
 test("set() stores a valid rule", () => {
   const reg = createFreshRegistry();
   const ok = reg.set(validRule);
-  assert.equal(ok, true);
-  assert.equal(reg.size, 1);
+  expect(ok).toBe(true);
+  expect(reg.size).toBe(1);
 });
 
 test("set() rejects duplicate quotaId", () => {
   const reg = createFreshRegistry();
   reg.set(validRule);
   const ok2 = reg.set(validRule);
-  assert.equal(ok2, false);
-  assert.equal(reg.size, 1);
+  expect(ok2).toBe(false);
+  expect(reg.size).toBe(1);
 });
 
 test("get() returns existing rule or null", () => {
   const reg = createFreshRegistry();
   reg.set(validRule);
   const got = reg.get("q1");
-  assert.ok(got);
-  assert.equal(got!.quotaId, "q1");
+  expect(got).toBeTruthy();;
+  expect(got!.quotaId).toBe("q1");
 
   const missing = reg.get("nonexistent");
-  assert.equal(missing, null);
+  expect(missing).toBe(null);
 });
 
 test("list() returns all rules when no scope filter", () => {
@@ -48,7 +47,7 @@ test("list() returns all rules when no scope filter", () => {
   reg.set(validRule);
   reg.set({ ...validRule, quotaId: "q2", scope: "global" });
   const all = reg.list();
-  assert.equal(all.length, 2);
+  expect(all.length).toBe(2);
 });
 
 test("list() filters by scope", () => {
@@ -58,26 +57,26 @@ test("list() filters by scope", () => {
   reg.set({ ...validRule, quotaId: "q3", scope: "provider", scopeId: "p1" });
 
   const sessionRules = reg.list("session");
-  assert.equal(sessionRules.length, 1);
-  assert.equal(sessionRules[0].quotaId, "q1");
+  expect(sessionRules.length).toBe(1);
+  expect(sessionRules[0].quotaId).toBe("q1");
 
   const globalRules = reg.list("global");
-  assert.equal(globalRules.length, 1);
+  expect(globalRules.length).toBe(1);
 
   const all = reg.list();
-  assert.equal(all.length, 3);
+  expect(all.length).toBe(3);
 });
 
 test("remove() deletes a rule and returns true/false", () => {
   const reg = createFreshRegistry();
   reg.set(validRule);
   const removed = reg.remove("q1");
-  assert.equal(removed, true);
-  assert.equal(reg.get("q1"), null);
-  assert.equal(reg.size, 0);
+  expect(removed).toBe(true);
+  expect(reg.get("q1")).toBe(null);
+  expect(reg.size).toBe(0);
 
   const removedAgain = reg.remove("q1");
-  assert.equal(removedAgain, false);
+  expect(removedAgain).toBe(false);
 });
 
 test("clear() removes all rules and returns count", () => {
@@ -85,8 +84,8 @@ test("clear() removes all rules and returns count", () => {
   reg.set(validRule);
   reg.set({ ...validRule, quotaId: "q2" });
   const count = reg.clear();
-  assert.equal(count, 2);
-  assert.equal(reg.size, 0);
+  expect(count).toBe(2);
+  expect(reg.size).toBe(0);
 });
 
 test("removeBySession() removes only session-scoped rules for that session", () => {
@@ -97,11 +96,11 @@ test("removeBySession() removes only session-scoped rules for that session", () 
   reg.set({ ...validRule, quotaId: "q4", scope: "provider", scopeId: "p1" });
 
   const removed = reg.removeBySession("s1");
-  assert.equal(removed, 1);
-  assert.equal(reg.get("q1"), null);
-  assert.equal(reg.get("q2")?.quotaId, "q2");
-  assert.equal(reg.get("q3")?.quotaId, "q3");
-  assert.equal(reg.size, 3);
+  expect(removed).toBe(1);
+  expect(reg.get("q1")).toBe(null);
+  expect(reg.get("q2")?.quotaId).toBe("q2");
+  expect(reg.get("q3")?.quotaId).toBe("q3");
+  expect(reg.size).toBe(3);
 });
 
 test("getMatchingRules() matches by scope and scopeId", () => {
@@ -112,9 +111,9 @@ test("getMatchingRules() matches by scope and scopeId", () => {
   reg.set({ ...validRule, quotaId: "q-global", scope: "global" });
 
   const matched = reg.getMatchingRules("s1", "p1");
-  assert.equal(matched.length, 3);
+  expect(matched.length).toBe(3);
   const ids = matched.map((r) => r.quotaId).sort();
-  assert.deepEqual(ids, ["q-global", "q-provider-p1", "q-session-s1"]);
+  expect(ids).toEqual(["q-global", "q-provider-p1", "q-session-s1"]);
 });
 
 test("recordViolation() stores violation with auto-generated id", () => {
@@ -129,12 +128,12 @@ test("recordViolation() stores violation with auto-generated id", () => {
     action: "block",
     blocked: true,
   });
-  assert.ok(v.violationId.startsWith("qv-"));
-  assert.equal(v.quotaId, "q1");
-  assert.equal(v.blocked, true);
+  expect(v.violationId.startsWith("qv-")).toBeTruthy();;
+  expect(v.quotaId).toBe("q1");
+  expect(v.blocked).toBe(true);
 
   const violations = reg.getViolations();
-  assert.equal(violations.length, 1);
+  expect(violations.length).toBe(1);
 });
 
 test("getViolations() filters by sessionId", () => {
@@ -149,11 +148,11 @@ test("getViolations() filters by sessionId", () => {
   });
 
   const s1Violations = reg.getViolations("s1");
-  assert.equal(s1Violations.length, 1);
-  assert.equal(s1Violations[0].sessionId, "s1");
+  expect(s1Violations.length).toBe(1);
+  expect(s1Violations[0].sessionId).toBe("s1");
 
   const allViolations = reg.getViolations();
-  assert.equal(allViolations.length, 2);
+  expect(allViolations.length).toBe(2);
 });
 
 test("clearViolations() removes all violations", () => {
@@ -163,6 +162,6 @@ test("clearViolations() removes all violations", () => {
     timestamp: 1000, usageAtViolation: 500, limit: 1000, action: "block", blocked: true,
   });
   const count = reg.clearViolations();
-  assert.equal(count, 1);
-  assert.equal(reg.getViolations().length, 0);
+  expect(count).toBe(1);
+  expect(reg.getViolations().length).toBe(0);
 });

@@ -1,7 +1,5 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, expect, afterEach } from "bun:test";
 import { WebSocketTransport } from "../src/ws-transport.js";
-import { BridgeClientError } from "../src/errors.js";
 
 // Mock WebSocket
 class MockWebSocket {
@@ -37,38 +35,41 @@ class MockWebSocket {
 
 const OriginalWebSocket = globalThis.WebSocket;
 
+afterEach(() => {
+  globalThis.WebSocket = OriginalWebSocket;
+});
+
 test("WebSocketTransport > connects successfully", async () => {
   globalThis.WebSocket = MockWebSocket as any;
   const transport = new WebSocketTransport({ url: "ws://localhost/ws" });
-  assert.equal(transport.isClosed, false);
-  
+  expect(transport.isClosed).toBe(false);
+
   // Request should wait for connection and then send data
   const reqPromise = transport.request("test.method", { arg: 1 });
-  
+
   setTimeout(() => {
     // Check what was sent
     const ws = (transport as any).ws as MockWebSocket;
-    assert.equal(ws.sentData.length, 1);
+    expect(ws.sentData.length).toBe(1);
     const sent = JSON.parse(ws.sentData[0]);
-    assert.equal(sent.method, "test.method");
-    assert.deepEqual(sent.params, { arg: 1 });
-    assert.ok(sent.id);
-    
+    expect(sent.method).toBe("test.method");
+    expect(sent.params).toEqual({ arg: 1 });
+    expect(sent.id).toBeTruthy();
+
     // Simulate response
     ws.simulateMessage(JSON.stringify({ jsonrpc: "2.0", id: sent.id, result: "success" }));
   }, 50);
 
   const res = await reqPromise;
-  assert.equal(res, "success");
-  
+  expect(res).toBe("success");
+
   transport.close();
-  globalThis.WebSocket = OriginalWebSocket;
 });
 
 test("WebSocketTransport > handles notifications", async () => {
   globalThis.WebSocket = MockWebSocket as any;
   const transport = new WebSocketTransport({ url: "ws://localhost/ws" });
-  
+
   let receivedNotif: any = null;
   transport.onNotification((n) => {
     receivedNotif = n;
@@ -80,31 +81,29 @@ test("WebSocketTransport > handles notifications", async () => {
   }, 20);
 
   await new Promise((resolve) => setTimeout(resolve, 50));
-  
-  assert.ok(receivedNotif);
-  assert.equal(receivedNotif.method, "bridge/session_event");
-  assert.deepEqual(receivedNotif.params, { ok: true });
-  
+
+  expect(receivedNotif).toBeTruthy();
+  expect(receivedNotif.method).toBe("bridge/session_event");
+  expect(receivedNotif.params).toEqual({ ok: true });
+
   transport.close();
-  globalThis.WebSocket = OriginalWebSocket;
 });
 
 test("WebSocketTransport > auto reconnects on close", async () => {
   globalThis.WebSocket = MockWebSocket as any;
   const transport = new WebSocketTransport({ url: "ws://localhost/ws" });
-  
+
   await new Promise((resolve) => setTimeout(resolve, 20));
-  
+
   const ws1 = (transport as any).ws as MockWebSocket;
   ws1.close();
-  
+
   // Wait for reconnect logic to fire
   await new Promise((resolve) => setTimeout(resolve, 1500));
-  
+
   const ws2 = (transport as any).ws as MockWebSocket;
-  assert.notEqual(ws1, ws2);
-  assert.ok(ws2);
-  
+  expect(ws1).not.toBe(ws2);
+  expect(ws2).toBeTruthy();
+
   transport.close();
-  globalThis.WebSocket = OriginalWebSocket;
 });

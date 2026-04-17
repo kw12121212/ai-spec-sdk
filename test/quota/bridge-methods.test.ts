@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, expect } from "bun:test";
 import { BridgeServer } from "../../src/bridge.js";
 import { getQuotaRegistry, setQuotaRegistry } from "../../src/quota/registry.js";
 import type { JsonRpcRequest } from "../../src/bridge.js";
@@ -29,10 +28,10 @@ test("quota.set creates a rule and returns success", async () => {
   setQuotaRegistry(null);
   const bridge = createBridge();
   const res = await send(bridge, "quota.set", validQuotaParams);
-  assert.equal(res.error, undefined);
+  expect(res.error).toBe(undefined);
   const result = res.result as Record<string, unknown>;
-  assert.equal(result.success, true);
-  assert.equal(result.quotaId, "q-test");
+  expect(result.success).toBe(true);
+  expect(result.quotaId).toBe("q-test");
 });
 
 test("quota.set rejects duplicate quotaId with -32602", async () => {
@@ -40,16 +39,16 @@ test("quota.set rejects duplicate quotaId with -32602", async () => {
   const bridge = createBridge();
   await send(bridge, "quota.set", validQuotaParams);
   const res = await send(bridge, "quota.set", validQuotaParams);
-  assert.ok(res.error);
-  assert.equal((res.error as Record<string, unknown>).code, -32602);
+  expect(res.error).toBeTruthy();
+  expect((res.error as Record<string, unknown>).code).toBe(-32602);
 });
 
 test("quota.set rejects invalid parameters with -32602", async () => {
   setQuotaRegistry(null);
   const bridge = createBridge();
   const res = await send(bridge, "quota.set", { quotaId: "", scope: "bad" });
-  assert.ok(res.error);
-  assert.equal((res.error as Record<string, unknown>).code, -32602);
+  expect(res.error).toBeTruthy();
+  expect((res.error as Record<string, unknown>).code).toBe(-32602);
 });
 
 test("quota.get returns existing rule", async () => {
@@ -57,26 +56,26 @@ test("quota.get returns existing rule", async () => {
   const bridge = createBridge();
   await send(bridge, "quota.set", validQuotaParams);
   const res = await send(bridge, "quota.get", { quotaId: "q-test" });
-  assert.equal(res.error, undefined);
+  expect(res.error).toBe(undefined);
   const result = res.result as Record<string, unknown>;
-  assert.equal(result.quotaId, "q-test");
-  assert.equal(result.scope, "session");
-  assert.equal(result.limit, 1000);
+  expect(result.quotaId).toBe("q-test");
+  expect(result.scope).toBe("session");
+  expect(result.limit).toBe(1000);
 });
 
 test("quota.get returns -32061 for non-existent rule", async () => {
   setQuotaRegistry(null);
   const bridge = createBridge();
   const res = await send(bridge, "quota.get", { quotaId: "nonexistent" });
-  assert.ok(res.error);
-  assert.equal((res.error as Record<string, unknown>).code, -32061);
+  expect(res.error).toBeTruthy();
+  expect((res.error as Record<string, unknown>).code).toBe(-32061);
 });
 
 test("quota.get rejects missing quotaId with -32602", async () => {
   const bridge = createBridge();
   const res = await send(bridge, "quota.get", {});
-  assert.ok(res.error);
-  assert.equal((res.error as Record<string, unknown>).code, -32602);
+  expect(res.error).toBeTruthy();
+  expect((res.error as Record<string, unknown>).code).toBe(-32602);
 });
 
 test("quota.list returns all rules when no scope filter", async () => {
@@ -85,9 +84,9 @@ test("quota.list returns all rules when no scope filter", async () => {
   await send(bridge, "quota.set", validQuotaParams);
   await send(bridge, "quota.set", { ...validQuotaParams, quotaId: "q2", scope: "global" });
   const res = await send(bridge, "quota.list");
-  assert.equal(res.error, undefined);
+  expect(res.error).toBe(undefined);
   const result = res.result as Array<Record<string, unknown>>;
-  assert.equal(result.length, 2);
+  expect(result.length).toBe(2);
 });
 
 test("quota.list filters by scope parameter", async () => {
@@ -96,10 +95,10 @@ test("quota.list filters by scope parameter", async () => {
   await send(bridge, "quota.set", { ...validQuotaParams, quotaId: "q-session", scope: "session" });
   await send(bridge, "quota.set", { ...validQuotaParams, quotaId: "q-global", scope: "global" });
   const res = await send(bridge, "quota.list", { scope: "session" });
-  assert.equal(res.error, undefined);
+  expect(res.error).toBe(undefined);
   const result = res.result as Array<Record<string, unknown>>;
-  assert.equal(result.length, 1);
-  assert.equal(result[0].scope, "session");
+  expect(result.length).toBe(1);
+  expect(result[0].scope).toBe("session");
 });
 
 test("quota.remove deletes a rule and returns success", async () => {
@@ -107,21 +106,21 @@ test("quota.remove deletes a rule and returns success", async () => {
   const bridge = createBridge();
   await send(bridge, "quota.set", validQuotaParams);
   const res = await send(bridge, "quota.remove", { quotaId: "q-test" });
-  assert.equal(res.error, undefined);
+  expect(res.error).toBe(undefined);
   const result = res.result as Record<string, unknown>;
-  assert.equal(result.success, true);
+  expect(result.success).toBe(true);
 
   const getRes = await send(bridge, "quota.get", { quotaId: "q-test" });
-  assert.ok(getRes.error);
-  assert.equal((getRes.error as Record<string, unknown>).code, -32061);
+  expect(getRes.error).toBeTruthy();
+  expect((getRes.error as Record<string, unknown>).code).toBe(-32061);
 });
 
 test("quota.remove returns -32061 for non-existent rule", async () => {
   setQuotaRegistry(null);
   const bridge = createBridge();
   const res = await send(bridge, "quota.remove", { quotaId: "ghost" });
-  assert.ok(res.error);
-  assert.equal((res.error as Record<string, unknown>).code, -32061);
+  expect(res.error).toBeTruthy();
+  expect((res.error as Record<string, unknown>).code).toBe(-32061);
 });
 
 test("quota.clear removes all rules and returns count", async () => {
@@ -130,10 +129,10 @@ test("quota.clear removes all rules and returns count", async () => {
   await send(bridge, "quota.set", validQuotaParams);
   await send(bridge, "quota.set", { ...validQuotaParams, quotaId: "q2" });
   const res = await send(bridge, "quota.clear");
-  assert.equal(res.error, undefined);
+  expect(res.error).toBe(undefined);
   const result = res.result as Record<string, unknown>;
-  assert.equal(result.success, true);
-  assert.equal(result.clearedCount, 2);
+  expect(result.success).toBe(true);
+  expect(result.clearedCount).toBe(2);
 });
 
 test("quota.getStatus returns array of status objects", async () => {
@@ -141,21 +140,21 @@ test("quota.getStatus returns array of status objects", async () => {
   const bridge = createBridge();
   await send(bridge, "quota.set", validQuotaParams);
   const res = await send(bridge, "quota.getStatus", { sessionId: "s1" });
-  assert.equal(res.error, undefined);
+  expect(res.error).toBe(undefined);
   const result = res.result as Array<Record<string, unknown>>;
-  assert.equal(result.length, 1);
-  assert.equal(result[0].quotaId, "q-test");
-  assert.equal(typeof result[0].status, "string");
-  assert.equal(typeof result[0].percentage, "number");
+  expect(result.length).toBe(1);
+  expect(result[0].quotaId).toBe("q-test");
+  expect(typeof result[0].status).toBe("string");
+  expect(typeof result[0].percentage).toBe("number");
 });
 
 test("quota.getStatus returns empty array when no rules exist", async () => {
   setQuotaRegistry(null);
   const bridge = createBridge();
   const res = await send(bridge, "quota.getStatus");
-  assert.equal(res.error, undefined);
+  expect(res.error).toBe(undefined);
   const result = res.result as unknown[];
-  assert.equal(result.length, 0);
+  expect(result.length).toBe(0);
 });
 
 test("quota.getViolations returns violations list", async () => {
@@ -163,6 +162,6 @@ test("quota.getViolations returns violations list", async () => {
   const bridge = createBridge();
   await send(bridge, "quota.set", validQuotaParams);
   const res = await send(bridge, "quota.getViolations");
-  assert.equal(res.error, undefined);
-  assert(Array.isArray(res.result));
+  expect(res.error).toBe(undefined);
+  expect(Array.isArray(res.result)).toBeTruthy();
 });

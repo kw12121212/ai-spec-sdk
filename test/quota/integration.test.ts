@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, expect } from "bun:test";
 import { BridgeServer } from "../../src/bridge.js";
 import { getQuotaRegistry, setQuotaRegistry } from "../../src/quota/registry.js";
 import { InMemoryTokenStore, setTokenStore } from "../../src/token-tracking/store.js";
@@ -46,10 +45,10 @@ test("full flow: quota.set → check status → record more tokens → status up
   });
 
   const statusRes = await send(bridge, "quota.getStatus", { sessionId: "s-integ" });
-  assert.equal(statusRes.error, undefined);
+  expect(statusRes.error).toBe(undefined);
   const statuses = statusRes.result as Array<Record<string, unknown>>;
-  assert.equal(statuses.length, 1);
-  assert.equal(statuses[0].status, "ok");
+  expect(statuses.length).toBe(1);
+  expect(statuses[0].status).toBe("ok");
 
   tokenStore.record({
     sessionId: "s-integ",
@@ -61,7 +60,7 @@ test("full flow: quota.set → check status → record more tokens → status up
 
   const statusRes2 = await send(bridge, "quota.getStatus", { sessionId: "s-integ" });
   const statuses2 = statusRes2.result as Array<Record<string, unknown>>;
-  assert.equal(statuses2[0].status, "exceeded");
+  expect(statuses2[0].status).toBe("exceeded");
 });
 
 test("registry.removeBySession cleans up session-scoped rules", () => {
@@ -84,13 +83,13 @@ test("registry.removeBySession cleans up session-scoped rules", () => {
     warnThreshold: 0.9,
   });
 
-  assert.equal(registry.size, 2);
+  expect(registry.size).toBe(2);
 
   const removed = registry.removeBySession("s-to-delete");
-  assert.equal(removed, 1);
-  assert.equal(registry.size, 1);
-  assert.ok(registry.get("q-global-keep"));
-  assert.equal(registry.get("q-session-cleanup"), null);
+  expect(removed).toBe(1);
+  expect(registry.size).toBe(1);
+  expect(registry.get("q-global-keep")).toBeTruthy();
+  expect(registry.get("q-session-cleanup")).toBe(null);
 });
 
 test("global rule persists after session-scoped cleanup", () => {
@@ -102,8 +101,8 @@ test("global rule persists after session-scoped cleanup", () => {
 
   registry.removeBySession("s-x");
 
-  assert.equal(registry.size, 1);
-  assert.equal(registry.list()[0].quotaId, "q-g1");
+  expect(registry.size).toBe(1);
+  expect(registry.list()[0].quotaId).toBe("q-g1");
 });
 
 test("quota.getViolations returns empty when no violations recorded", async () => {
@@ -119,15 +118,15 @@ test("quota.getViolations returns empty when no violations recorded", async () =
   });
 
   const res = await send(bridge, "quota.getViolations");
-  assert.equal(res.error, undefined);
+  expect(res.error).toBe(undefined);
   const violations = res.result as unknown[];
-  assert.equal(violations.length, 0);
+  expect(violations.length).toBe(0);
 });
 
 test("capabilities include all quota.* methods", async () => {
   const bridge = createBridge();
   const res = await send(bridge, "bridge.capabilities");
-  assert.equal(res.error, undefined);
+  expect(res.error).toBe(undefined);
   const caps = res.result as Record<string, unknown>;
   const methods = caps.methods as string[];
 
@@ -136,6 +135,6 @@ test("capabilities include all quota.* methods", async () => {
     "quota.clear", "quota.getStatus", "quota.getViolations",
   ];
   for (const m of expectedMethods) {
-    assert.ok(methods.includes(m), `capabilities missing method: ${m}`);
+    expect(methods.includes(m)).toBeTruthy();
   }
 });

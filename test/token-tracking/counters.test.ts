@@ -1,70 +1,69 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, expect } from "bun:test";
 import { AnthropicTokenCounter, PassthroughTokenCounter, counterRegistry } from "../../src/token-tracking/counters/index.js";
 
 test("AnthropicTokenCounter normalizes SDK format { input_tokens, output_tokens }", () => {
   const counter = new AnthropicTokenCounter();
   const result = counter.count({ input_tokens: 100, output_tokens: 200 });
-  assert.ok(result);
-  assert.equal(result!.inputTokens, 100);
-  assert.equal(result!.outputTokens, 200);
-  assert.equal(result!.totalTokens, 300);
+  expect(result).toBeTruthy();
+  expect(result!.inputTokens).toBe(100);
+  expect(result!.outputTokens).toBe(200);
+  expect(result!.totalTokens).toBe(300);
 });
 
 test("AnthropicTokenCounter normalizes Provider format { inputTokens, outputTokens }", () => {
   const counter = new AnthropicTokenCounter();
   const result = counter.count({ inputTokens: 50, outputTokens: 75 });
-  assert.ok(result);
-  assert.equal(result!.inputTokens, 50);
-  assert.equal(result!.outputTokens, 75);
-  assert.equal(result!.totalTokens, 125);
+  expect(result).toBeTruthy();
+  expect(result!.inputTokens).toBe(50);
+  expect(result!.outputTokens).toBe(75);
+  expect(result!.totalTokens).toBe(125);
 });
 
 test("AnthropicTokenCounter handles null usage gracefully", () => {
   const counter = new AnthropicTokenCounter();
   const result = counter.count(null);
-  assert.equal(result, null);
+  expect(result).toBeNull();
 });
 
 test("AnthropicTokenCounter handles undefined usage gracefully", () => {
   const counter = new AnthropicTokenCounter();
   const result = counter.count(undefined);
-  assert.equal(result, null);
+  expect(result).toBeNull();
 });
 
 test("AnthropicTokenCounter returns null for non-object usage", () => {
   const counter = new AnthropicTokenCounter();
-  assert.equal(counter.count("string"), null);
-  assert.equal(counter.count(42), null);
-  assert.equal(counter.count(true), null);
+  expect(counter.count("string")).toBeNull();
+  expect(counter.count(42)).toBeNull();
+  expect(counter.count(true)).toBeNull();
 });
 
 test("AnthropicTokenCounter rejects negative token values in SDK format", () => {
   const counter = new AnthropicTokenCounter();
-  assert.equal(counter.count({ input_tokens: -1, output_tokens: 100 }), null);
-  assert.equal(counter.count({ input_tokens: 100, output_tokens: -5 }), null);
+  expect(counter.count({ input_tokens: -1, output_tokens: 100 })).toBeNull();
+  expect(counter.count({ input_tokens: 100, output_tokens: -5 })).toBeNull();
 });
 
 test("AnthropicTokenCounter rejects non-finite values", () => {
   const counter = new AnthropicTokenCounter();
-  assert.equal(counter.count({ input_tokens: NaN, output_tokens: 100 }), null);
-  assert.equal(counter.count({ input_tokens: Infinity, output_tokens: 100 }), null);
+  expect(counter.count({ input_tokens: NaN, output_tokens: 100 })).toBeNull();
+  expect(counter.count({ input_tokens: Infinity, output_tokens: 100 })).toBeNull();
 });
 
 test("PassthroughTokenCounter extracts inputTokens/outputTokens", () => {
   const counter = new PassthroughTokenCounter("openai");
   const result = counter.count({ inputTokens: 200, outputTokens: 300 });
-  assert.ok(result);
-  assert.equal(result!.inputTokens, 200);
-  assert.equal(result!.outputTokens, 300);
-  assert.equal(result!.totalTokens, 500);
+  expect(result).toBeTruthy();
+  expect(result!.inputTokens).toBe(200);
+  expect(result!.outputTokens).toBe(300);
+  expect(result!.totalTokens).toBe(500);
 });
 
 test("PassthroughTokenCounter returns null for missing fields", () => {
   const counter = new PassthroughTokenCounter("custom");
-  assert.equal(counter.count({ inputTokens: 100 }), null);
-  assert.equal(counter.count({ outputTokens: 100 }), null);
-  assert.equal(counter.count({}), null);
+  expect(counter.count({ inputTokens: 100 })).toBeNull();
+  expect(counter.count({ outputTokens: 100 })).toBeNull();
+  expect(counter.count({})).toBeNull();
 });
 
 test("CounterRegistry.register() adds counter for provider type", () => {
@@ -72,33 +71,33 @@ test("CounterRegistry.register() adds counter for provider type", () => {
   const beforeSize = registry.size;
   const dummy = { providerType: "test-type", count: () => null };
   counterRegistry.register(dummy as never);
-  assert.equal(registry.size, beforeSize + 1);
+  expect(registry.size).toBe(beforeSize + 1);
   registry.delete("test-type");
 });
 
 test("CounterRegistry.get() returns correct counter or default passthrough", () => {
   const anthropic = counterRegistry.get("anthropic");
-  assert.equal(anthropic.providerType, "anthropic");
+  expect(anthropic.providerType).toBe("anthropic");
 
   const fallback = counterRegistry.get("nonexistent-type");
-  assert.ok(fallback instanceof PassthroughTokenCounter);
-  assert.equal(fallback.providerType, "nonexistent-type");
+  expect(fallback instanceof PassthroughTokenCounter).toBeTruthy();
+  expect(fallback.providerType).toBe("nonexistent-type");
 });
 
 test("CounterRegistry.list() returns all registered counters with metadata", () => {
   const list = counterRegistry.list();
-  assert.ok(Array.isArray(list));
-  assert.ok(list.length >= 1);
+  expect(Array.isArray(list)).toBeTruthy();
+  expect(list.length >= 1).toBeTruthy();
   const anthropicEntry = list.find((e) => e.providerType === "anthropic");
-  assert.ok(anthropicEntry);
-  assert.equal(typeof anthropicEntry!.description, "string");
+  expect(anthropicEntry).toBeTruthy();
+  expect(typeof anthropicEntry!.description === "string").toBeTruthy();
 });
 
 test("CounterRegistry allows overriding built-in counters", () => {
   const custom = { providerType: "anthropic" as const, count: () => null };
   counterRegistry.register(custom as never);
   const retrieved = counterRegistry.get("anthropic");
-  assert.equal(retrieved, custom);
+  expect(retrieved).toBe(custom);
 
   counterRegistry.register(new AnthropicTokenCounter());
 });

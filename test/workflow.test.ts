@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, expect } from "bun:test";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
@@ -51,12 +50,12 @@ test("workflow.run returns parsed verify JSON output", async () => {
     (method, params) => notifications.push({ method, params }),
   );
 
-  assert.equal(result.workflow, "verify");
-  assert.equal(result.workspace, fixtureWorkspace);
-  assert.ok(result.parsed);
-  assert.equal(typeof (result.parsed as Record<string, unknown>)["valid"], "boolean");
-  assert.equal(notifications[0]!.method, "bridge/progress");
-  assert.equal(notifications[0]!.params["phase"], "workflow_started");
+  expect(result.workflow).toBe("verify");
+  expect(result.workspace).toBe(fixtureWorkspace);
+  expect(result.parsed).toBeTruthy();
+  expect(typeof (result.parsed as Record<string, unknown>)["valid"]).toBe("boolean");
+  expect(notifications[0]!.method).toBe("bridge/progress");
+  expect(notifications[0]!.params["phase"]).toBe("workflow_started");
 });
 
 test("workflow.run returns structured error when script path is invalid", async () => {
@@ -65,17 +64,17 @@ test("workflow.run returns structured error when script path is invalid", async 
   process.env["SPEC_DRIVEN_SCRIPT"] = path.join(fixtureWorkspace, "does-not-exist.js");
 
   try {
-    await assert.rejects(
-      runWorkflow({
+    try {
+      await runWorkflow({
         workspace: fixtureWorkspace,
         workflow: "verify",
         args: ["missing-change"],
-      }),
-      (error: unknown) =>
-        error !== null &&
-        typeof error === "object" &&
-        (error as { code?: number }).code === -32002,
-    );
+      });
+      expect(true).toBe(false); // should not reach here
+    } catch (error: unknown) {
+      expect(error !== null && typeof error === "object").toBeTruthy();
+      expect((error as { code?: number }).code).toBe(-32002);
+    }
   } finally {
     if (original === undefined) {
       delete process.env["SPEC_DRIVEN_SCRIPT"];
@@ -89,24 +88,24 @@ test("workflow.run returns structured error when command execution fails", async
   const fixtureWorkspace = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-workflow-fail-"));
   const notifications: Array<{ method: string; params: Record<string, unknown> }> = [];
 
-  await assert.rejects(
-    runWorkflow(
+  try {
+    await runWorkflow(
       {
         workspace: fixtureWorkspace,
         workflow: "apply",
         args: [],
       },
       (method, params) => notifications.push({ method, params }),
-    ),
-    (error: unknown) =>
-      error !== null &&
-      typeof error === "object" &&
-      (error as { code?: number }).code === -32003,
-  );
+    );
+    expect(true).toBe(false); // should not reach here
+  } catch (error: unknown) {
+    expect(error !== null && typeof error === "object").toBeTruthy();
+    expect((error as { code?: number }).code).toBe(-32003);
+  }
 
   const phases = notifications
     .filter((item) => item.method === "bridge/progress")
     .map((item) => item.params["phase"]);
-  assert.ok(phases.includes("workflow_started"));
-  assert.ok(phases.includes("workflow_failed"));
+  expect(phases.includes("workflow_started")).toBeTruthy();
+  expect(phases.includes("workflow_failed")).toBeTruthy();
 });

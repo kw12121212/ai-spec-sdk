@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, expect } from "bun:test";
 import { InMemoryTokenStore, getTokenStore, setTokenStore } from "../../src/token-tracking/store.js";
 
 function createFreshStore(): InMemoryTokenStore {
@@ -17,14 +16,14 @@ test("record() stores entry with correct structure", () => {
     inputTokens: 10,
     outputTokens: 20,
   });
-  assert.equal(ok, true);
+  expect(ok).toBe(true);
 
   const summary = store.getSessionUsage("s1");
-  assert.ok(summary);
-  assert.equal(summary!.queryCount, 1);
-  assert.equal(summary!.totalInputTokens, 10);
-  assert.equal(summary!.totalOutputTokens, 20);
-  assert.equal(summary!.totalTokens, 30);
+  expect(summary).toBeTruthy();
+  expect(summary!.queryCount).toBe(1);
+  expect(summary!.totalInputTokens).toBe(10);
+  expect(summary!.totalOutputTokens).toBe(20);
+  expect(summary!.totalTokens).toBe(30);
 });
 
 test("record() rejects negative token values", () => {
@@ -36,8 +35,8 @@ test("record() rejects negative token values", () => {
     inputTokens: -5,
     outputTokens: 10,
   });
-  assert.equal(ok, false);
-  assert.equal(store.getSessionUsage("s1"), null);
+  expect(ok).toBe(false);
+  expect(store.getSessionUsage("s1")).toBeNull();
 });
 
 test("record() auto-generates timestamp when missing", () => {
@@ -53,9 +52,9 @@ test("record() auto-generates timestamp when missing", () => {
   const after = Date.now();
 
   const msgUsage = store.getMessageUsage("s1", undefined!);
-  assert.ok(msgUsage);
-  assert.ok(msgUsage!.timestamp >= before);
-  assert.ok(msgUsage!.timestamp <= after);
+  expect(msgUsage).toBeTruthy();
+  expect(msgUsage!.timestamp >= before).toBeTruthy();
+  expect(msgUsage!.timestamp <= after).toBeTruthy();
 });
 
 test("record() auto-computes totalTokens", () => {
@@ -69,8 +68,8 @@ test("record() auto-computes totalTokens", () => {
   });
 
   const summary = store.getSessionUsage("s1");
-  assert.ok(summary);
-  assert.equal(summary!.totalTokens, 579);
+  expect(summary).toBeTruthy();
+  expect(summary!.totalTokens).toBe(579);
 });
 
 test("getSessionUsage() aggregates multiple records correctly", () => {
@@ -98,16 +97,16 @@ test("getSessionUsage() aggregates multiple records correctly", () => {
   });
 
   const summary = store.getSessionUsage("s1");
-  assert.ok(summary);
-  assert.equal(summary!.totalInputTokens, 180);
-  assert.equal(summary!.totalOutputTokens, 420);
-  assert.equal(summary!.totalTokens, 600);
-  assert.equal(summary!.queryCount, 3);
+  expect(summary).toBeTruthy();
+  expect(summary!.totalInputTokens).toBe(180);
+  expect(summary!.totalOutputTokens).toBe(420);
+  expect(summary!.totalTokens).toBe(600);
+  expect(summary!.queryCount).toBe(3);
 });
 
 test("getSessionUsage() returns null for non-existent session", () => {
   const store = createFreshStore();
-  assert.equal(store.getSessionUsage("nonexistent"), null);
+  expect(store.getSessionUsage("nonexistent")).toBeNull();
 });
 
 test("getSessionUsage() includes correct providerBreakdown", () => {
@@ -135,17 +134,17 @@ test("getSessionUsage() includes correct providerBreakdown", () => {
   });
 
   const summary = store.getSessionUsage("s1")!;
-  assert.equal(summary.providerBreakdown.length, 2);
+  expect(summary.providerBreakdown.length).toBe(2);
 
   const anthBreakdown = summary.providerBreakdown.find((b) => b.providerId === "anth-1");
-  assert.ok(anthBreakdown);
-  assert.equal(anthBreakdown!.inputTokens, 200);
-  assert.equal(anthBreakdown!.outputTokens, 400);
+  expect(anthBreakdown).toBeTruthy();
+  expect(anthBreakdown!.inputTokens).toBe(200);
+  expect(anthBreakdown!.outputTokens).toBe(400);
 
   const openaiBreakdown = summary.providerBreakdown.find((b) => b.providerId === "openai-1");
-  assert.ok(openaiBreakdown);
-  assert.equal(openaiBreakdown!.inputTokens, 200);
-  assert.equal(openaiBreakdown!.outputTokens, 400);
+  expect(openaiBreakdown).toBeTruthy();
+  expect(openaiBreakdown!.inputTokens).toBe(200);
+  expect(openaiBreakdown!.outputTokens).toBe(400);
 });
 
 test("getMessageUsage() returns correct single record", () => {
@@ -168,10 +167,10 @@ test("getMessageUsage() returns correct single record", () => {
   });
 
   const record = store.getMessageUsage("s1", "m1");
-  assert.ok(record);
-  assert.equal(record!.messageId, "m1");
-  assert.equal(record!.inputTokens, 10);
-  assert.equal(record!.outputTokens, 20);
+  expect(record).toBeTruthy();
+  expect(record!.messageId).toBe("m1");
+  expect(record!.inputTokens).toBe(10);
+  expect(record!.outputTokens).toBe(20);
 });
 
 test("getMessageUsage() returns null for non-existent message", () => {
@@ -185,8 +184,8 @@ test("getMessageUsage() returns null for non-existent message", () => {
     outputTokens: 20,
   });
 
-  assert.equal(store.getMessageUsage("s1", "m999"), null);
-  assert.equal(store.getMessageUsage("nonexistent", "m1"), null);
+  expect(store.getMessageUsage("s1", "m999")).toBeNull();
+  expect(store.getMessageUsage("nonexistent", "m1")).toBeNull();
 });
 
 test("getProviderUsage() filters by providerId when specified", () => {
@@ -209,11 +208,11 @@ test("getProviderUsage() filters by providerId when specified", () => {
   });
 
   const results = store.getProviderUsage("anth-prod");
-  assert.equal(results.length, 1);
-  assert.equal(results[0].providerId, "anth-prod");
-  assert.equal(results[0].totalInputTokens, 300);
-  assert.equal(results[0].totalOutputTokens, 600);
-  assert.equal(results[0].queryCount, 3);
+  expect(results.length).toBe(1);
+  expect(results[0].providerId).toBe("anth-prod");
+  expect(results[0].totalInputTokens).toBe(300);
+  expect(results[0].totalOutputTokens).toBe(600);
+  expect(results[0].queryCount).toBe(3);
 });
 
 test("getProviderUsage() returns all providers when no filter", () => {
@@ -241,7 +240,7 @@ test("getProviderUsage() returns all providers when no filter", () => {
   });
 
   const results = store.getProviderUsage();
-  assert.equal(results.length, 3);
+  expect(results.length).toBe(3);
 });
 
 test("getProviderUsage() returns zero-entry for unused provider", () => {
@@ -255,11 +254,11 @@ test("getProviderUsage() returns zero-entry for unused provider", () => {
   });
 
   const results = store.getProviderUsage("unused-provider");
-  assert.equal(results.length, 1);
-  assert.equal(results[0].providerId, "unused-provider");
-  assert.equal(results[0].totalInputTokens, 0);
-  assert.equal(results[0].totalOutputTokens, 0);
-  assert.equal(results[0].queryCount, 0);
+  expect(results.length).toBe(1);
+  expect(results[0].providerId).toBe("unused-provider");
+  expect(results[0].totalInputTokens).toBe(0);
+  expect(results[0].totalOutputTokens).toBe(0);
+  expect(results[0].queryCount).toBe(0);
 });
 
 test("clearSession() removes only target session's records", () => {
@@ -287,9 +286,9 @@ test("clearSession() removes only target session's records", () => {
   });
 
   const removed = store.clearSession("s1");
-  assert.equal(removed, 2);
-  assert.equal(store.getSessionUsage("s1"), null);
-  assert.ok(store.getSessionUsage("s2"));
+  expect(removed).toBe(2);
+  expect(store.getSessionUsage("s1")).toBeNull();
+  expect(store.getSessionUsage("s2")).toBeTruthy();
 });
 
 test("clearAll() removes all records and returns count", () => {
@@ -299,21 +298,21 @@ test("clearAll() removes all records and returns count", () => {
   store.record({ sessionId: "s3", providerId: "p1", providerType: "a", inputTokens: 3, outputTokens: 3 });
 
   const count = store.clearAll();
-  assert.equal(count, 3);
-  assert.equal(store.getSessionUsage("s1"), null);
-  assert.equal(store.getSessionUsage("s2"), null);
-  assert.equal(store.getSessionUsage("s3"), null);
+  expect(count).toBe(3);
+  expect(store.getSessionUsage("s1")).toBeNull();
+  expect(store.getSessionUsage("s2")).toBeNull();
+  expect(store.getSessionUsage("s3")).toBeNull();
 });
 
 test("getTokenStore/setTokenStore singleton pattern", () => {
   setTokenStore(null);
   const a = getTokenStore();
   const b = getTokenStore();
-  assert.equal(a, b);
+  expect(a).toBe(b);
 
   const fresh = new InMemoryTokenStore();
   setTokenStore(fresh);
-  assert.equal(getTokenStore(), fresh);
+  expect(getTokenStore()).toBe(fresh);
 
   setTokenStore(null);
 });

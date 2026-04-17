@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, expect } from "bun:test";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
@@ -42,8 +41,8 @@ test("WS /ws happy path: bridge.ping returns pong", async () => {
     await new Promise((resolve) => ws.addEventListener("open", resolve));
 
     const result = await wsRequest(ws, "bridge.ping");
-    assert.equal(result.pong, true);
-    assert.ok(typeof result.ts === "string");
+    expect(result.pong).toBe(true);
+    expect(typeof result.ts === "string").toBeTruthy();
 
     ws.close();
   } finally {
@@ -58,7 +57,7 @@ test("WS /ws: bridge.capabilities includes transport: ws", async () => {
     await new Promise((resolve) => ws.addEventListener("open", resolve));
 
     const result = await wsRequest(ws, "bridge.capabilities");
-    assert.equal(result.transport, "ws");
+    expect(result.transport).toBe("ws");
 
     ws.close();
   } finally {
@@ -73,7 +72,7 @@ test("WS /ws: bridge.info reports transport: ws", async () => {
     await new Promise((resolve) => ws.addEventListener("open", resolve));
 
     const result = await wsRequest(ws, "bridge.info");
-    assert.equal(result.transport, "ws");
+    expect(result.transport).toBe("ws");
 
     ws.close();
   } finally {
@@ -92,7 +91,7 @@ test("WS event fan-out: two WS subscribers receive the same session-scoped notif
 
     const startRes = await wsRequest(ws1, "session.start", { workspace, prompt: "hello" });
     const sessionId = startRes.sessionId;
-    assert.ok(typeof sessionId === "string");
+    expect(typeof sessionId === "string").toBeTruthy();
 
     const ws2 = new WebSocket(`ws://localhost:${port}/ws`);
     await new Promise((resolve) => ws2.addEventListener("open", resolve));
@@ -120,15 +119,15 @@ test("WS event fan-out: two WS subscribers receive the same session-scoped notif
     ws1.close();
     ws2.close();
 
-    assert.ok(events1.length > 0, "subscriber 1 received no events");
-    assert.ok(events2.length > 0, "subscriber 2 received no events");
+    expect(events1.length > 0, "subscriber 1 received no events").toBeTruthy();
+    expect(events2.length > 0, "subscriber 2 received no events").toBeTruthy();
     
     // Check they both received the same agent_message
     const msg1 = events1.find((e) => e.type === "agent_message");
     const msg2 = events2.find((e) => e.type === "agent_message");
-    assert.ok(msg1, "no agent_message in events1");
-    assert.ok(msg2, "no agent_message in events2");
-    assert.deepEqual(msg1, msg2);
+    expect(msg1, "no agent_message in events1").toBeTruthy();
+    expect(msg2, "no agent_message in events2").toBeTruthy();
+    expect(msg1).toEqual(msg2);
 
   } finally {
     delete globalThis.__AI_SPEC_SDK_QUERY__;

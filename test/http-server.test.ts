@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, expect } from "bun:test";
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
@@ -154,10 +153,10 @@ test("POST /rpc happy path: bridge.ping returns pong", { timeout: 30000 }, async
   const { shutdown, port } = await startHttpServer({ port: 0, noAuth: true });
   try {
     const { status, body } = await rpc(port, { jsonrpc: "2.0", id: 1, method: "bridge.ping" });
-    assert.equal(status, 200);
+    expect(status).toBe(200);
     const result = (body as Record<string, unknown>)["result"] as Record<string, unknown>;
-    assert.equal(result["pong"], true);
-    assert.ok(typeof result["ts"] === "string");
+    expect(result["pong"]).toBe(true);
+    expect(typeof result["ts"] === "string").toBeTruthy();
   } finally {
     await shutdown();
   }
@@ -171,9 +170,9 @@ test("POST /rpc: bridge.capabilities includes transport: http", { timeout: 30000
       id: 1,
       method: "bridge.capabilities",
     });
-    assert.equal(status, 200);
+    expect(status).toBe(200);
     const result = (body as Record<string, unknown>)["result"] as Record<string, unknown>;
-    assert.equal(result["transport"], "http");
+    expect(result["transport"]).toBe("http");
   } finally {
     await shutdown();
   }
@@ -187,7 +186,7 @@ test("POST /rpc: wrong Content-Type returns 415", { timeout: 30000 }, async () =
       { jsonrpc: "2.0", id: 1, method: "bridge.ping" },
       { "Content-Type": "text/plain" },
     );
-    assert.equal(status, 415);
+    expect(status).toBe(415);
   } finally {
     await shutdown();
   }
@@ -225,9 +224,9 @@ test("POST /rpc: invalid JSON returns parse error", async () => {
         req.end(data);
       },
     );
-    assert.equal(status, 200);
+    expect(status).toBe(200);
     const error = (body as Record<string, unknown>)["error"] as Record<string, unknown>;
-    assert.equal(error["code"], -32700);
+    expect(error["code"]).toBe(-32700);
   } finally {
     await shutdown();
   }
@@ -263,7 +262,7 @@ test("POST /rpc: body exceeding 10 MB returns 413", async () => {
         req.end(bigBody);
       },
     );
-    assert.equal(status, 413);
+    expect(status).toBe(413);
   } finally {
     await shutdown();
   }
@@ -273,10 +272,10 @@ test("GET /health returns { status: ok, apiVersion }", async () => {
   const { shutdown, port } = await startHttpServer({ port: 0, noAuth: true });
   try {
     const { status, body } = await httpGet(port, "/health");
-    assert.equal(status, 200);
+    expect(status).toBe(200);
     const b = body as Record<string, unknown>;
-    assert.equal(b["status"], "ok");
-    assert.equal(b["apiVersion"], API_VERSION);
+    expect(b["status"]).toBe("ok");
+    expect(b["apiVersion"]).toBe(API_VERSION);
   } finally {
     await shutdown();
   }
@@ -286,10 +285,7 @@ test("GET /health includes CORS header", async () => {
   const { shutdown, port } = await startHttpServer({ port: 0, noAuth: true });
   try {
     const { headers } = await httpGet(port, "/health");
-    assert.ok(
-      headers["access-control-allow-origin"] !== undefined,
-      "CORS header missing",
-    );
+    expect(headers["access-control-allow-origin"] !== undefined).toBeTruthy();
   } finally {
     await shutdown();
   }
@@ -299,7 +295,7 @@ test("GET /events without sessionId returns 400", async () => {
   const { shutdown, port } = await startHttpServer({ port: 0, noAuth: true });
   try {
     const { status } = await httpGet(port, "/events");
-    assert.equal(status, 400);
+    expect(status).toBe(400);
   } finally {
     await shutdown();
   }
@@ -320,7 +316,7 @@ test("SSE fan-out: two subscribers receive the same session-scoped notification"
     const sessionId = (
       (startRes.body as Record<string, unknown>)["result"] as Record<string, unknown>
     )["sessionId"] as string;
-    assert.ok(typeof sessionId === "string");
+    expect(typeof sessionId === "string").toBeTruthy();
 
     // Register two SSE subscribers for this session
     const sub1 = sseCollect(port, sessionId);
@@ -346,9 +342,9 @@ test("SSE fan-out: two subscribers receive the same session-scoped notification"
     const events1 = await sub1.events;
     const events2 = await sub2.events;
 
-    assert.ok(events1.length > 0, "subscriber 1 received no events");
-    assert.ok(events2.length > 0, "subscriber 2 received no events");
-    assert.equal(events1[0], events2[0], "both subscribers must receive the same first event");
+    expect(events1.length > 0).toBeTruthy();
+    expect(events2.length > 0).toBeTruthy();
+    expect(events1[0]).toBe(events2[0]);
   } finally {
     delete globalThis.__AI_SPEC_SDK_QUERY__;
     await shutdown();
@@ -369,7 +365,7 @@ test("SSE: notification without sessionId is not delivered to any subscriber", a
     sub.destroy();
     const events = await sub.events;
 
-    assert.equal(events.length, 0, "no data events expected on the SSE stream");
+    expect(events.length).toBe(0);
   } finally {
     await shutdown();
   }
@@ -404,7 +400,7 @@ test("graceful shutdown: in-flight POST /rpc completes before SSE connections ar
 
     // The in-flight request must still complete successfully
     const { status } = await rpcPromise;
-    assert.equal(status, 200);
+    expect(status).toBe(200);
 
     await shutdownPromise;
   } finally {
@@ -440,9 +436,9 @@ test("auth: unauthenticated POST /rpc to authenticated method returns -32061", a
   const { shutdown, port } = await startHttpServer({ port: 0, keysFile });
   try {
     const { status, body } = await rpc(port, { jsonrpc: "2.0", id: 1, method: "session.list" });
-    assert.equal(status, 200);
+    expect(status).toBe(200);
     const error = (body as Record<string, unknown>)["error"] as Record<string, unknown>;
-    assert.equal(error["code"], -32061);
+    expect(error["code"]).toBe(-32061);
   } finally {
     await shutdown();
     cleanup();
@@ -459,7 +455,7 @@ test("auth: invalid bearer token returns -32061", async () => {
       { Authorization: "Bearer invalidtoken" },
     );
     const error = (body as Record<string, unknown>)["error"] as Record<string, unknown>;
-    assert.equal(error["code"], -32061);
+    expect(error["code"]).toBe(-32061);
   } finally {
     await shutdown();
     cleanup();
@@ -476,8 +472,8 @@ test("auth: valid key with correct scope dispatches the request", async () => {
       { jsonrpc: "2.0", id: 1, method: "session.list" },
       { Authorization: `Bearer ${token}` },
     );
-    assert.equal(status, 200);
-    assert.ok("result" in (body as Record<string, unknown>), "expected result, got error");
+    expect(status).toBe(200);
+    expect("result" in (body as Record<string, unknown>)).toBeTruthy();
   } finally {
     await shutdown();
     cleanup();
@@ -495,7 +491,7 @@ test("auth: valid key with insufficient scope returns -32060", async () => {
       { Authorization: `Bearer ${token}` },
     );
     const error = (body as Record<string, unknown>)["error"] as Record<string, unknown>;
-    assert.equal(error["code"], -32060);
+    expect(error["code"]).toBe(-32060);
   } finally {
     await shutdown();
     cleanup();
@@ -512,7 +508,7 @@ test("auth: admin key passes all scope checks", async () => {
       { jsonrpc: "2.0", id: 1, method: "session.list" },
       { Authorization: `Bearer ${token}` },
     );
-    assert.ok("result" in (body as Record<string, unknown>), "admin key should pass all checks");
+    expect("result" in (body as Record<string, unknown>)).toBeTruthy();
   } finally {
     await shutdown();
     cleanup();
@@ -524,8 +520,8 @@ test("auth: bridge.capabilities requires no key even with auth enabled", async (
   const { shutdown, port } = await startHttpServer({ port: 0, keysFile });
   try {
     const { status, body } = await rpc(port, { jsonrpc: "2.0", id: 1, method: "bridge.capabilities" });
-    assert.equal(status, 200);
-    assert.ok("result" in (body as Record<string, unknown>));
+    expect(status).toBe(200);
+    expect("result" in (body as Record<string, unknown>)).toBeTruthy();
   } finally {
     await shutdown();
     cleanup();
@@ -536,8 +532,8 @@ test("auth: --no-auth mode dispatches all requests without credentials", async (
   const { shutdown, port } = await startHttpServer({ port: 0, noAuth: true });
   try {
     const { status, body } = await rpc(port, { jsonrpc: "2.0", id: 1, method: "session.list" });
-    assert.equal(status, 200);
-    assert.ok("result" in (body as Record<string, unknown>));
+    expect(status).toBe(200);
+    expect("result" in (body as Record<string, unknown>)).toBeTruthy();
   } finally {
     await shutdown();
   }
@@ -548,8 +544,8 @@ test("auth: GET /health is always unauthenticated", async () => {
   const { shutdown, port } = await startHttpServer({ port: 0, keysFile });
   try {
     const { status, body } = await httpGet(port, "/health");
-    assert.equal(status, 200);
-    assert.equal((body as Record<string, unknown>)["status"], "ok");
+    expect(status).toBe(200);
+    expect((body as Record<string, unknown>)["status"]).toBe("ok");
   } finally {
     await shutdown();
     cleanup();
@@ -577,7 +573,7 @@ test("auth: expired key returns -32061", async () => {
       { Authorization: `Bearer ${token}` },
     );
     const error = (body as Record<string, unknown>)["error"] as Record<string, unknown>;
-    assert.equal(error["code"], -32061);
+    expect(error["code"]).toBe(-32061);
   } finally {
     await shutdown();
     cleanup();
@@ -597,7 +593,7 @@ test("auth: bridge.info requires admin scope", async () => {
       { Authorization: `Bearer ${token}` },
     );
     const error = (body as Record<string, unknown>)["error"] as Record<string, unknown>;
-    assert.equal(error["code"], -32060, "bridge.info with non-admin scope should return -32060");
+    expect(error["code"]).toBe(-32060);
   } finally {
     await shutdown();
     cleanup();
@@ -614,11 +610,11 @@ test("auth: bridge.info returns runtime info with admin key", async () => {
       { jsonrpc: "2.0", id: 1, method: "bridge.info" },
       { Authorization: `Bearer ${token}` },
     );
-    assert.ok("result" in (body as Record<string, unknown>), "admin key should succeed for bridge.info");
+    expect("result" in (body as Record<string, unknown>)).toBeTruthy();
     const result = (body as Record<string, unknown>)["result"] as Record<string, unknown>;
-    assert.equal(result["transport"], "http");
-    assert.equal(typeof result["bridgeVersion"], "string");
-    assert.equal(result["authMode"], "bearer");
+    expect(result["transport"]).toBe("http");
+    expect(typeof result["bridgeVersion"]).toBe("string");
+    expect(result["authMode"]).toBe("bearer");
   } finally {
     await shutdown();
     cleanup();
@@ -631,7 +627,7 @@ test("auth: bridge.info requires auth when auth is enabled (no key)", async () =
   try {
     const { body } = await rpc(port, { jsonrpc: "2.0", id: 1, method: "bridge.info" });
     const error = (body as Record<string, unknown>)["error"] as Record<string, unknown>;
-    assert.equal(error["code"], -32061, "bridge.info without token should return -32061");
+    expect(error["code"]).toBe(-32061);
   } finally {
     await shutdown();
     cleanup();
@@ -642,10 +638,10 @@ test("auth: bridge.info accessible in noAuth mode without credentials", async ()
   const { shutdown, port } = await startHttpServer({ port: 0, noAuth: true });
   try {
     const { body } = await rpc(port, { jsonrpc: "2.0", id: 1, method: "bridge.info" });
-    assert.ok("result" in (body as Record<string, unknown>), "bridge.info should succeed in noAuth mode");
+    expect("result" in (body as Record<string, unknown>)).toBeTruthy();
     const result = (body as Record<string, unknown>)["result"] as Record<string, unknown>;
-    assert.equal(result["transport"], "http");
-    assert.equal(result["authMode"], "none");
+    expect(result["transport"]).toBe("http");
+    expect(result["authMode"]).toBe("none");
   } finally {
     await shutdown();
   }
@@ -664,9 +660,9 @@ test("rate limiting: same key receives 429 on the 121st POST /rpc request", asyn
         { jsonrpc: "2.0", id: attempt, method: "session.list" },
         { Authorization: `Bearer ${token}` },
       );
-      assert.equal(response.status, 200, `request ${attempt} should be allowed`);
-      assert.equal(response.headers["x-ratelimit-limit"], "120");
-      assert.ok(response.headers["x-ratelimit-remaining"] !== undefined);
+      expect(response.status).toBe(200);
+      expect(response.headers["x-ratelimit-limit"]).toBe("120");
+      expect(response.headers["x-ratelimit-remaining"] !== undefined).toBeTruthy();
     }
 
     const rejected = await rpc(
@@ -675,13 +671,13 @@ test("rate limiting: same key receives 429 on the 121st POST /rpc request", asyn
       { Authorization: `Bearer ${token}` },
     );
 
-    assert.equal(rejected.status, 429);
-    assert.equal(rejected.headers["x-ratelimit-limit"], "120");
-    assert.equal(rejected.headers["x-ratelimit-remaining"], "0");
-    assert.ok(rejected.headers["x-ratelimit-reset"] !== undefined);
+    expect(rejected.status).toBe(429);
+    expect(rejected.headers["x-ratelimit-limit"]).toBe("120");
+    expect(rejected.headers["x-ratelimit-remaining"]).toBe("0");
+    expect(rejected.headers["x-ratelimit-reset"] !== undefined).toBeTruthy();
     const error = (rejected.body as Record<string, unknown>)["error"] as Record<string, unknown>;
-    assert.equal(error["code"], -32029);
-    assert.equal(error["message"], "Rate limit exceeded");
+    expect(error["code"]).toBe(-32029);
+    expect(error["message"]).toBe("Rate limit exceeded");
   } finally {
     await shutdown();
     cleanup();
@@ -703,10 +699,10 @@ test("rate limiting: admin key bypasses the per-key limit", async () => {
       );
     }
 
-    assert.ok(finalResponse);
-    assert.equal(finalResponse.status, 200);
-    assert.ok("result" in (finalResponse.body as Record<string, unknown>));
-    assert.equal(finalResponse.headers["x-ratelimit-limit"], undefined);
+    expect(finalResponse).toBeTruthy();
+    expect(finalResponse.status).toBe(200);
+    expect("result" in (finalResponse.body as Record<string, unknown>)).toBeTruthy();
+    expect(finalResponse.headers["x-ratelimit-limit"]).toBe(undefined);
   } finally {
     await shutdown();
     cleanup();
@@ -722,9 +718,9 @@ test("rate limiting: --no-auth mode never returns 429", async () => {
       finalResponse = await rpc(port, { jsonrpc: "2.0", id: attempt, method: "session.list" });
     }
 
-    assert.ok(finalResponse);
-    assert.equal(finalResponse.status, 200);
-    assert.ok("result" in (finalResponse.body as Record<string, unknown>));
+    expect(finalResponse).toBeTruthy();
+    expect(finalResponse.status).toBe(200);
+    expect("result" in (finalResponse.body as Record<string, unknown>)).toBeTruthy();
   } finally {
     await shutdown();
   }
@@ -748,7 +744,7 @@ test("rate limiting: GET /events remains available after the key exhausts POST /
       },
       { Authorization: `Bearer ${token}` },
     );
-    assert.equal(started.status, 200);
+    expect(started.status).toBe(200);
     const sessionId = ((started.body as Record<string, unknown>)["result"] as Record<string, unknown>)["sessionId"] as string;
 
     for (let attempt = 2; attempt <= 120; attempt++) {
@@ -757,7 +753,7 @@ test("rate limiting: GET /events remains available after the key exhausts POST /
         { jsonrpc: "2.0", id: attempt, method: "session.list" },
         { Authorization: `Bearer ${token}` },
       );
-      assert.equal(response.status, 200);
+      expect(response.status).toBe(200);
     }
 
     const rejected = await rpc(
@@ -765,11 +761,11 @@ test("rate limiting: GET /events remains available after the key exhausts POST /
       { jsonrpc: "2.0", id: 121, method: "session.list" },
       { Authorization: `Bearer ${token}` },
     );
-    assert.equal(rejected.status, 429);
+    expect(rejected.status).toBe(429);
 
     const sse = await openSseConnection(port, sessionId);
-    assert.equal(sse.status, 200);
-    assert.ok(sse.headers["content-type"]?.includes("text/event-stream"));
+    expect(sse.status).toBe(200);
+    expect(sse.headers["content-type"]?.includes("text/event-stream")).toBeTruthy();
     sse.close();
   } finally {
     delete globalThis.__AI_SPEC_SDK_QUERY__;
@@ -785,11 +781,11 @@ test("GET / returns UI HTML when UI enabled (default)", async () => {
   const { shutdown, port } = await startHttpServer({ port: 0, noAuth: true });
   try {
     const { status, body, headers } = await httpGet(port, "/");
-    assert.equal(status, 200);
-    assert.ok(headers["content-type"]?.includes("text/html"), "Content-Type should be text/html");
+    expect(status).toBe(200);
+    expect(headers["content-type"]?.includes("text/html")).toBeTruthy();
     const html = body as string;
-    assert.ok(html.includes("AI Spec Bridge"), "HTML should include the app title");
-    assert.ok(html.includes("login-view"), "HTML should include login view");
+    expect(html.includes("AI Spec Bridge")).toBeTruthy();
+    expect(html.includes("login-view")).toBeTruthy();
   } finally {
     await shutdown();
   }
@@ -811,7 +807,7 @@ test("GET / returns 404 when AI_SPEC_SDK_UI_ENABLED=false", async () => {
   const { shutdown, port } = await startHttpServer({ port: 0, noAuth: true });
   try {
     const { status } = await httpGet(port, "/");
-    assert.equal(status, 200, "GET / should return 200 when UI_ENABLED is not false");
+    expect(status).toBe(200);
   } finally {
     await shutdown();
   }
@@ -822,8 +818,8 @@ test("GET / does not require authentication", async () => {
   const { shutdown, port } = await startHttpServer({ port: 0, keysFile });
   try {
     const { status, body, headers } = await httpGet(port, "/");
-    assert.equal(status, 200);
-    assert.ok(headers["content-type"]?.includes("text/html"), "UI should be served without auth");
+    expect(status).toBe(200);
+    expect(headers["content-type"]?.includes("text/html")).toBeTruthy();
   } finally {
     await shutdown();
     cleanup();
@@ -835,18 +831,18 @@ test("GET / does not interfere with other endpoints", async () => {
   try {
     // POST /rpc still works
     const rpcRes = await rpc(port, { jsonrpc: "2.0", id: 1, method: "bridge.ping" });
-    assert.equal(rpcRes.status, 200);
+    expect(rpcRes.status).toBe(200);
     const rpcResult = (rpcRes.body as Record<string, unknown>)["result"] as Record<string, unknown>;
-    assert.equal(rpcResult["pong"], true);
+    expect(rpcResult["pong"]).toBe(true);
 
     // GET /health still works
     const healthRes = await httpGet(port, "/health");
-    assert.equal(healthRes.status, 200);
-    assert.equal((healthRes.body as Record<string, unknown>)["status"], "ok");
+    expect(healthRes.status).toBe(200);
+    expect((healthRes.body as Record<string, unknown>)["status"]).toBe("ok");
 
     // GET /events without sessionId still returns 400
     const eventsRes = await httpGet(port, "/events");
-    assert.equal(eventsRes.status, 400);
+    expect(eventsRes.status).toBe(400);
   } finally {
     await shutdown();
   }
@@ -857,10 +853,10 @@ test("bridge.capabilities includes ui field for HTTP transport", async () => {
   try {
     const { body } = await rpc(port, { jsonrpc: "2.0", id: 1, method: "bridge.capabilities" });
     const result = (body as Record<string, unknown>)["result"] as Record<string, unknown>;
-    assert.ok("ui" in result, "capabilities should include ui field");
+    expect("ui" in result).toBeTruthy();
     const ui = result["ui"] as Record<string, unknown>;
-    assert.equal(typeof ui["enabled"], "boolean");
-    assert.equal(ui["path"], "/");
+    expect(typeof ui["enabled"]).toBe("boolean");
+    expect(ui["path"]).toBe("/");
   } finally {
     await shutdown();
   }
@@ -872,16 +868,16 @@ test("GET /metrics returns 200 with Prometheus text in no-auth mode", async () =
   const { shutdown, port } = await startHttpServer({ port: 0, noAuth: true });
   try {
     const { status, body, headers } = await httpGet(port, "/metrics");
-    assert.equal(status, 200);
-    assert.equal(headers["content-type"], "text/plain; version=0.0.4; charset=utf-8");
+    expect(status).toBe(200);
+    expect(headers["content-type"]).toBe("text/plain; version=0.0.4; charset=utf-8");
     const text = body as string;
-    assert.ok(text.includes("# HELP bridge_requests_total"));
-    assert.ok(text.includes("# TYPE bridge_requests_total counter"));
-    assert.ok(text.includes("# HELP bridge_sessions_active"));
-    assert.ok(text.includes("# TYPE bridge_sessions_active gauge"));
-    assert.ok(text.includes("# HELP bridge_rate_limit_rejections_total"));
-    assert.ok(text.includes("# HELP bridge_tokens_consumed_total"));
-    assert.ok(text.includes("# HELP bridge_rpc_duration_seconds"));
+    expect(text.includes("# HELP bridge_requests_total")).toBeTruthy();
+    expect(text.includes("# TYPE bridge_requests_total counter")).toBeTruthy();
+    expect(text.includes("# HELP bridge_sessions_active")).toBeTruthy();
+    expect(text.includes("# TYPE bridge_sessions_active gauge")).toBeTruthy();
+    expect(text.includes("# HELP bridge_rate_limit_rejections_total")).toBeTruthy();
+    expect(text.includes("# HELP bridge_tokens_consumed_total")).toBeTruthy();
+    expect(text.includes("# HELP bridge_rpc_duration_seconds")).toBeTruthy();
   } finally {
     await shutdown();
   }
@@ -892,7 +888,7 @@ test("GET /metrics returns 401 when auth enabled and no token provided", async (
   const { shutdown, port } = await startHttpServer({ port: 0, keysFile });
   try {
     const { status } = await httpGet(port, "/metrics");
-    assert.equal(status, 401);
+    expect(status).toBe(401);
   } finally {
     await shutdown();
     cleanup();
@@ -905,7 +901,7 @@ test("GET /metrics returns 200 with session:read scope key", async () => {
   const { shutdown, port } = await startHttpServer({ port: 0, keysFile });
   try {
     const { status } = await httpGet(port, "/metrics", { Authorization: `Bearer ${token}` });
-    assert.equal(status, 200);
+    expect(status).toBe(200);
   } finally {
     await shutdown();
     cleanup();
@@ -918,7 +914,7 @@ test("GET /metrics returns 403 with insufficient scope", async () => {
   const { shutdown, port } = await startHttpServer({ port: 0, keysFile });
   try {
     const { status } = await httpGet(port, "/metrics", { Authorization: `Bearer ${token}` });
-    assert.equal(status, 403);
+    expect(status).toBe(403);
   } finally {
     await shutdown();
     cleanup();
@@ -934,7 +930,7 @@ test("bridge_requests_total increments per RPC call", async () => {
 
     const { body } = await httpGet(port, "/metrics");
     const text = body as string;
-    assert.match(text, /bridge_requests_total\{method="bridge\.ping",status="200"\} 3/);
+    expect(text).toMatch(/bridge_requests_total\{method="bridge\.ping",status="200"\} 3/);
   } finally {
     await shutdown();
   }
@@ -947,8 +943,8 @@ test("bridge_rpc_duration_seconds includes count and sum after RPC calls", async
 
     const { body } = await httpGet(port, "/metrics");
     const text = body as string;
-    assert.match(text, /bridge_rpc_duration_seconds_count\{method="bridge\.ping"\} 1/);
-    assert.match(text, /bridge_rpc_duration_seconds_sum\{method="bridge\.ping"\} [\d.]+/);
+    expect(text).toMatch(/bridge_rpc_duration_seconds_count\{method="bridge\.ping"\} 1/);
+    expect(text).toMatch(/bridge_rpc_duration_seconds_sum\{method="bridge\.ping"\} [\d.]+/);
   } finally {
     await shutdown();
   }
@@ -972,13 +968,13 @@ test("bridge_sessions_active reflects active sessions", async () => {
 
       const { body } = await httpGet(port, "/metrics");
       const text = body as string;
-      assert.match(text, /bridge_sessions_active 1/);
+      expect(text).toMatch(/bridge_sessions_active 1/);
 
       await sessionPromise;
 
       // After completion, gauge should be 0
       const { body: body2 } = await httpGet(port, "/metrics");
-      assert.match(body2 as string, /bridge_sessions_active 0/);
+      expect(body2 as string).toMatch(/bridge_sessions_active 0/);
     } finally {
       await shutdown();
     }
@@ -1002,7 +998,7 @@ test("bridge_rate_limit_rejections_total increments on 429", async () => {
 
     const { body } = await httpGet(port, "/metrics", { Authorization: `Bearer ${token}` });
     const text = body as string;
-    assert.match(text, /bridge_rate_limit_rejections_total [1-9]\d*/);
+    expect(text).toMatch(/bridge_rate_limit_rejections_total [1-9]\d*/);
   } finally {
     await shutdown();
     cleanup();
@@ -1021,7 +1017,7 @@ test("GET /metrics is exempt from rate limiting", async () => {
 
     // /metrics should still work even after rate limit is exceeded
     const { status } = await httpGet(port, "/metrics", { Authorization: `Bearer ${token}` });
-    assert.equal(status, 200);
+    expect(status).toBe(200);
   } finally {
     await shutdown();
     cleanup();
@@ -1041,7 +1037,7 @@ test("bridge_tokens_consumed_total increments on session completion with usage d
 
       const { body } = await httpGet(port, "/metrics");
       const text = body as string;
-      assert.match(text, /bridge_tokens_consumed_total 150/);
+      expect(text).toMatch(/bridge_tokens_consumed_total 150/);
     } finally {
       await shutdown();
     }

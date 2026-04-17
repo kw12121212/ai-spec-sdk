@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, expect } from "bun:test";
 import { BridgeServer } from "../src/bridge.js";
 
 test("taskTemplate.create creates a task template", async () => {
@@ -17,16 +16,16 @@ test("taskTemplate.create creates a task template", async () => {
     },
   });
 
-  assert.ok(!response.error, "taskTemplate.create should not return an error");
+  expect(!response.error, "taskTemplate.create should not return an error").toBeTruthy();
   const result = response.result as Record<string, unknown>;
-  assert.equal(result["name"], "test-task");
-  assert.equal(result["description"], "A test task");
-  assert.equal(result["systemPrompt"], "You are a helpful assistant");
-  assert.deepEqual(result["tools"], ["Read", "Write"]);
-  assert.deepEqual(result["parameters"], { type: "object", properties: {} });
-  assert.equal(result["version"], 1);
-  assert.ok(typeof result["createdAt"] === "string");
-  assert.ok(typeof result["updatedAt"] === "string");
+  expect(result["name"]).toBe("test-task");
+  expect(result["description"]).toBe("A test task");
+  expect(result["systemPrompt"]).toBe("You are a helpful assistant");
+  expect(result["tools"]).toEqual(["Read", "Write"]);
+  expect(result["parameters"]).toEqual({ type: "object", properties: {} });
+  expect(result["version"]).toBe(1);
+  expect(typeof result["createdAt"] === "string").toBeTruthy();
+  expect(typeof result["updatedAt"] === "string").toBeTruthy();
 });
 
 test("taskTemplate.create returns error when name is missing", async () => {
@@ -40,8 +39,8 @@ test("taskTemplate.create returns error when name is missing", async () => {
     },
   });
 
-  assert.ok(response.error);
-  assert.equal(response.error!.code, -32602);
+  expect(response.error).toBeTruthy();
+  expect(response.error!.code).toBe(-32602);
 });
 
 test("taskTemplate.get returns existing task template", async () => {
@@ -61,10 +60,10 @@ test("taskTemplate.get returns existing task template", async () => {
     params: { name: "get-test" },
   });
 
-  assert.ok(!response.error);
+  expect(!response.error).toBeTruthy();
   const result = response.result as Record<string, unknown>;
-  assert.equal(result["name"], "get-test");
-  assert.equal(result["description"], "testing get");
+  expect(result["name"]).toBe("get-test");
+  expect(result["description"]).toBe("testing get");
 });
 
 test("taskTemplate.update updates existing task template", async () => {
@@ -84,11 +83,11 @@ test("taskTemplate.update updates existing task template", async () => {
     params: { name: "update-test", description: "updated description" },
   });
 
-  assert.ok(!response.error);
+  expect(!response.error).toBeTruthy();
   const result = response.result as Record<string, unknown>;
-  assert.equal(result["name"], "update-test");
-  assert.equal(result["description"], "updated description");
-  assert.equal(result["version"], 2);
+  expect(result["name"]).toBe("update-test");
+  expect(result["description"]).toBe("updated description");
+  expect(result["version"]).toBe(2);
 });
 
 test("taskTemplate.list returns all task templates", async () => {
@@ -114,12 +113,12 @@ test("taskTemplate.list returns all task templates", async () => {
     method: "taskTemplate.list",
   });
 
-  assert.ok(!response.error);
+  expect(!response.error).toBeTruthy();
   const result = response.result as Record<string, unknown>;
   const templates = result["templates"] as Array<Record<string, unknown>>;
-  assert.ok(templates.length >= 2);
-  assert.ok(templates.some((t) => t["name"] === "task-a"));
-  assert.ok(templates.some((t) => t["name"] === "task-b"));
+  expect(templates.length >= 2).toBeTruthy();
+  expect(templates.some((t) => t["name"] === "task-a")).toBeTruthy();
+  expect(templates.some((t) => t["name"] === "task-b")).toBeTruthy();
 });
 
 test("taskTemplate.delete removes task template", async () => {
@@ -139,8 +138,8 @@ test("taskTemplate.delete removes task template", async () => {
     params: { name: "to-delete" },
   });
 
-  assert.ok(!deleteResponse.error);
-  assert.equal((deleteResponse.result as Record<string, unknown>)["removed"], true);
+  expect(!deleteResponse.error).toBeTruthy();
+  expect((deleteResponse.result as Record<string, unknown>)["removed"]).toBe(true);
 
   const getResponse = await server.handleMessage({
     jsonrpc: "2.0",
@@ -149,5 +148,5 @@ test("taskTemplate.delete removes task template", async () => {
     params: { name: "to-delete" },
   });
 
-  assert.equal(getResponse.result, null);
+  expect(getResponse.result).toBeNull();
 });

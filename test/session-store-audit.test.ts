@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, expect } from "bun:test";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -22,8 +21,8 @@ test("SessionStore with AuditLog writes session_created on create", () => {
     store.create(ws, "hello audit");
 
     const result = auditLog.query({ eventType: "session_created" });
-    assert.equal(result.total, 1);
-    assert.equal(result.entries[0].payload.workspace, ws);
+    expect(result.total).toBe(1);
+    expect(result.entries[0].payload.workspace).toBe(ws);
   } finally {
     fs.rmSync(sessionsDir, { recursive: true, force: true });
     fs.rmSync(auditDir, { recursive: true, force: true });
@@ -44,10 +43,10 @@ test("SessionStore with AuditLog writes state_transition on state change", () =>
     store.transitionExecutionState(session.id, "running", "query_started");
 
     const transitions = auditLog.query({ eventType: "state_transition" });
-    assert.ok(transitions.total >= 1);
+    expect(transitions.total >= 1).toBeTruthy();
     const lastTransition = transitions.entries[0];
-    assert.equal(lastTransition.payload.to, "running");
-    assert.equal(lastTransition.payload.trigger, "query_started");
+    expect(lastTransition.payload.to).toBe("running");
+    expect(lastTransition.payload.trigger).toBe("query_started");
   } finally {
     fs.rmSync(sessionsDir, { recursive: true, force: true });
     fs.rmSync(auditDir, { recursive: true, force: true });
@@ -62,11 +61,11 @@ test("SessionStore without AuditLog works normally (backward compat)", () => {
     const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ws3-"));
 
     const session = store.create(ws, "no-audit");
-    assert.ok(session.id.length > 0);
+    expect(session.id.length > 0).toBeTruthy();
 
     store.transitionExecutionState(session.id, "running", "query_started");
     const updated = store.get(session.id);
-    assert.equal(updated!.executionState, "running");
+    expect(updated!.executionState).toBe("running");
   } finally {
     fs.rmSync(sessionsDir, { recursive: true, force: true });
   }
@@ -84,11 +83,10 @@ test("SessionStore with AuditLog records parentSessionId in session_created", ()
     store.create(ws, "child", false, "parent-123");
 
     const created = auditLog.query({ eventType: "session_created" });
-    assert.equal(created.total, 1);
-    assert.equal(
+    expect(created.total).toBe(1);
+    expect(
       (created.entries[0].metadata as Record<string, unknown>)["parentSessionId"],
-      "parent-123",
-    );
+    ).toBe("parent-123");
   } finally {
     fs.rmSync(sessionsDir, { recursive: true, force: true });
     fs.rmSync(auditDir, { recursive: true, force: true });

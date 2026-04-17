@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, expect } from "bun:test";
 import { preQueryCheck, postQueryCheck, buildQuotaStatuses } from "../../src/quota/enforcer.js";
 import { QuotaRegistry, setQuotaRegistry } from "../../src/quota/registry.js";
 import { InMemoryTokenStore, setTokenStore } from "../../src/token-tracking/store.js";
@@ -25,9 +24,9 @@ const sessionRule: QuotaRule = {
 test("preQueryCheck allows when no rules exist", () => {
   setupTestEnv();
   const result = preQueryCheck("s1", "p1");
-  assert.equal(result.allowed, true);
-  assert.equal(result.warnings.length, 0);
-  assert.equal(result.violation, undefined);
+  expect(result.allowed).toBe(true);
+  expect(result.warnings.length).toBe(0);
+  expect(result.violation).toBe(undefined);
 });
 
 test("preQueryCheck allows when usage is below threshold", () => {
@@ -43,8 +42,8 @@ test("preQueryCheck allows when usage is below threshold", () => {
   });
 
   const result = preQueryCheck("s1", "p1");
-  assert.equal(result.allowed, true);
-  assert.equal(result.warnings.length, 0);
+  expect(result.allowed).toBe(true);
+  expect(result.warnings.length).toBe(0);
 });
 
 test("preQueryCheck warns when usage exceeds warnThreshold but not limit (warn action)", () => {
@@ -63,10 +62,10 @@ test("preQueryCheck warns when usage exceeds warnThreshold but not limit (warn a
   const result = preQueryCheck("s1", "p1", {
     onWarning: (w) => warnings.push(w),
   });
-  assert.equal(result.allowed, true);
-  assert.equal(result.warnings.length, 1);
-  assert.equal(warnings.length, 1);
-  assert.equal((warnings[0] as Record<string, unknown>).quotaId, "q-warn-only");
+  expect(result.allowed).toBe(true);
+  expect(result.warnings.length).toBe(1);
+  expect(warnings.length).toBe(1);
+  expect((warnings[0] as Record<string, unknown>).quotaId).toBe("q-warn-only");
 });
 
 test("preQueryCheck blocks when usage exceeds limit with block action", () => {
@@ -85,10 +84,10 @@ test("preQueryCheck blocks when usage exceeds limit with block action", () => {
   const result = preQueryCheck("s1", "p1", {
     onBlocked: (n) => blockedNotifications.push(n),
   });
-  assert.equal(result.allowed, false);
-  assert.ok(result.violation);
-  assert.equal(result.violation!.blocked, true);
-  assert.equal(blockedNotifications.length, 1);
+  expect(result.allowed).toBe(false);
+  expect(result.violation).toBeTruthy();
+  expect(result.violation!.blocked).toBe(true);
+  expect(blockedNotifications.length).toBe(1);
 });
 
 test("preQueryCheck does not block when action is warn only even at limit", () => {
@@ -104,8 +103,8 @@ test("preQueryCheck does not block when action is warn only even at limit", () =
   });
 
   const result = preQueryCheck("s1", "p1");
-  assert.equal(result.allowed, true);
-  assert.equal(result.warnings.length, 1);
+  expect(result.allowed).toBe(true);
+  expect(result.warnings.length).toBe(1);
 });
 
 test("postQueryCheck returns warnings after recording tokens", () => {
@@ -121,14 +120,14 @@ test("postQueryCheck returns warnings after recording tokens", () => {
   });
 
   const warnings = postQueryCheck("s1", "p1");
-  assert.equal(warnings.length, 1);
-  assert.ok(warnings[0].percentage >= 0.8);
+  expect(warnings.length).toBe(1);
+  expect(warnings[0].percentage >= 0.8).toBeTruthy();
 });
 
 test("postQueryCheck returns empty when no rules match", () => {
   setupTestEnv();
   const warnings = postQueryCheck("s1", "p1");
-  assert.equal(warnings.length, 0);
+  expect(warnings.length).toBe(0);
 });
 
 test("global scope rule matches any session/provider", () => {
@@ -144,7 +143,7 @@ test("global scope rule matches any session/provider", () => {
   });
 
   const result = preQueryCheck("any-session", "any-provider");
-  assert.equal(result.allowed, false);
+  expect(result.allowed).toBe(false);
 });
 
 test("provider scope rule matches only that providerId", () => {
@@ -160,10 +159,10 @@ test("provider scope rule matches only that providerId", () => {
   });
 
   const resultForP1 = preQueryCheck("s1", "p1");
-  assert.equal(resultForP1.allowed, false);
+  expect(resultForP1.allowed).toBe(false);
 
   const resultForP2 = preQueryCheck("s1", "p2");
-  assert.equal(resultForP2.allowed, true);
+  expect(resultForP2.allowed).toBe(true);
 });
 
 test("buildQuotaStatuses computes correct status for each rule", () => {
@@ -183,14 +182,14 @@ test("buildQuotaStatuses computes correct status for each rule", () => {
   const statuses = buildQuotaStatuses(registry.list(), "s1", "p1");
 
   const okStatus = statuses.find((s) => s.quotaId === "q-ok");
-  assert.ok(okStatus);
-  assert.equal(okStatus!.status, "ok");
+  expect(okStatus).toBeTruthy();
+  expect(okStatus!.status).toBe("ok");
 
   const warnStatus = statuses.find((s) => s.quotaId === "q-warn");
-  assert.ok(warnStatus);
-  assert.equal(warnStatus!.status, "warning");
+  expect(warnStatus).toBeTruthy();
+  expect(warnStatus!.status).toBe("warning");
 
   const exceededStatus = statuses.find((s) => s.quotaId === "q-exceeded");
-  assert.ok(exceededStatus);
-  assert.equal(exceededStatus!.status, "exceeded");
+  expect(exceededStatus).toBeTruthy();
+  expect(exceededStatus!.status).toBe("exceeded");
 });

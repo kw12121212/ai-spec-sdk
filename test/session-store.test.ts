@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, expect } from "bun:test";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
@@ -14,11 +13,11 @@ test("SessionStore with sessionsDir writes session to disk on create", () => {
     const session = store.create(ws, "hello world");
 
     const filePath = path.join(sessionsDir, `${session.id}.json`);
-    assert.ok(fs.existsSync(filePath), "session file should exist on disk");
+    expect(fs.existsSync(filePath)).toBeTruthy();
 
     const parsed = JSON.parse(fs.readFileSync(filePath, "utf8")) as Record<string, unknown>;
-    assert.equal(parsed["id"], session.id);
-    assert.equal(parsed["workspace"], ws);
+    expect(parsed["id"]).toBe(session.id);
+    expect(parsed["workspace"]).toBe(ws);
   } finally {
     fs.rmSync(sessionsDir, { recursive: true, force: true });
   }
@@ -38,11 +37,11 @@ test("SessionStore with sessionsDir reloads sessions from disk on construction",
     const store2 = new SessionStore(sessionsDir);
     const loaded = store2.get(session.id);
 
-    assert.ok(loaded, "session should be reloaded from disk");
-    assert.equal(loaded!.id, session.id);
-    assert.equal(loaded!.workspace, ws);
-    assert.equal(loaded!.status, "interrupted");
-    assert.equal(loaded!.history[0]?.prompt, "persist me");
+    expect(loaded).toBeTruthy();
+    expect(loaded!.id).toBe(session.id);
+    expect(loaded!.workspace).toBe(ws);
+    expect(loaded!.status).toBe("interrupted");
+    expect(loaded!.history[0]?.prompt).toBe("persist me");
   } finally {
     fs.rmSync(sessionsDir, { recursive: true, force: true });
   }
@@ -53,9 +52,9 @@ test("SessionStore creates sessionsDir if it does not exist", () => {
   const sessionsDir = path.join(parent, "sessions", "nested");
 
   try {
-    assert.ok(!fs.existsSync(sessionsDir), "directory should not exist before construction");
+    expect(!fs.existsSync(sessionsDir)).toBeTruthy();
     new SessionStore(sessionsDir);
-    assert.ok(fs.existsSync(sessionsDir), "SessionStore must create the directory on construction");
+    expect(fs.existsSync(sessionsDir)).toBeTruthy();
   } finally {
     fs.rmSync(parent, { recursive: true, force: true });
   }
@@ -69,7 +68,7 @@ test("SessionStore without sessionsDir does not write files", () => {
     const session = store.create(ws, "no persistence");
 
     // Should not throw and session should be in memory
-    assert.ok(store.get(session.id));
+    expect(store.get(session.id)).toBeTruthy();
   } finally {
     fs.rmSync(ws, { recursive: true, force: true });
   }
@@ -86,8 +85,8 @@ test("SessionStore atomic write leaves no temp file after create", () => {
     const tmpPath = path.join(sessionsDir, `${session.id}.json.tmp`);
     const finalPath = path.join(sessionsDir, `${session.id}.json`);
 
-    assert.ok(!fs.existsSync(tmpPath), "temp file must not remain after write");
-    assert.ok(fs.existsSync(finalPath), "final file must exist");
+    expect(!fs.existsSync(tmpPath)).toBeTruthy();
+    expect(fs.existsSync(finalPath)).toBeTruthy();
   } finally {
     fs.rmSync(sessionsDir, { recursive: true, force: true });
   }
@@ -105,9 +104,9 @@ test("SessionStore persists updated state after complete", () => {
     // Reload and verify persisted status
     const store2 = new SessionStore(sessionsDir);
     const loaded = store2.get(session.id);
-    assert.ok(loaded);
-    assert.equal(loaded!.status, "completed");
-    assert.equal(loaded!.result, "the result");
+    expect(loaded).toBeTruthy();
+    expect(loaded!.status).toBe("completed");
+    expect(loaded!.result).toBe("the result");
   } finally {
     fs.rmSync(sessionsDir, { recursive: true, force: true });
   }
@@ -129,13 +128,13 @@ test("SessionStore marks active sessions as interrupted on reload", () => {
     const store2 = new SessionStore(sessionsDir);
     const loaded = store2.get(session.id);
 
-    assert.ok(loaded);
-    assert.equal(loaded!.status, "interrupted");
+    expect(loaded).toBeTruthy();
+    expect(loaded!.status).toBe("interrupted");
 
     // Verify persisted to disk as interrupted
     const filePath = path.join(sessionsDir, `${session.id}.json`);
     const parsed = JSON.parse(fs.readFileSync(filePath, "utf8")) as Record<string, unknown>;
-    assert.equal(parsed["status"], "interrupted");
+    expect(parsed["status"]).toBe("interrupted");
   } finally {
     fs.rmSync(sessionsDir, { recursive: true, force: true });
   }
@@ -153,8 +152,8 @@ test("SessionStore leaves completed and stopped sessions unchanged on reload", (
     store1.stop(s2.id);
 
     const store2 = new SessionStore(sessionsDir);
-    assert.equal(store2.get(s1.id)!.status, "completed");
-    assert.equal(store2.get(s2.id)!.status, "stopped");
+    expect(store2.get(s1.id)!.status).toBe("completed");
+    expect(store2.get(s2.id)!.status).toBe("stopped");
   } finally {
     fs.rmSync(sessionsDir, { recursive: true, force: true });
   }
@@ -171,11 +170,11 @@ test("SessionStore.export returns full session data", () => {
     store.appendEvent(session.id, { type: "agent_message", message: { text: "hello" } });
 
     const exported = store.export(session.id);
-    assert.ok(exported);
-    assert.equal(exported!.id, session.id);
-    assert.equal(exported!.workspace, ws);
-    assert.equal(exported!.status, "active");
-    assert.equal(exported!.history.length, 2);
+    expect(exported).toBeTruthy();
+    expect(exported!.id).toBe(session.id);
+    expect(exported!.workspace).toBe(ws);
+    expect(exported!.status).toBe("active");
+    expect(exported!.history.length).toBe(2);
   } finally {
     fs.rmSync(ws, { recursive: true, force: true });
   }
@@ -183,7 +182,7 @@ test("SessionStore.export returns full session data", () => {
 
 test("SessionStore.export returns null for unknown session", () => {
   const store = new SessionStore();
-  assert.equal(store.export("nonexistent"), null);
+  expect(store.export("nonexistent")).toBe(null);
 });
 
 // --- Delete ---
@@ -198,10 +197,10 @@ test("SessionStore.delete removes completed session from memory and disk", () =>
     store.complete(session.id, "done");
 
     const result = store.delete(session.id);
-    assert.equal(result, "ok");
+    expect(result).toBe("ok");
 
-    assert.equal(store.get(session.id), null);
-    assert.ok(!fs.existsSync(path.join(sessionsDir, `${session.id}.json`)));
+    expect(store.get(session.id)).toBe(null);
+    expect(!fs.existsSync(path.join(sessionsDir, `${session.id}.json`))).toBeTruthy();
   } finally {
     fs.rmSync(sessionsDir, { recursive: true, force: true });
   }
@@ -216,10 +215,10 @@ test("SessionStore.delete rejects active session", () => {
     const session = store.create(ws, "still running");
 
     const result = store.delete(session.id);
-    assert.equal(result, "active");
+    expect(result).toBe("active");
 
     // Session should still exist
-    assert.ok(store.get(session.id));
+    expect(store.get(session.id)).toBeTruthy();
   } finally {
     fs.rmSync(sessionsDir, { recursive: true, force: true });
   }
@@ -227,7 +226,7 @@ test("SessionStore.delete rejects active session", () => {
 
 test("SessionStore.delete returns not_found for unknown session", () => {
   const store = new SessionStore();
-  assert.equal(store.delete("nonexistent"), "not_found");
+  expect(store.delete("nonexistent")).toBe("not_found");
 });
 
 // --- Cleanup ---
@@ -251,9 +250,9 @@ test("SessionStore.cleanup removes old non-active sessions", () => {
     fs.writeFileSync(filePath, JSON.stringify(loaded), "utf8");
 
     const removed = store.cleanup(30);
-    assert.equal(removed, 1);
-    assert.equal(store.get(session.id), null);
-    assert.ok(!fs.existsSync(path.join(sessionsDir, `${session.id}.json`)));
+    expect(removed).toBe(1);
+    expect(store.get(session.id)).toBe(null);
+    expect(!fs.existsSync(path.join(sessionsDir, `${session.id}.json`))).toBeTruthy();
   } finally {
     fs.rmSync(sessionsDir, { recursive: true, force: true });
   }
@@ -273,7 +272,7 @@ test("SessionStore.cleanup uses default 30 days", () => {
     fs.writeFileSync(path.join(sessionsDir, `${session.id}.json`), JSON.stringify(loaded), "utf8");
 
     const removed = store.cleanup();
-    assert.equal(removed, 1);
+    expect(removed).toBe(1);
   } finally {
     fs.rmSync(sessionsDir, { recursive: true, force: true });
   }
@@ -292,8 +291,8 @@ test("SessionStore.cleanup preserves active sessions", () => {
     fs.writeFileSync(path.join(sessionsDir, `${session.id}.json`), JSON.stringify(loaded), "utf8");
 
     const removed = store.cleanup(1);
-    assert.equal(removed, 0);
-    assert.ok(store.get(session.id));
+    expect(removed).toBe(0);
+    expect(store.get(session.id)).toBeTruthy();
   } finally {
     fs.rmSync(sessionsDir, { recursive: true, force: true });
   }
@@ -314,7 +313,7 @@ test("SessionStore.cleanup caps olderThanDays at 365", () => {
     fs.writeFileSync(path.join(sessionsDir, `${session.id}.json`), JSON.stringify(loaded), "utf8");
 
     const removed = store.cleanup(500);
-    assert.equal(removed, 1, "should remove because cap is 365 and session is 400 days old");
+    expect(removed).toBe(1);
   } finally {
     fs.rmSync(sessionsDir, { recursive: true, force: true });
   }
@@ -325,7 +324,7 @@ test("SessionStore.cleanup with olderThanDays 0 is handled gracefully", () => {
   // With 0 days, cutoff is Date.now() so all non-active sessions are removed
   // But cleanup itself just calls with the number — the bridge validates
   const removed = store.cleanup(0);
-  assert.equal(removed, 0);
+  expect(removed).toBe(0);
 });
 
 // --- Pause/Resume ---
@@ -336,8 +335,8 @@ test("Session creates sessions with pausedAt and pauseReason as undefined", () =
 
   try {
     const session = store.create(ws, "test pause init");
-    assert.equal(session.pausedAt, undefined);
-    assert.equal(session.pauseReason, undefined);
+    expect(session.pausedAt).toBe(undefined);
+    expect(session.pauseReason).toBe(undefined);
   } finally {
     fs.rmSync(ws, { recursive: true, force: true });
   }
@@ -362,9 +361,9 @@ test("SessionStore persists pausedAt and pauseReason to disk", () => {
     // Reload from disk
     const store2 = new SessionStore(sessionsDir);
     const loaded2 = store2.get(session.id);
-    assert.ok(loaded2);
-    assert.equal(loaded2!.pausedAt, "2026-04-12T10:00:00.000Z");
-    assert.equal(loaded2!.pauseReason, "need break");
+    expect(loaded2).toBeTruthy();
+    expect(loaded2!.pausedAt).toBe("2026-04-12T10:00:00.000Z");
+    expect(loaded2!.pauseReason).toBe("need break");
   } finally {
     fs.rmSync(sessionsDir, { recursive: true, force: true });
   }
@@ -378,9 +377,9 @@ test("Session creates sessions with cancelledAt, cancelReason, and timeoutMs as 
 
   try {
     const session = store.create(ws, "test cancel init");
-    assert.equal(session.cancelledAt, undefined);
-    assert.equal(session.cancelReason, undefined);
-    assert.equal(session.timeoutMs, undefined);
+    expect(session.cancelledAt).toBe(undefined);
+    expect(session.cancelReason).toBe(undefined);
+    expect(session.timeoutMs).toBe(undefined);
   } finally {
     fs.rmSync(ws, { recursive: true, force: true });
   }
@@ -395,11 +394,11 @@ test("SessionStore.cancelSession cancels an active session", () => {
     store.transitionExecutionState(session.id, "running", "test");
     const cancelled = store.cancelSession(session.id, "test reason");
 
-    assert.ok(cancelled);
-    assert.equal(cancelled!.status, "completed");
-    assert.equal(cancelled!.executionState, "completed");
-    assert.ok(cancelled!.cancelledAt);
-    assert.equal(cancelled!.cancelReason, "test reason");
+    expect(cancelled).toBeTruthy();
+    expect(cancelled!.status).toBe("completed");
+    expect(cancelled!.executionState).toBe("completed");
+    expect(cancelled!.cancelledAt).toBeTruthy();
+    expect(cancelled!.cancelReason).toBe("test reason");
   } finally {
     fs.rmSync(ws, { recursive: true, force: true });
   }
@@ -414,8 +413,8 @@ test("SessionStore.cancelSession uses default reason when none provided", () => 
     store.transitionExecutionState(session.id, "running", "test");
     const cancelled = store.cancelSession(session.id);
 
-    assert.ok(cancelled);
-    assert.equal(cancelled!.cancelReason, "user_requested");
+    expect(cancelled).toBeTruthy();
+    expect(cancelled!.cancelReason).toBe("user_requested");
   } finally {
     fs.rmSync(ws, { recursive: true, force: true });
   }
@@ -424,7 +423,7 @@ test("SessionStore.cancelSession uses default reason when none provided", () => 
 test("SessionStore.cancelSession returns null for unknown session", () => {
   const store = new SessionStore();
   const cancelled = store.cancelSession("nonexistent");
-  assert.equal(cancelled, null);
+  expect(cancelled).toBe(null);
 });
 
 test("SessionStore persists cancelledAt, cancelReason, and timeoutMs to disk", () => {
@@ -447,10 +446,10 @@ test("SessionStore persists cancelledAt, cancelReason, and timeoutMs to disk", (
     // Reload from disk
     const store2 = new SessionStore(sessionsDir);
     const loaded2 = store2.get(session.id);
-    assert.ok(loaded2);
-    assert.equal(loaded2!.cancelledAt, "2026-04-12T10:00:00.000Z");
-    assert.equal(loaded2!.cancelReason, "timeout");
-    assert.equal(loaded2!.timeoutMs, 60000);
+    expect(loaded2).toBeTruthy();
+    expect(loaded2!.cancelledAt).toBe("2026-04-12T10:00:00.000Z");
+    expect(loaded2!.cancelReason).toBe("timeout");
+    expect(loaded2!.timeoutMs).toBe(60000);
   } finally {
     fs.rmSync(sessionsDir, { recursive: true, force: true });
   }
@@ -472,7 +471,7 @@ test("SessionStore.persist saves session changes to disk", () => {
     // Verify on disk
     const filePath = path.join(sessionsDir, `${session.id}.json`);
     const parsed = JSON.parse(fs.readFileSync(filePath, "utf8")) as Record<string, unknown>;
-    assert.equal(parsed["timeoutMs"], 30000);
+    expect(parsed["timeoutMs"]).toBe(30000);
   } finally {
     fs.rmSync(sessionsDir, { recursive: true, force: true });
   }

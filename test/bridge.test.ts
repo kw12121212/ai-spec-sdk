@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, expect } from "bun:test";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -20,13 +19,13 @@ test("bridge.capabilities returns stdio JSON-RPC capabilities", async () => {
     method: "bridge.capabilities",
   });
 
-  assert.equal(response.jsonrpc, "2.0");
-  assert.equal(response.id, 1);
+  expect(response.jsonrpc).toBe("2.0");
+  expect(response.id).toBe(1);
   const result = response.result as Record<string, unknown>;
-  assert.equal(result["transport"], "stdio");
-  assert.equal(result["protocol"], "jsonrpc-2.0");
-  assert.ok((result["methods"] as string[]).includes("workflow.run"));
-  assert.equal(notifications.length, 0);
+  expect(result["transport"]).toBe("stdio");
+  expect(result["protocol"]).toBe("jsonrpc-2.0");
+  expect((result["methods"] as string[]).includes("workflow.run")).toBeTruthy();
+  expect(notifications.length).toBe(0);
 });
 
 test("unknown method returns method-not-found error", async () => {
@@ -37,9 +36,9 @@ test("unknown method returns method-not-found error", async () => {
     method: "does.not.exist",
   });
 
-  assert.equal(response.jsonrpc, "2.0");
-  assert.equal(response.id, 2);
-  assert.equal(response.error!.code, -32601);
+  expect(response.jsonrpc).toBe("2.0");
+  expect(response.id).toBe(2);
+  expect(response.error!.code).toBe(-32601);
 });
 
 test("bridge.capabilities includes session.history in methods list", async () => {
@@ -51,10 +50,7 @@ test("bridge.capabilities includes session.history in methods list", async () =>
   });
 
   const result = response.result as Record<string, unknown>;
-  assert.ok(
-    (result["methods"] as string[]).includes("session.history"),
-    "capabilities must advertise session.history",
-  );
+  expect((result["methods"] as string[]).includes("session.history")).toBeTruthy();
 });
 
 test("invalid JSON-RPC object returns invalid-request error", async () => {
@@ -64,9 +60,9 @@ test("invalid JSON-RPC object returns invalid-request error", async () => {
     method: "bridge.capabilities",
   });
 
-  assert.equal(response.jsonrpc, "2.0");
-  assert.equal(response.id, 3);
-  assert.equal(response.error!.code, -32600);
+  expect(response.jsonrpc).toBe("2.0");
+  expect(response.id).toBe(3);
+  expect(response.error!.code).toBe(-32600);
 });
 
 test("bridge.ping returns pong with ISO timestamp", async () => {
@@ -79,14 +75,14 @@ test("bridge.ping returns pong with ISO timestamp", async () => {
   });
   const after = Date.now();
 
-  assert.equal(response.jsonrpc, "2.0");
-  assert.equal(response.id, 5);
-  assert.ok(!response.error, "bridge.ping should not return an error");
+  expect(response.jsonrpc).toBe("2.0");
+  expect(response.id).toBe(5);
+  expect(!response.error).toBeTruthy();
   const result = response.result as Record<string, unknown>;
-  assert.equal(result["pong"], true);
-  assert.equal(typeof result["ts"], "string");
+  expect(result["pong"]).toBe(true);
+  expect(typeof result["ts"]).toBe("string");
   const ts = new Date(result["ts"] as string).getTime();
-  assert.ok(ts >= before && ts <= after, "ts should be a current ISO timestamp");
+  expect(ts >= before && ts <= after).toBeTruthy();
 });
 
 test("bridge.capabilities advertises bridge.ping and session.events", async () => {
@@ -98,8 +94,8 @@ test("bridge.capabilities advertises bridge.ping and session.events", async () =
   });
 
   const methods = (response.result as Record<string, unknown>)["methods"] as string[];
-  assert.ok(methods.includes("bridge.ping"), "capabilities must advertise bridge.ping");
-  assert.ok(methods.includes("session.events"), "capabilities must advertise session.events");
+  expect(methods.includes("bridge.ping")).toBeTruthy();
+  expect(methods.includes("session.events")).toBeTruthy();
 });
 
 test("models.list returns non-empty array of {id, displayName} objects", async () => {
@@ -110,13 +106,13 @@ test("models.list returns non-empty array of {id, displayName} objects", async (
     method: "models.list",
   });
 
-  assert.ok(!response.error, "models.list must not return an error");
+  expect(!response.error).toBeTruthy();
   const result = response.result as Record<string, unknown>;
   const models = result["models"] as Array<Record<string, unknown>>;
-  assert.ok(Array.isArray(models) && models.length > 0, "models must be a non-empty array");
+  expect(Array.isArray(models) && models.length > 0).toBeTruthy();
   for (const m of models) {
-    assert.ok(typeof m["id"] === "string" && m["id"].length > 0, "each model must have an id");
-    assert.ok(typeof m["displayName"] === "string" && m["displayName"].length > 0, "each model must have a displayName");
+    expect(typeof m["id"] === "string" && m["id"].length > 0).toBeTruthy();
+    expect(typeof m["displayName"] === "string" && m["displayName"].length > 0).toBeTruthy();
   }
 });
 
@@ -129,10 +125,10 @@ test("bridge.capabilities advertises models.list, workspace.register, workspace.
   });
 
   const methods = (response.result as Record<string, unknown>)["methods"] as string[];
-  assert.ok(methods.includes("models.list"));
-  assert.ok(methods.includes("workspace.register"));
-  assert.ok(methods.includes("workspace.list"));
-  assert.ok(methods.includes("tools.list"));
+  expect(methods.includes("models.list")).toBeTruthy();
+  expect(methods.includes("workspace.register")).toBeTruthy();
+  expect(methods.includes("workspace.list")).toBeTruthy();
+  expect(methods.includes("tools.list")).toBeTruthy();
 });
 
 test("tools.list returns non-empty array of {name, description} objects", async () => {
@@ -143,13 +139,13 @@ test("tools.list returns non-empty array of {name, description} objects", async 
     method: "tools.list",
   });
 
-  assert.ok(!response.error, "tools.list must not return an error");
+  expect(!response.error).toBeTruthy();
   const result = response.result as Record<string, unknown>;
   const tools = result["tools"] as Array<Record<string, unknown>>;
-  assert.ok(Array.isArray(tools) && tools.length > 0, "tools must be a non-empty array");
+  expect(Array.isArray(tools) && tools.length > 0).toBeTruthy();
   for (const t of tools) {
-    assert.ok(typeof t["name"] === "string" && t["name"].length > 0, "each tool must have a name");
-    assert.ok(typeof t["description"] === "string" && t["description"].length > 0, "each tool must have a description");
+    expect(typeof t["name"] === "string" && t["name"].length > 0).toBeTruthy();
+    expect(typeof t["description"] === "string" && t["description"].length > 0).toBeTruthy();
   }
 });
 
@@ -164,11 +160,11 @@ test("workspace.register returns entry and workspace.list reflects it", async ()
       params: { workspace: wsDir },
     });
 
-    assert.ok(!regResponse.error, "workspace.register must not error for an existing directory");
+    expect(!regResponse.error).toBeTruthy();
     const entry = (regResponse.result as Record<string, unknown>)["workspace"] as Record<string, unknown>;
-    assert.equal(entry["path"], wsDir);
-    assert.ok(typeof entry["registeredAt"] === "string");
-    assert.ok(typeof entry["lastUsedAt"] === "string");
+    expect(entry["path"]).toBe(wsDir);
+    expect(typeof entry["registeredAt"] === "string").toBeTruthy();
+    expect(typeof entry["lastUsedAt"] === "string").toBeTruthy();
 
     const listResponse = await server.handleMessage({
       jsonrpc: "2.0",
@@ -176,7 +172,7 @@ test("workspace.register returns entry and workspace.list reflects it", async ()
       method: "workspace.list",
     });
     const workspaces = (listResponse.result as Record<string, unknown>)["workspaces"] as Array<Record<string, unknown>>;
-    assert.ok(workspaces.some((w) => w["path"] === wsDir), "workspace.list must include the registered path");
+    expect(workspaces.some((w) => w["path"] === wsDir)).toBeTruthy();
   } finally {
     fs.rmSync(wsDir, { recursive: true, force: true });
   }
@@ -191,8 +187,8 @@ test("workspace.register returns -32001 for a non-existent path", async () => {
     params: { workspace: "/this/path/does/not/exist" },
   });
 
-  assert.ok(response.error, "must return an error for non-existent path");
-  assert.equal(response.error!.code, -32001);
+  expect(response.error).toBeTruthy();
+  expect(response.error!.code).toBe(-32001);
 });
 
 test("workspace.register returns -32602 when workspace param is missing", async () => {
@@ -204,8 +200,8 @@ test("workspace.register returns -32602 when workspace param is missing", async 
     params: {},
   });
 
-  assert.ok(response.error);
-  assert.equal(response.error!.code, -32602);
+  expect(response.error).toBeTruthy();
+  expect(response.error!.code).toBe(-32602);
 });
 
 test("workspace.list returns empty array when no workspaces registered", async () => {
@@ -216,9 +212,9 @@ test("workspace.list returns empty array when no workspaces registered", async (
     method: "workspace.list",
   });
 
-  assert.ok(!response.error);
+  expect(!response.error).toBeTruthy();
   const workspaces = (response.result as Record<string, unknown>)["workspaces"] as unknown[];
-  assert.deepEqual(workspaces, []);
+  expect(workspaces).toEqual([]);
 });
 
 // --- Context management tests ---
@@ -236,10 +232,10 @@ test("context.read reads a project CLAUDE.md", async () => {
       params: { scope: "project", workspace: wsDir, path: "CLAUDE.md" },
     });
 
-    assert.ok(!response.error, `unexpected error: ${JSON.stringify(response.error)}`);
+    expect(!response.error).toBeTruthy();
     const result = response.result as Record<string, unknown>;
-    assert.equal(result["content"], "# Test");
-    assert.equal(result["scope"], "project");
+    expect(result["content"]).toBe("# Test");
+    expect(result["scope"]).toBe("project");
   } finally {
     fs.rmSync(wsDir, { recursive: true, force: true });
   }
@@ -256,8 +252,8 @@ test("context.write creates a file and context.read reads it back", async () => 
       method: "context.write",
       params: { scope: "project", workspace: wsDir, path: "CLAUDE.md", content: "# Written" },
     });
-    assert.ok(!writeResp.error);
-    assert.equal((writeResp.result as Record<string, unknown>)["written"], true);
+    expect(!writeResp.error).toBeTruthy();
+    expect((writeResp.result as Record<string, unknown>)["written"]).toBe(true);
 
     const readResp = await server.handleMessage({
       jsonrpc: "2.0",
@@ -265,7 +261,7 @@ test("context.write creates a file and context.read reads it back", async () => 
       method: "context.read",
       params: { scope: "project", workspace: wsDir, path: "CLAUDE.md" },
     });
-    assert.equal((readResp.result as Record<string, unknown>)["content"], "# Written");
+    expect((readResp.result as Record<string, unknown>)["content"]).toBe("# Written");
   } finally {
     fs.rmSync(wsDir, { recursive: true, force: true });
   }
@@ -282,8 +278,8 @@ test("context.write rejects path traversal", async () => {
       method: "context.write",
       params: { scope: "project", workspace: wsDir, path: "../../etc/bad", content: "hacked" },
     });
-    assert.ok(response.error);
-    assert.equal(response.error!.code, -32602);
+    expect(response.error).toBeTruthy();
+    expect(response.error!.code).toBe(-32602);
   } finally {
     fs.rmSync(wsDir, { recursive: true, force: true });
   }
@@ -304,10 +300,10 @@ test("context.list returns project and user files", async () => {
       params: { workspace: wsDir },
     });
 
-    assert.ok(!response.error);
+    expect(!response.error).toBeTruthy();
     const files = (response.result as Record<string, unknown>)["files"] as Array<Record<string, unknown>>;
     const projectFiles = files.filter((f) => f["scope"] === "project");
-    assert.ok(projectFiles.length >= 2, "should have CLAUDE.md and .claude/settings.json");
+    expect(projectFiles.length >= 2).toBeTruthy();
   } finally {
     fs.rmSync(wsDir, { recursive: true, force: true });
   }
@@ -323,8 +319,8 @@ test("context.read returns -32001 for non-existent file", async () => {
       method: "context.read",
       params: { scope: "project", workspace: wsDir, path: ".claude/nonexistent.md" },
     });
-    assert.ok(response.error);
-    assert.equal(response.error!.code, -32001);
+    expect(response.error).toBeTruthy();
+    expect(response.error!.code).toBe(-32001);
   } finally {
     fs.rmSync(wsDir, { recursive: true, force: true });
   }
@@ -357,10 +353,10 @@ test("bridge/file_changed emitted for Write tool_use", async () => {
     const fileChanged = notifications.find(
       (n) => (n as Record<string, unknown>)["method"] === "bridge/file_changed",
     );
-    assert.ok(fileChanged, "should emit bridge/file_changed for Write tool");
+    expect(fileChanged).toBeTruthy();
     const params = (fileChanged as Record<string, unknown>)["params"] as Record<string, unknown>;
-    assert.equal(params["action"], "created");
-    assert.ok(params["path"], "should include relative path");
+    expect(params["action"]).toBe("created");
+    expect(params["path"]).toBeTruthy();
   } finally {
     fs.rmSync(wsDir, { recursive: true, force: true });
   }
@@ -394,10 +390,10 @@ test("bridge/file_changed emitted for Edit tool_use with diff", async () => {
     const fileChanged = notifications.find(
       (n) => (n as Record<string, unknown>)["method"] === "bridge/file_changed",
     );
-    assert.ok(fileChanged, "should emit bridge/file_changed for Edit tool");
+    expect(fileChanged).toBeTruthy();
     const params = (fileChanged as Record<string, unknown>)["params"] as Record<string, unknown>;
-    assert.equal(params["action"], "modified");
-    assert.ok(params["path"], "should include relative path");
+    expect(params["action"]).toBe("modified");
+    expect(params["path"]).toBeTruthy();
   } finally {
     fs.rmSync(wsDir, { recursive: true, force: true });
   }
@@ -425,7 +421,7 @@ test("session.branch creates new session with copied history", async () => {
     delete globalThis.__AI_SPEC_SDK_QUERY__;
 
     const srcSessionId = (startResp.result as Record<string, unknown>)["sessionId"] as string;
-    assert.ok(srcSessionId, "source session should have an ID");
+    expect(srcSessionId).toBeTruthy();
 
     const branchResp = await server.handleMessage({
       jsonrpc: "2.0",
@@ -434,11 +430,11 @@ test("session.branch creates new session with copied history", async () => {
       params: { sessionId: srcSessionId },
     });
 
-    assert.ok(!branchResp.error, `unexpected error: ${JSON.stringify(branchResp.error)}`);
+    expect(!branchResp.error).toBeTruthy();
     const result = branchResp.result as Record<string, unknown>;
-    assert.ok(result["sessionId"], "should return a new session ID");
-    assert.notEqual(result["sessionId"], srcSessionId, "branched session ID must differ");
-    assert.equal(result["branchedFrom"], srcSessionId);
+    expect(result["sessionId"]).toBeTruthy();
+    expect(result["sessionId"]).not.toBe(srcSessionId);
+    expect(result["branchedFrom"]).toBe(srcSessionId);
   } finally {
     fs.rmSync(wsDir, { recursive: true, force: true });
   }
@@ -452,8 +448,8 @@ test("session.branch returns -32011 for unknown session", async () => {
     method: "session.branch",
     params: { sessionId: "nonexistent" },
   });
-  assert.ok(response.error);
-  assert.equal(response.error!.code, -32011);
+  expect(response.error).toBeTruthy();
+  expect(response.error!.code).toBe(-32011);
 });
 
 test("session.branch with fromIndex limits copied history", async () => {
@@ -486,9 +482,9 @@ test("session.branch with fromIndex limits copied history", async () => {
       params: { sessionId: srcId, fromIndex: 2 },
     });
 
-    assert.ok(!branchResp.error);
+    expect(!branchResp.error).toBeTruthy();
     const result = branchResp.result as Record<string, unknown>;
-    assert.equal(result["historyCopied"], 2);
+    expect(result["historyCopied"]).toBe(2);
   } finally {
     fs.rmSync(wsDir, { recursive: true, force: true });
   }
@@ -522,12 +518,12 @@ test("session.search finds matching sessions", async () => {
       params: { query: "authentication" },
     });
 
-    assert.ok(!searchResp.error);
+    expect(!searchResp.error).toBeTruthy();
     const results = (searchResp.result as Record<string, unknown>)["results"] as Array<Record<string, unknown>>;
-    assert.ok(results.length >= 1, "should find at least one matching session");
+    expect(results.length >= 1).toBeTruthy();
     const first = results[0];
-    assert.ok(first["matches"].length > 0, "should have match details");
-    assert.ok(first["sessionId"], "result should have sessionId");
+    expect(first["matches"].length > 0).toBeTruthy();
+    expect(first["sessionId"]).toBeTruthy();
   } finally {
     fs.rmSync(wsDir, { recursive: true, force: true });
   }
@@ -561,7 +557,7 @@ test("session.search with workspace filter", async () => {
       params: { query: "unique search test", workspace: otherWs },
     });
     const results1 = (resp1.result as Record<string, unknown>)["results"] as unknown[];
-    assert.equal(results1.length, 0);
+    expect(results1.length).toBe(0);
 
     // Filter to correct workspace — should find it
     const resp2 = await server.handleMessage({
@@ -571,7 +567,7 @@ test("session.search with workspace filter", async () => {
       params: { query: "unique search test", workspace: wsDir },
     });
     const results2 = (resp2.result as Record<string, unknown>)["results"] as unknown[];
-    assert.ok(results2.length >= 1);
+    expect(results2.length >= 1).toBeTruthy();
   } finally {
     fs.rmSync(wsDir, { recursive: true, force: true });
     fs.rmSync(otherWs, { recursive: true, force: true });
@@ -586,8 +582,8 @@ test("session.search rejects empty query", async () => {
     method: "session.search",
     params: { query: "" },
   });
-  assert.ok(response.error);
-  assert.equal(response.error!.code, -32602);
+  expect(response.error).toBeTruthy();
+  expect(response.error!.code).toBe(-32602);
 });
 
 test("session.search caps limit at 100", async () => {
@@ -598,7 +594,7 @@ test("session.search caps limit at 100", async () => {
     method: "session.search",
     params: { query: "test", limit: 500 },
   });
-  assert.ok(!response.error);
+  expect(!response.error).toBeTruthy();
 });
 
 test("bridge.capabilities advertises context.*, session.spawn, session.branch, session.search", async () => {
@@ -610,12 +606,12 @@ test("bridge.capabilities advertises context.*, session.spawn, session.branch, s
   });
 
   const methods = (response.result as Record<string, unknown>)["methods"] as string[];
-  assert.ok(methods.includes("context.read"), "must advertise context.read");
-  assert.ok(methods.includes("context.write"), "must advertise context.write");
-  assert.ok(methods.includes("context.list"), "must advertise context.list");
-  assert.ok(methods.includes("session.spawn"), "must advertise session.spawn");
-  assert.ok(methods.includes("session.branch"), "must advertise session.branch");
-  assert.ok(methods.includes("session.search"), "must advertise session.search");
+  expect(methods.includes("context.read")).toBeTruthy();
+  expect(methods.includes("context.write")).toBeTruthy();
+  expect(methods.includes("context.list")).toBeTruthy();
+  expect(methods.includes("session.spawn")).toBeTruthy();
+  expect(methods.includes("session.branch")).toBeTruthy();
+  expect(methods.includes("session.search")).toBeTruthy();
 });
 
 // --- Skills list tests ---
@@ -628,15 +624,15 @@ test("skills.list returns SkillInfo objects with name, description, hasScript, p
     method: "skills.list",
   });
 
-  assert.ok(!response.error, `unexpected error: ${JSON.stringify(response.error)}`);
+  expect(!response.error).toBeTruthy();
   const result = response.result as Record<string, unknown>;
   const skills = result["skills"] as Array<Record<string, unknown>>;
-  assert.ok(Array.isArray(skills) && skills.length > 0, "skills must be a non-empty array");
+  expect(Array.isArray(skills) && skills.length > 0).toBeTruthy();
   for (const s of skills) {
-    assert.equal(typeof s["name"], "string", "each skill must have a name string");
-    assert.equal(typeof s["description"], "string", "each skill must have a description string");
-    assert.equal(typeof s["hasScript"], "boolean", "each skill must have a hasScript boolean");
-    assert.ok(Array.isArray(s["parameters"]), "each skill must have a parameters array");
+    expect(typeof s["name"]).toBe("string");
+    expect(typeof s["description"]).toBe("string");
+    expect(typeof s["hasScript"]).toBe("boolean");
+    expect(Array.isArray(s["parameters"])).toBeTruthy();
   }
 });
 
@@ -649,10 +645,10 @@ test("skills.list returns 12 skills including spec-driven-maintenance", async ()
   });
 
   const skills = (response.result as Record<string, unknown>)["skills"] as Array<Record<string, unknown>>;
-  assert.equal(skills.length, 12, "should have 12 skills");
+  expect(skills.length).toBe(12);
   const maintenance = skills.find((s) => s["name"] === "spec-driven-maintenance");
-  assert.ok(maintenance, "must include spec-driven-maintenance");
-  assert.equal(maintenance!["hasScript"], true);
+  expect(maintenance).toBeTruthy();
+  expect(maintenance!["hasScript"]).toBe(true);
 });
 
 test("skills.list AI-only skills have hasScript false", async () => {
@@ -667,9 +663,9 @@ test("skills.list AI-only skills have hasScript false", async () => {
   const aiOnly = ["spec-driven-brainstorm", "spec-driven-auto", "spec-driven-review", "spec-driven-spec-content"];
   for (const name of aiOnly) {
     const skill = skills.find((s) => s["name"] === name);
-    assert.ok(skill, `${name} should be in skills list`);
-    assert.equal(skill!["hasScript"], false, `${name} should have hasScript: false`);
-    assert.deepEqual(skill!["parameters"], [], `${name} should have empty parameters`);
+    expect(skill).toBeTruthy();
+    expect(skill!["hasScript"]).toBe(false);
+    expect(skill!["parameters"]).toEqual([]);
   }
 });
 
@@ -683,12 +679,12 @@ test("bridge.capabilities includes maintenance and migrate in workflows", async 
 
   const result = response.result as Record<string, unknown>;
   const workflows = result["workflows"] as string[];
-  assert.ok(workflows.includes("maintenance"), "must include maintenance workflow");
-  assert.ok(workflows.includes("migrate"), "must include migrate workflow");
+  expect(workflows.includes("maintenance")).toBeTruthy();
+  expect(workflows.includes("migrate")).toBeTruthy();
 
   const skillMap = result["workflowSkillMap"] as Record<string, string>;
-  assert.equal(skillMap["maintenance"], "spec-driven-maintenance");
-  assert.equal(skillMap["migrate"], "spec-driven-maintenance");
+  expect(skillMap["maintenance"]).toBe("spec-driven-maintenance");
+  expect(skillMap["migrate"]).toBe("spec-driven-maintenance");
 });
 
 test("bridge.setLogLevel sets a valid level", async () => {
@@ -700,7 +696,7 @@ test("bridge.setLogLevel sets a valid level", async () => {
     params: { level: "debug" },
   });
 
-  assert.equal((response.result as Record<string, unknown>)["level"], "debug");
+  expect((response.result as Record<string, unknown>)["level"]).toBe("debug");
 });
 
 test("bridge.setLogLevel rejects an invalid level", async () => {
@@ -712,8 +708,8 @@ test("bridge.setLogLevel rejects an invalid level", async () => {
     params: { level: "verbose" },
   });
 
-  assert.ok(response.error, "should return error for invalid level");
-  assert.equal(response.error!.code, -32602);
+  expect(response.error).toBeTruthy();
+  expect(response.error!.code).toBe(-32602);
 });
 
 test("bridge.setLogLevel is listed in capabilities", async () => {
@@ -726,7 +722,7 @@ test("bridge.setLogLevel is listed in capabilities", async () => {
 
   const result = response.result as Record<string, unknown>;
   const methods = result["methods"] as string[];
-  assert.ok(methods.includes("bridge.setLogLevel"), "capabilities must list bridge.setLogLevel");
+  expect(methods.includes("bridge.setLogLevel")).toBeTruthy();
 });
 
 // ---------------------------------------------------------------------------
@@ -742,8 +738,8 @@ test("bridge.capabilities includes apiVersion", async () => {
   });
 
   const result = response.result as Record<string, unknown>;
-  assert.equal(typeof result["apiVersion"], "string", "apiVersion must be a string");
-  assert.ok(/^\d+\.\d+\.\d+$/.test(result["apiVersion"] as string), "apiVersion must be semver");
+  expect(typeof result["apiVersion"]).toBe("string");
+  expect(/^\d+\.\d+\.\d+$/.test(result["apiVersion"] as string)).toBeTruthy();
 });
 
 test("bridge.capabilities includes bridge.negotiateVersion in methods", async () => {
@@ -756,7 +752,7 @@ test("bridge.capabilities includes bridge.negotiateVersion in methods", async ()
 
   const result = response.result as Record<string, unknown>;
   const methods = result["methods"] as string[];
-  assert.ok(methods.includes("bridge.negotiateVersion"), "capabilities must list bridge.negotiateVersion");
+  expect(methods.includes("bridge.negotiateVersion")).toBeTruthy();
 });
 
 test("bridge.negotiateVersion returns negotiatedVersion and capabilities on match", async () => {
@@ -768,11 +764,11 @@ test("bridge.negotiateVersion returns negotiatedVersion and capabilities on matc
     params: { supportedVersions: ["0.2.0"] },
   });
 
-  assert.equal(response.jsonrpc, "2.0");
-  assert.equal(response.id, 802);
+  expect(response.jsonrpc).toBe("2.0");
+  expect(response.id).toBe(802);
   const result = response.result as Record<string, unknown>;
-  assert.equal(result["negotiatedVersion"], "0.2.0");
-  assert.equal(typeof (result["capabilities"] as Record<string, unknown>)["apiVersion"], "string");
+  expect(result["negotiatedVersion"]).toBe("0.2.0");
+  expect(typeof (result["capabilities"] as Record<string, unknown>)["apiVersion"]).toBe("string");
 });
 
 test("bridge.negotiateVersion returns -32050 when no version matches", async () => {
@@ -784,10 +780,10 @@ test("bridge.negotiateVersion returns -32050 when no version matches", async () 
     params: { supportedVersions: ["99.0.0"] },
   });
 
-  assert.equal(response.error!.code, -32050);
+  expect(response.error!.code).toBe(-32050);
   const data = response.error!.data as Record<string, unknown>;
-  assert.ok(Array.isArray(data["supportedVersions"]));
-  assert.ok((data["supportedVersions"] as string[]).includes("0.2.0"));
+  expect(Array.isArray(data["supportedVersions"])).toBeTruthy();
+  expect((data["supportedVersions"] as string[]).includes("0.2.0")).toBeTruthy();
 });
 
 test("bridge.negotiateVersion rejects empty supportedVersions", async () => {
@@ -799,7 +795,7 @@ test("bridge.negotiateVersion rejects empty supportedVersions", async () => {
     params: { supportedVersions: [] },
   });
 
-  assert.equal(response.error!.code, -32602);
+  expect(response.error!.code).toBe(-32602);
 });
 
 test("bridge.negotiateVersion rejects non-string supportedVersions", async () => {
@@ -811,7 +807,7 @@ test("bridge.negotiateVersion rejects non-string supportedVersions", async () =>
     params: { supportedVersions: [123] },
   });
 
-  assert.equal(response.error!.code, -32602);
+  expect(response.error!.code).toBe(-32602);
 });
 
 test("request with matching apiVersion in params succeeds", async () => {
@@ -823,7 +819,7 @@ test("request with matching apiVersion in params succeeds", async () => {
     params: { apiVersion: "0.2.0" },
   });
 
-  assert.equal(response.result!.pong, true);
+  expect(response.result!.pong).toBe(true);
 });
 
 test("request with unsupported apiVersion returns -32050", async () => {
@@ -835,10 +831,10 @@ test("request with unsupported apiVersion returns -32050", async () => {
     params: { apiVersion: "99.0.0" },
   });
 
-  assert.equal(response.error!.code, -32050);
+  expect(response.error!.code).toBe(-32050);
   const data = response.error!.data as Record<string, unknown>;
-  assert.ok(Array.isArray(data["supportedVersions"]));
-  assert.ok((data["supportedVersions"] as string[]).includes("0.2.0"));
+  expect(Array.isArray(data["supportedVersions"])).toBeTruthy();
+  expect((data["supportedVersions"] as string[]).includes("0.2.0")).toBeTruthy();
 });
 
 test("request without apiVersion succeeds normally (opt-in)", async () => {
@@ -849,7 +845,7 @@ test("request without apiVersion succeeds normally (opt-in)", async () => {
     method: "bridge.ping",
   });
 
-  assert.equal(response.result!.pong, true);
+  expect(response.result!.pong).toBe(true);
 });
 
 // ── bridge.info tests ─────────────────────────────────────────────────────────
@@ -864,20 +860,20 @@ test("bridge.info returns runtime metadata with expected shape", async () => {
       method: "bridge.info",
     });
 
-    assert.equal(response.jsonrpc, "2.0");
-    assert.equal(response.id, 900);
-    assert.ok(!response.error, `unexpected error: ${JSON.stringify(response.error)}`);
+    expect(response.jsonrpc).toBe("2.0");
+    expect(response.id).toBe(900);
+    expect(!response.error).toBeTruthy();
 
     const result = response.result as Record<string, unknown>;
-    assert.equal(typeof result["bridgeVersion"], "string");
-    assert.equal(typeof result["apiVersion"], "string");
-    assert.equal(typeof result["transport"], "string");
-    assert.equal(typeof result["authMode"], "string");
-    assert.equal(typeof result["logLevel"], "string");
-    assert.equal(typeof result["sessionsPath"], "string");
-    assert.equal(typeof result["keysPath"], "string");
-    assert.equal(typeof result["specDrivenScriptPath"], "string");
-    assert.equal(typeof result["nodeVersion"], "string");
+    expect(typeof result["bridgeVersion"]).toBe("string");
+    expect(typeof result["apiVersion"]).toBe("string");
+    expect(typeof result["transport"]).toBe("string");
+    expect(typeof result["authMode"]).toBe("string");
+    expect(typeof result["logLevel"]).toBe("string");
+    expect(typeof result["sessionsPath"]).toBe("string");
+    expect(typeof result["keysPath"]).toBe("string");
+    expect(typeof result["specDrivenScriptPath"]).toBe("string");
+    expect(typeof result["nodeVersion"]).toBe("string");
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
@@ -891,8 +887,8 @@ test("bridge.info transport field reflects stdio by default", async () => {
     method: "bridge.info",
   });
   const result = response.result as Record<string, unknown>;
-  assert.equal(result["transport"], "stdio");
-  assert.equal(result["http"], null);
+  expect(result["transport"]).toBe("stdio");
+  expect(result["http"]).toBe(null);
 });
 
 test("bridge.info transport field reflects http when constructed with http transport", async () => {
@@ -906,10 +902,10 @@ test("bridge.info transport field reflects http when constructed with http trans
     method: "bridge.info",
   });
   const result = response.result as Record<string, unknown>;
-  assert.equal(result["transport"], "http");
+  expect(result["transport"]).toBe("http");
   const http = result["http"] as Record<string, unknown>;
-  assert.ok(http !== null);
-  assert.equal(http["port"], 9999);
+  expect(http !== null).toBeTruthy();
+  expect(http["port"]).toBe(9999);
 });
 
 test("bridge.info bridgeVersion and apiVersion match capabilities", async () => {
@@ -921,8 +917,8 @@ test("bridge.info bridgeVersion and apiVersion match capabilities", async () => 
 
   const info = infoResp.result as Record<string, unknown>;
   const caps = capsResp.result as Record<string, unknown>;
-  assert.equal(info["bridgeVersion"], caps["bridgeVersion"]);
-  assert.equal(info["apiVersion"], caps["apiVersion"]);
+  expect(info["bridgeVersion"]).toBe(caps["bridgeVersion"]);
+  expect(info["apiVersion"]).toBe(caps["apiVersion"]);
 });
 
 // ── capabilities advertisement tests ─────────────────────────────────────────
@@ -936,7 +932,7 @@ test("bridge.capabilities advertises bridge.info in methods", async () => {
   });
   const result = response.result as Record<string, unknown>;
   const methods = result["methods"] as string[];
-  assert.ok(methods.includes("bridge.info"), "capabilities must advertise bridge.info");
+  expect(methods.includes("bridge.info")).toBeTruthy();
 });
 
 test("bridge.capabilities advertises session.export in methods", async () => {
@@ -948,9 +944,9 @@ test("bridge.capabilities advertises session.export in methods", async () => {
   });
   const result = response.result as Record<string, unknown>;
   const methods = result["methods"] as string[];
-  assert.ok(methods.includes("session.export"), "capabilities must advertise session.export");
-  assert.ok(methods.includes("session.delete"), "capabilities must advertise session.delete");
-  assert.ok(methods.includes("session.cleanup"), "capabilities must advertise session.cleanup");
+  expect(methods.includes("session.export")).toBeTruthy();
+  expect(methods.includes("session.delete")).toBeTruthy();
+  expect(methods.includes("session.cleanup")).toBeTruthy();
 });
 
 // --- Template tests ---
@@ -969,14 +965,14 @@ test("template.create creates a template with session parameters", async () => {
     },
   });
 
-  assert.ok(!response.error, "template.create should not return an error");
+  expect(!response.error).toBeTruthy();
   const result = response.result as Record<string, unknown>;
-  assert.equal(result["name"], "test-template");
-  assert.equal(result["model"], "claude-3-opus");
-  assert.equal(result["maxTurns"], 10);
-  assert.equal(result["systemPrompt"], "You are a helpful assistant");
-  assert.ok(typeof result["createdAt"] === "string");
-  assert.ok(typeof result["updatedAt"] === "string");
+  expect(result["name"]).toBe("test-template");
+  expect(result["model"]).toBe("claude-3-opus");
+  expect(result["maxTurns"]).toBe(10);
+  expect(result["systemPrompt"]).toBe("You are a helpful assistant");
+  expect(typeof result["createdAt"] === "string").toBeTruthy();
+  expect(typeof result["updatedAt"] === "string").toBeTruthy();
 });
 
 test("template.create returns -32602 when name is missing", async () => {
@@ -990,8 +986,8 @@ test("template.create returns -32602 when name is missing", async () => {
     },
   });
 
-  assert.ok(response.error);
-  assert.equal(response.error!.code, -32602);
+  expect(response.error).toBeTruthy();
+  expect(response.error!.code).toBe(-32602);
 });
 
 test("template.create validates model parameter type", async () => {
@@ -1006,8 +1002,8 @@ test("template.create validates model parameter type", async () => {
     },
   });
 
-  assert.ok(response.error);
-  assert.equal(response.error!.code, -32602);
+  expect(response.error).toBeTruthy();
+  expect(response.error!.code).toBe(-32602);
 });
 
 test("template.get returns existing template", async () => {
@@ -1028,10 +1024,10 @@ test("template.get returns existing template", async () => {
     params: { name: "get-test" },
   });
 
-  assert.ok(!response.error);
+  expect(!response.error).toBeTruthy();
   const result = response.result as Record<string, unknown>;
-  assert.equal(result["name"], "get-test");
-  assert.equal(result["model"], "claude-3-sonnet");
+  expect(result["name"]).toBe("get-test");
+  expect(result["model"]).toBe("claude-3-sonnet");
 });
 
 test("template.get returns null for non-existent template", async () => {
@@ -1043,8 +1039,8 @@ test("template.get returns null for non-existent template", async () => {
     params: { name: "does-not-exist" },
   });
 
-  assert.ok(!response.error);
-  assert.equal(response.result, null);
+  expect(!response.error).toBeTruthy();
+  expect(response.result).toBe(null);
 });
 
 test("template.list returns all templates", async () => {
@@ -1070,12 +1066,12 @@ test("template.list returns all templates", async () => {
     method: "template.list",
   });
 
-  assert.ok(!response.error);
+  expect(!response.error).toBeTruthy();
   const result = response.result as Record<string, unknown>;
   const templates = result["templates"] as Array<Record<string, unknown>>;
-  assert.ok(templates.length >= 2);
-  assert.ok(templates.some((t) => t["name"] === "template-a"));
-  assert.ok(templates.some((t) => t["name"] === "template-b"));
+  expect(templates.length >= 2).toBeTruthy();
+  expect(templates.some((t) => t["name"] === "template-a")).toBeTruthy();
+  expect(templates.some((t) => t["name"] === "template-b")).toBeTruthy();
 });
 
 test("template.delete removes template", async () => {
@@ -1095,8 +1091,8 @@ test("template.delete removes template", async () => {
     params: { name: "to-delete" },
   });
 
-  assert.ok(!deleteResponse.error);
-  assert.equal((deleteResponse.result as Record<string, unknown>)["removed"], true);
+  expect(!deleteResponse.error).toBeTruthy();
+  expect((deleteResponse.result as Record<string, unknown>)["removed"]).toBe(true);
 
   const getResponse = await server.handleMessage({
     jsonrpc: "2.0",
@@ -1105,7 +1101,7 @@ test("template.delete removes template", async () => {
     params: { name: "to-delete" },
   });
 
-  assert.equal(getResponse.result, null);
+  expect(getResponse.result).toBe(null);
 });
 
 test("template.delete returns removed:false for non-existent template", async () => {
@@ -1117,8 +1113,8 @@ test("template.delete returns removed:false for non-existent template", async ()
     params: { name: "never-existed" },
   });
 
-  assert.ok(!response.error);
-  assert.equal((response.result as Record<string, unknown>)["removed"], false);
+  expect(!response.error).toBeTruthy();
+  expect((response.result as Record<string, unknown>)["removed"]).toBe(false);
 });
 
 test("bridge.capabilities advertises template.* methods", async () => {
@@ -1131,10 +1127,10 @@ test("bridge.capabilities advertises template.* methods", async () => {
 
   const result = response.result as Record<string, unknown>;
   const methods = result["methods"] as string[];
-  assert.ok(methods.includes("template.create"), "capabilities must advertise template.create");
-  assert.ok(methods.includes("template.get"), "capabilities must advertise template.get");
-  assert.ok(methods.includes("template.list"), "capabilities must advertise template.list");
-  assert.ok(methods.includes("template.delete"), "capabilities must advertise template.delete");
+  expect(methods.includes("template.create")).toBeTruthy();
+  expect(methods.includes("template.get")).toBeTruthy();
+  expect(methods.includes("template.list")).toBeTruthy();
+  expect(methods.includes("template.delete")).toBeTruthy();
 });
 
 // --- Session Pause/Resume ---
@@ -1147,7 +1143,7 @@ test("bridge.capabilities includes session.pause", async () => {
     method: "bridge.capabilities",
   });
   const methods = (response.result as Record<string, unknown>)["methods"] as string[];
-  assert.ok(methods.includes("session.pause"), "capabilities must include session.pause");
+  expect(methods.includes("session.pause")).toBeTruthy();
 });
 
 test("session.pause requires sessionId", async () => {
@@ -1158,8 +1154,8 @@ test("session.pause requires sessionId", async () => {
     method: "session.pause",
     params: {},
   });
-  assert.ok(response.error);
-  assert.equal(response.error!.code, -32602);
+  expect(response.error).toBeTruthy();
+  expect(response.error!.code).toBe(-32602);
 });
 
 test("session.pause returns -32011 for unknown session", async () => {
@@ -1170,8 +1166,8 @@ test("session.pause returns -32011 for unknown session", async () => {
     method: "session.pause",
     params: { sessionId: "nonexistent-id" },
   });
-  assert.ok(response.error);
-  assert.equal(response.error!.code, -32011);
+  expect(response.error).toBeTruthy();
+  expect(response.error!.code).toBe(-32011);
 });
 
 test("session.pause returns -32602 when session not pausable", async () => {
@@ -1201,8 +1197,8 @@ test("session.pause returns -32602 when session not pausable", async () => {
       method: "session.pause",
       params: { sessionId },
     });
-    assert.ok(pauseResp.error);
-    assert.equal(pauseResp.error!.code, -32602);
+    expect(pauseResp.error).toBeTruthy();
+    expect(pauseResp.error!.code).toBe(-32602);
   } finally {
     fs.rmSync(wsDir, { recursive: true, force: true });
   }
@@ -1216,8 +1212,8 @@ test("session.resume returns -32011 for unknown session", async () => {
     method: "session.resume",
     params: { sessionId: "nonexistent-id", prompt: "test" },
   });
-  assert.ok(response.error);
-  assert.equal(response.error!.code, -32011);
+  expect(response.error).toBeTruthy();
+  expect(response.error!.code).toBe(-32011);
 });
 
 test("session.list returns pausedAt and pauseReason as null when not paused", async () => {
@@ -1249,9 +1245,9 @@ test("session.list returns pausedAt and pauseReason as null when not paused", as
 
     const sessions = (listResp.result as Record<string, unknown>)["sessions"] as Array<Record<string, unknown>>;
     const listed = sessions.find((s) => s["sessionId"] === sessionId);
-    assert.ok(listed, "session should be listed");
-    assert.ok("pausedAt" in listed!, "should have pausedAt field");
-    assert.ok("pauseReason" in listed!, "should have pauseReason field");
+    expect(listed).toBeTruthy();
+    expect("pausedAt" in listed!).toBeTruthy();
+    expect("pauseReason" in listed!).toBeTruthy();
   } finally {
     fs.rmSync(wsDir, { recursive: true, force: true });
   }
@@ -1267,9 +1263,9 @@ test("bridge.capabilities includes session.cancel", async () => {
     method: "bridge.capabilities",
   });
   const methods = (response.result as Record<string, unknown>)["methods"] as string[];
-  assert.ok(methods.includes("session.cancel"), "capabilities must include session.cancel");
+  expect(methods.includes("session.cancel")).toBeTruthy();
   const agentControlParams = (response.result as Record<string, unknown>)["agentControlParams"] as string[];
-  assert.ok(agentControlParams.includes("timeoutMs"), "capabilities must include timeoutMs in agentControlParams");
+  expect(agentControlParams.includes("timeoutMs")).toBeTruthy();
 });
 
 test("session.cancel requires sessionId", async () => {
@@ -1280,8 +1276,8 @@ test("session.cancel requires sessionId", async () => {
     method: "session.cancel",
     params: {},
   });
-  assert.ok(response.error);
-  assert.equal(response.error!.code, -32602);
+  expect(response.error).toBeTruthy();
+  expect(response.error!.code).toBe(-32602);
 });
 
 test("session.cancel returns -32011 for unknown session", async () => {
@@ -1292,8 +1288,8 @@ test("session.cancel returns -32011 for unknown session", async () => {
     method: "session.cancel",
     params: { sessionId: "nonexistent-id" },
   });
-  assert.ok(response.error);
-  assert.equal(response.error!.code, -32011);
+  expect(response.error).toBeTruthy();
+  expect(response.error!.code).toBe(-32011);
 });
 
 test("session.start accepts timeoutMs parameter", async () => {
@@ -1314,7 +1310,7 @@ test("session.start accepts timeoutMs parameter", async () => {
     });
     delete globalThis.__AI_SPEC_SDK_QUERY__;
 
-    assert.ok(!startResp.error);
+    expect(!startResp.error).toBeTruthy();
     const sessionId = (startResp.result as Record<string, unknown>)["sessionId"] as string;
 
     // Check session status includes timeoutMs
@@ -1325,7 +1321,7 @@ test("session.start accepts timeoutMs parameter", async () => {
       params: { sessionId },
     });
     const statusResult = statusResp.result as Record<string, unknown>;
-    assert.equal(statusResult["timeoutMs"], 60000);
+    expect(statusResult["timeoutMs"]).toBe(60000);
   } finally {
     fs.rmSync(wsDir, { recursive: true, force: true });
   }
@@ -1342,8 +1338,8 @@ test("session.start rejects timeoutMs < 1", async () => {
       method: "session.start",
       params: { workspace: wsDir, prompt: "test invalid timeout", timeoutMs: 0 },
     });
-    assert.ok(response.error);
-    assert.equal(response.error!.code, -32602);
+    expect(response.error).toBeTruthy();
+    expect(response.error!.code).toBe(-32602);
   } finally {
     fs.rmSync(wsDir, { recursive: true, force: true });
   }
@@ -1379,8 +1375,8 @@ test("session.start with roles parameter is stored and applied", async () => {
     });
     delete globalThis.__AI_SPEC_SDK_QUERY__;
 
-    assert.ok(!startResp.error);
-    assert.equal((startResp.result as any).status, "completed");
+    expect(!startResp.error).toBeTruthy();
+    expect((startResp.result as any).status).toBe("completed");
   } finally {
     roleStore.resolveRoles = originalResolve;
     roleStore.hasRole = originalHas;
@@ -1417,9 +1413,9 @@ test("session.list returns cancelledAt and cancelReason as null when not cancell
 
     const sessions = (listResp.result as Record<string, unknown>)["sessions"] as Array<Record<string, unknown>>;
     const listed = sessions.find((s) => s["sessionId"] === sessionId);
-    assert.ok(listed, "session should be listed");
-    assert.ok("cancelledAt" in listed!, "should have cancelledAt field");
-    assert.ok("cancelReason" in listed!, "should have cancelReason field");
+    expect(listed).toBeTruthy();
+    expect("cancelledAt" in listed!).toBeTruthy();
+    expect("cancelReason" in listed!).toBeTruthy();
   } finally {
     fs.rmSync(wsDir, { recursive: true, force: true });
   }
@@ -1443,7 +1439,7 @@ test("session.cancel returns error when called on non-running (completed) sessio
     });
     delete globalThis.__AI_SPEC_SDK_QUERY__;
 
-    assert.ok(!startResp.error, "start should succeed");
+    expect(!startResp.error).toBeTruthy();
     const sessionId = (startResp.result as Record<string, unknown>)["sessionId"] as string;
 
     const cancelResp = await server.handleMessage({
@@ -1453,8 +1449,8 @@ test("session.cancel returns error when called on non-running (completed) sessio
       params: { sessionId },
     });
 
-    assert.ok(cancelResp.error, "cancel should return error for completed session");
-    assert.equal(cancelResp.error!.code, -32602);
+    expect(cancelResp.error).toBeTruthy();
+    expect(cancelResp.error!.code).toBe(-32602);
   } finally {
     fs.rmSync(wsDir, { recursive: true, force: true });
   }
@@ -1494,9 +1490,9 @@ test("timeoutMs on session.start automatically cancels session after duration", 
 
     const startResult = await startPromise;
     const result = startResult.result as Record<string, unknown>;
-    assert.equal(result["status"], "completed", "session should be completed (cancelled)");
-    assert.ok(result["cancelledAt"], "should have cancelledAt");
-    assert.equal(result["cancelReason"], "timeout", "reason should be timeout");
+    expect(result["status"]).toBe("completed");
+    expect(result["cancelledAt"]).toBeTruthy();
+    expect(result["cancelReason"]).toBe("timeout");
 
     const statusResp = await server.handleMessage({
       jsonrpc: "2.0",
@@ -1505,9 +1501,9 @@ test("timeoutMs on session.start automatically cancels session after duration", 
       params: { sessionId },
     });
     const statusResult = statusResp.result as Record<string, unknown>;
-    assert.equal(statusResult["status"], "completed");
-    assert.ok(statusResult["cancelledAt"]);
-    assert.equal(statusResult["cancelReason"], "timeout");
+    expect(statusResult["status"]).toBe("completed");
+    expect(statusResult["cancelledAt"]).toBeTruthy();
+    expect(statusResult["cancelReason"]).toBe("timeout");
   } finally {
     delete globalThis.__AI_SPEC_SDK_QUERY__;
     fs.rmSync(wsDir, { recursive: true, force: true });
@@ -1532,10 +1528,10 @@ test("timer is cleared when session completes normally before timeout", async ()
     });
     delete globalThis.__AI_SPEC_SDK_QUERY__;
 
-    assert.ok(!startResp.error, "start should succeed");
+    expect(!startResp.error).toBeTruthy();
     const result = startResp.result as Record<string, unknown>;
-    assert.equal(result["status"], "completed");
-    assert.equal(result["result"], "done fast");
+    expect(result["status"]).toBe("completed");
+    expect(result["result"]).toBe("done fast");
 
     const sessionId = result["sessionId"] as string;
 
@@ -1546,9 +1542,9 @@ test("timer is cleared when session completes normally before timeout", async ()
       params: { sessionId },
     });
     const statusResult = statusResp.result as Record<string, unknown>;
-    assert.equal(statusResult["status"], "completed");
-    assert.equal(statusResult["cancelledAt"], null, "should NOT be cancelled");
-    assert.equal(statusResult["cancelReason"], null, "should have no cancel reason");
+    expect(statusResult["status"]).toBe("completed");
+    expect(statusResult["cancelledAt"]).toBe(null);
+    expect(statusResult["cancelReason"]).toBe(null);
   } finally {
     fs.rmSync(wsDir, { recursive: true, force: true });
   }
@@ -1575,7 +1571,7 @@ test("timeoutMs on session.resume automatically cancels session after duration",
     });
     delete globalThis.__AI_SPEC_SDK_QUERY__;
 
-    assert.ok(!startResp.error);
+    expect(!startResp.error).toBeTruthy();
     const sessionId = (startResp.result as Record<string, unknown>)["sessionId"] as string;
 
     globalThis.__AI_SPEC_SDK_QUERY__ = async function* () {
@@ -1597,9 +1593,9 @@ test("timeoutMs on session.resume automatically cancels session after duration",
 
     const resumeResult = await resumePromise;
     const result = resumeResult.result as Record<string, unknown>;
-    assert.equal(result["status"], "completed", "resume should complete (cancelled)");
-    assert.ok(result["cancelledAt"], "should have cancelledAt");
-    assert.equal(result["cancelReason"], "timeout", "reason should be timeout");
+    expect(result["status"]).toBe("completed");
+    expect(result["cancelledAt"]).toBeTruthy();
+    expect(result["cancelReason"]).toBe("timeout");
 
     const statusResp = await server.handleMessage({
       jsonrpc: "2.0",
@@ -1608,9 +1604,9 @@ test("timeoutMs on session.resume automatically cancels session after duration",
       params: { sessionId },
     });
     const statusResult = statusResp.result as Record<string, unknown>;
-    assert.equal(statusResult["status"], "completed");
-    assert.ok(statusResult["cancelledAt"]);
-    assert.equal(statusResult["cancelReason"], "timeout");
+    expect(statusResult["status"]).toBe("completed");
+    expect(statusResult["cancelledAt"]).toBeTruthy();
+    expect(statusResult["cancelReason"]).toBe("timeout");
   } finally {
     delete globalThis.__AI_SPEC_SDK_QUERY__;
     fs.rmSync(wsDir, { recursive: true, force: true });
@@ -1690,7 +1686,7 @@ test("bridge.approveTool resumes a paused tool execution", async () => {
     };
 
     const approvalId = await getApprovalId();
-    assert.ok(approvalId, "Should get an approvalId");
+    expect(approvalId).toBeTruthy();
 
     // Session should be in waiting_for_input state
     const statusResp = await server.handleMessage({
@@ -1699,7 +1695,7 @@ test("bridge.approveTool resumes a paused tool execution", async () => {
       method: "session.status",
       params: { sessionId },
     });
-    assert.equal((statusResp.result as Record<string, unknown>)["executionState"], "waiting_for_input");
+    expect((statusResp.result as Record<string, unknown>)["executionState"]).toBe("waiting_for_input");
 
     // Approve it
     const approveResp = await server.handleMessage({
@@ -1708,11 +1704,11 @@ test("bridge.approveTool resumes a paused tool execution", async () => {
       method: "bridge.approveTool",
       params: { approvalId },
     });
-    assert.ok(!approveResp.error);
+    expect(!approveResp.error).toBeTruthy();
 
     // After approval, the query should finish
     await startPromise;
-    assert.ok(queryFinished);
+    expect(queryFinished).toBeTruthy();
 
   } finally {
     delete globalThis.__AI_SPEC_SDK_QUERY__;
@@ -1777,10 +1773,10 @@ test("bridge.denyTool denies a paused tool execution and stops the session", asy
       method: "bridge.denyTool",
       params: { approvalId },
     });
-    assert.ok(!denyResp.error);
+    expect(!denyResp.error).toBeTruthy();
 
     const startResult = await startPromise;
-    assert.equal((startResult.result as Record<string, unknown>)["status"], "stopped");
+    expect((startResult.result as Record<string, unknown>)["status"]).toBe("stopped");
 
   } finally {
     delete globalThis.__AI_SPEC_SDK_QUERY__;
@@ -1813,7 +1809,7 @@ test("audit log scope_denied entry is created when tool execution is denied by s
       params: { workspace: wsDir, prompt: "test scope audit", allowedScopes: ["file:read"] }, // Bash requires 'system'
     });
 
-    assert.ok(!response.error);
+    expect(!response.error).toBeTruthy();
     const sessionId = (response.result as Record<string, unknown>)["sessionId"] as string;
     
     // Wait for the session to be stopped
@@ -1821,14 +1817,14 @@ test("audit log scope_denied entry is created when tool execution is denied by s
     
     const auditLog = new AuditLog(auditDir);
     const scopeDeniedEntries = auditLog.query({ sessionId, eventType: "scope_denied" }).entries;
-    assert.equal(scopeDeniedEntries.length, 1);
+    expect(scopeDeniedEntries.length).toBe(1);
     
     const entry = scopeDeniedEntries[0];
-    assert.equal(entry.category, "security");
-    assert.equal(entry.payload.toolName, "Bash");
-    assert.deepEqual(entry.payload.requiredScopes, ["system"]);
-    assert.deepEqual(entry.payload.allowedScopes, ["file:read"]);
-    assert.equal(entry.payload.blockedScopes, null);
+    expect(entry.category).toBe("security");
+    expect(entry.payload.toolName).toBe("Bash");
+    expect(entry.payload.requiredScopes).toEqual(["system"]);
+    expect(entry.payload.allowedScopes).toEqual(["file:read"]);
+    expect(entry.payload.blockedScopes).toBe(null);
     
   } finally {
     delete globalThis.__AI_SPEC_SDK_QUERY__;
@@ -1896,19 +1892,19 @@ test("audit log policy_decision entry is created for allow and deny policy decis
     // Check allow session
     const allowEntries = auditLog.query({ sessionId: sessionId1, eventType: "policy_decision" }).entries;
     // We yield 2 tool_uses for sessionId1 in the generator, so we get 2 policy_decision entries!
-    assert.equal(allowEntries.length, 2);
-    assert.equal(allowEntries[0].payload.decision, "allow");
-    assert.equal(allowEntries[0].payload.policyName, "audit-allow");
-    assert.equal(allowEntries[0].category, "security");
-    assert.equal(typeof allowEntries[0].payload.durationMs, "number");
+    expect(allowEntries.length).toBe(2);
+    expect(allowEntries[0].payload.decision).toBe("allow");
+    expect(allowEntries[0].payload.policyName).toBe("audit-allow");
+    expect(allowEntries[0].category).toBe("security");
+    expect(typeof allowEntries[0].payload.durationMs).toBe("number");
     
     // Check deny session
     const denyEntries = auditLog.query({ sessionId: sessionId2, eventType: "policy_decision" }).entries;
     // The second session runs the generator, hits the first tool_use (Read), and because the second policy is "deny", it denies! Wait, "deny" short-circuits. So it only gets 1 tool_use before it stops.
-    assert.equal(denyEntries.length, 1);
-    assert.equal(denyEntries[0].payload.decision, "deny");
-    assert.equal(denyEntries[0].payload.policyName, "audit-deny");
-    assert.equal(denyEntries[0].category, "security");
+    expect(denyEntries.length).toBe(1);
+    expect(denyEntries[0].payload.decision).toBe("deny");
+    expect(denyEntries[0].payload.policyName).toBe("audit-deny");
+    expect(denyEntries[0].category).toBe("security");
 
   } finally {
     delete globalThis.__AI_SPEC_SDK_QUERY__;

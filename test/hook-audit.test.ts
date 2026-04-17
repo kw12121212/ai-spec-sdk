@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, expect } from "bun:test";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -50,12 +49,12 @@ test("hook execution writes hook_execution audit entry", async () => {
 
     const auditLog = new AuditLog(auditDir);
     const hookEntries = auditLog.query({ eventType: "hook_execution" });
-    assert.ok(hookEntries.total >= 1, `expected at least 1 hook_execution entry, got ${hookEntries.total}`);
+    expect(hookEntries.total >= 1).toBeTruthy(`expected at least 1 hook_execution entry, got ${hookEntries.total}`);
 
     const entry = hookEntries.entries[0];
-    assert.equal(entry.eventType, "hook_execution");
-    assert.equal(entry.category, "security");
-    assert.equal(typeof entry.payload.exitCode, "number");
+    expect(entry.eventType).toBe("hook_execution");
+    expect(entry.category).toBe("security");
+    expect(typeof entry.payload.exitCode === "number").toBeTruthy();
   } finally {
     // Don't clean up auditDir immediately — let async writes finish
     await sleep(200);
@@ -99,7 +98,7 @@ test("non-blocking hook also writes audit entries", async () => {
 
     const auditLog = new AuditLog(auditDir);
     const hookEntries = auditLog.query({ eventType: "hook_execution" });
-    assert.ok(hookEntries.total >= 1, `expected at least 1 hook_execution entry, got ${hookEntries.total}`);
+    expect(hookEntries.total >= 1).toBeTruthy(`expected at least 1 hook_execution entry, got ${hookEntries.total}`);
   } finally {
     await sleep(200);
     try { fs.rmSync(wsDir, { recursive: true, force: true }); } catch {}

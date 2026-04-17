@@ -1,139 +1,159 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, expect } from "bun:test";
+import { BridgeServer } from "../../src/bridge.js";
 import { getTokenStore, setTokenStore } from "../../src/token-tracking/store.js";
+import type { JsonRpcRequest } from "../../src/bridge.js";
 
-declare global {
-  // eslint-disable-next-line no-var
-  var __AI_SPEC_SDK_QUERY__: unknown;
+function createBridge(): BridgeServer {
+  return new BridgeServer({ transport: "stdio" });
 }
 
-function createMockQueryFn(usage: unknown) {
-  return async function* () {
-    yield {
-      result: "test-result",
-      usage,
-    };
-  };
+function makeRequest(method: string, params?: Record<string, unknown>): JsonRpcRequest {
+  return { jsonrpc: "2.0", id: 1, method, params };
 }
 
-test("runClaudeQuery records tokens after successful SDK query", async () => {
+async function send(bridge: BridgeServer, method: string, params?: Record<string, unknown>) {
+  return bridge.handleMessage(makeRequest(method, params));
+}
+
+function seedData() {
+  const store = getTokenStore();
+  store.record({
+    sessionId: "s-active",
+    providerId: "anth-prod",
+    providerType: "anthropic",
+    inputTokens: 150,
+    outputTokens: 300,
+  });
+  store.record({
+    sessionId: "s-active",
+    providerId: "openai-dev",
+    providerType: "openai",
+    inputTokens: 200,
+    outputTokens: 400,
+  });
+  store.record({
+    sessionId: "s-other",
+    providerId: "anth-prod",
+    providerType: "anthropic",
+    inputTokens: 50,
+    outputTokens: 100,
+  });
+}
+
+test("token.getUsage returns raw records array for valid session", async () => {
   setTokenStore(null);
-  globalThis.__AI_SPEC_SDK_QUERY__ = createMockQueryFn({
-    input_tokens: 100,
-    output_tokens: 200,
-  });
-
-  const { runClaudeQuery } = await import("../../src/claude-agent-runner.js");
-  const events: unknown[] = [];
-  const result = await runClaudeQuery({
-    prompt: "hello",
-    options: { sessionId: "test-session-1" },
-    onEvent: (msg) => events.push(msg),
-  });
-
-  assert.equal(result.status, "completed");
-  assert.ok(result.usage);
-  assert.equal(result.usage!.inputTokens, 100);
-  assert.equal(result.usage!.outputTokens, 200);
-
-  const summary = getTokenStore().getSessionUsage("test-session-1");
-  assert.ok(summary);
-  assert.equal(summary!.totalInputTokens, 100);
-  assert.equal(summary!.totalOutputTokens, 200);
-
-  delete globalThis.__AI_SPEC_SDK_QUERY__;
+  seedData();
+  const bridge = createBridge();
+  const res = await send(bridge, "token.getUsage", { sessionId: "s-active" });
+  expect(res.error).toBeUndefined();
+  const result = res.result as Record<string, unknown>;
+  expect(result.sessionId).toBe("s-active");
+  expect(result.totalInputTokens).toBe(350);
+  expect(result.totalOutputTokens).toBe(700);
+  expect(result.queryCount).toBe(2);
 });
 
-test("runClaudeQuery does NOT record when usage is null", async () => {
-  setTokenStore(null);
-  globalThis.__AI_SPEC_SDK_QUERY__ = createMockQueryFn(null);
-
-  const { runClaudeQuery } = await import("../../src/claude-agent-runner.js");
-  const events: unknown[] = [];
-  const result = await runClaudeQuery({
-    prompt: "hello",
-    options: { sessionId: "test-null-usage" },
-    onEvent: (msg) => events.push(msg),
-  });
-
-  assert.equal(result.status, "completed");
-  assert.equal(result.usage, null);
-
-  const summary = getTokenStore().getSessionUsage("test-null-usage");
-  assert.equal(summary, null);
-
-  delete globalThis.__AI_SPEC_SDK_QUERY__;
+test("token.getUsage returns error -32051 for invalid session", async () => {
+  const bridge = createBridge();
+  const res = await send(bridge, "token.getUsage", { sessionId: "nonexistent" });
+  expect(res.error).toBeTruthy();
+  expect((res.error as Record<string, unknown>).code).toBe(-32051);
 });
 
-test("runClaudeQuery handles recording failure gracefully (no throw)", async () => {
+test("token.getSessionSummary returns correct aggregation", async () => {
   setTokenStore(null);
-  globalThis.__AI_SPEC_SDK_QUERY__ = createMockQueryFn({
-    input_tokens: 50,
-    output_tokens: 25,
-  });
-
-  let recordCalled = false;
-  const originalRecord = getTokenStore().record;
-  getTokenStore().record = (() => {
-    recordCalled = true;
-    throw new Error("intentional store failure");
-  }) as never;
-
-  try {
-    const { runClaudeQuery } = await import("../../src/claude-agent-runner.js");
-    const result = await runClaudeQuery({
-      prompt: "hello",
-      options: { sessionId: "fail-test" },
-      onEvent: () => {},
-    });
-
-    assert.equal(result.status, "completed");
-    assert.ok(recordCalled);
-  } finally {
-    getTokenStore().record = originalRecord;
-    delete globalThis.__AI_SPEC_SDK_QUERY__;
-    setTokenStore(null);
-  }
+  seedData();
+  const bridge = createBridge();
+  const res = await send(bridge, "token.getSessionSummary", { sessionId: "s-active" });
+  expect(res.error).toBeUndefined();
+  const result = res.result as Record<string, unknown>;
+  expect(result.sessionId).toBe("s-active");
+  expect(result.totalInputTokens).toBe(350);
+  expect(result.totalOutputTokens).toBe(700);
+  expect(result.totalTokens).toBe(1050);
+  expect(result.queryCount).toBe(2);
 });
 
-test("sessionId extraction from options context", async () => {
+test("token.getSessionSummary provider breakdown accuracy", async () => {
   setTokenStore(null);
-  globalThis.__AI_SPEC_SDK_QUERY__ = createMockQueryFn({
-    input_tokens: 10,
-    output_tokens: 20,
-  });
+  seedData();
+  const bridge = createBridge();
+  const res = await send(bridge, "token.getSessionSummary", { sessionId: "s-active" });
+  const result = res.result as Record<string, unknown>;
+  const breakdown = result.providerBreakdown as Array<Record<string, unknown>>;
+  expect(breakdown.length).toBe(2);
 
-  const { runClaudeQuery } = await import("../../src/claude-agent-runner.js");
-  await runClaudeQuery({
-    prompt: "test",
-    options: { sessionId: "my-custom-session-id" },
-    onEvent: () => {},
-  });
+  const anthEntry = breakdown.find((b) => b.providerId === "anth-prod")!;
+  expect(anthEntry.inputTokens).toBe(150);
+  expect(anthEntry.outputTokens).toBe(300);
 
-  const summary = getTokenStore().getSessionUsage("my-custom-session-id");
-  assert.ok(summary);
-  assert.equal(summary!.sessionId, "my-custom-session-id");
-
-  delete globalThis.__AI_SPEC_SDK_QUERY__;
+  const openaiEntry = breakdown.find((b) => b.providerId === "openai-dev")!;
+  expect(openaiEntry.inputTokens).toBe(200);
+  expect(openaiEntry.outputTokens).toBe(400);
 });
 
-test("messageId optional inclusion in TokenRecord", async () => {
+test("token.getMessageUsage returns single record", async () => {
   setTokenStore(null);
-  globalThis.__AI_SPEC_SDK_QUERY__ = createMockQueryFn({
-    input_tokens: 5,
-    output_tokens: 10,
+  const store = getTokenStore();
+  store.record({
+    sessionId: "s-msg",
+    messageId: "m1",
+    providerId: "p1",
+    providerType: "anthropic",
+    inputTokens: 42,
+    outputTokens: 84,
   });
 
-  const { runClaudeQuery } = await import("../../src/claude-agent-runner.js");
-  await runClaudeQuery({
-    prompt: "test",
-    options: { sessionId: "msg-test", messageId: "msg-abc" },
-    onEvent: () => {},
-  });
+  const bridge = createBridge();
+  const res = await send(bridge, "token.getMessageUsage", { sessionId: "s-msg", messageId: "m1" });
+  expect(res.error).toBeUndefined();
+  const result = res.result as Record<string, unknown>;
+  expect(result.messageId).toBe("m1");
+  expect(result.inputTokens).toBe(42);
+  expect(result.outputTokens).toBe(84);
+});
 
-  const record = getTokenStore().getMessageUsage("msg-test", "msg-abc");
-  assert.ok(record);
-  assert.equal(record!.messageId, "msg-abc");
+test("token.getMessageUsage returns error -32052 for invalid message", async () => {
+  const bridge = createBridge();
+  const res = await send(bridge, "token.getMessageUsage", { sessionId: "s-msg", messageId: "bad-msg" });
+  expect(res.error).toBeTruthy();
+  expect((res.error as Record<string, unknown>).code).toBe(-32052);
+});
 
-  delete globalThis.__AI_SPEC_SDK_QUERY__;
+test("token.getProviderUsage with filter", async () => {
+  setTokenStore(null);
+  seedData();
+  const bridge = createBridge();
+  const res = await send(bridge, "token.getProviderUsage", { providerId: "anth-prod" });
+  expect(res.error).toBeUndefined();
+  const results = res.result as Array<Record<string, unknown>>;
+  expect(results.length).toBe(1);
+  expect(results[0].providerId).toBe("anth-prod");
+  expect(results[0].totalInputTokens).toBe(200);
+  expect(results[0].queryCount).toBe(2);
+});
+
+test("token.getProviderUsage without filter returns all", async () => {
+  setTokenStore(null);
+  seedData();
+  const bridge = createBridge();
+  const res = await send(bridge, "token.getProviderUsage");
+  expect(res.error).toBeUndefined();
+  const results = res.result as Array<Record<string, unknown>>;
+  expect(results.length >= 2).toBeTruthy();
+});
+
+test("token.clearAll clears and returns count", async () => {
+  setTokenStore(null);
+  seedData();
+  const bridge = createBridge();
+  const res = await send(bridge, "token.clearAll");
+  expect(res.error).toBeUndefined();
+  const result = res.result as Record<string, unknown>;
+  expect(result.success).toBe(true);
+  expect(typeof result.clearedCount === "number").toBeTruthy();
+  expect((result.clearedCount as number) > 0).toBeTruthy();
+
+  const summary = getTokenStore().getSessionUsage("s-active");
+  expect(summary).toBeNull();
 });

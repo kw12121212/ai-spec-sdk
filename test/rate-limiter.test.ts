@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, expect } from "bun:test";
 import { RateLimiter } from "../src/rate-limiter.js";
 
 test("RateLimiter consumes tokens until the bucket is exhausted", () => {
@@ -14,9 +13,9 @@ test("RateLimiter consumes tokens until the bucket is exhausted", () => {
   const second = limiter.consume("key-1");
   const third = limiter.consume("key-1");
 
-  assert.deepEqual(first, { allowed: true, remaining: 1, resetAt: 0 });
-  assert.deepEqual(second, { allowed: true, remaining: 0, resetAt: 30 });
-  assert.deepEqual(third, { allowed: false, remaining: 0, resetAt: 30 });
+  expect(first).toEqual({ allowed: true, remaining: 1, resetAt: 0 });
+  expect(second).toEqual({ allowed: true, remaining: 0, resetAt: 30 });
+  expect(third).toEqual({ allowed: false, remaining: 0, resetAt: 30 });
 });
 
 test("RateLimiter refills tokens based on elapsed time", () => {
@@ -33,9 +32,9 @@ test("RateLimiter refills tokens based on elapsed time", () => {
   now = 30_000;
   const afterRefill = limiter.consume("key-1");
 
-  assert.equal(afterRefill.allowed, true);
-  assert.equal(afterRefill.remaining, 0);
-  assert.equal(afterRefill.resetAt, 60);
+  expect(afterRefill.allowed).toBe(true);
+  expect(afterRefill.remaining).toBe(0);
+  expect(afterRefill.resetAt).toBe(60);
 });
 
 test("RateLimiter rejects immediately after the last token is consumed", () => {
@@ -49,11 +48,11 @@ test("RateLimiter rejects immediately after the last token is consumed", () => {
   const allowed = limiter.consume("key-1");
   const rejected = limiter.consume("key-1");
 
-  assert.equal(allowed.allowed, true);
-  assert.equal(allowed.remaining, 0);
-  assert.equal(rejected.allowed, false);
-  assert.equal(rejected.remaining, 0);
-  assert.equal(rejected.resetAt, 1);
+  expect(allowed.allowed).toBe(true);
+  expect(allowed.remaining).toBe(0);
+  expect(rejected.allowed).toBe(false);
+  expect(rejected.remaining).toBe(0);
+  expect(rejected.resetAt).toBe(1);
 });
 
 test("RateLimiter allows requests again after enough time passes", () => {
@@ -70,8 +69,8 @@ test("RateLimiter allows requests again after enough time passes", () => {
   now = 1_000;
   const allowedAgain = limiter.consume("key-1");
 
-  assert.equal(rejected.allowed, false);
-  assert.equal(allowedAgain.allowed, true);
-  assert.equal(allowedAgain.remaining, 0);
-  assert.equal(allowedAgain.resetAt, 2);
+  expect(rejected.allowed).toBe(false);
+  expect(allowedAgain.allowed).toBe(true);
+  expect(allowedAgain.remaining).toBe(0);
+  expect(allowedAgain.resetAt).toBe(2);
 });

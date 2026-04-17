@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, expect } from "bun:test";
 import crypto from "node:crypto";
 import { checkScope, METHOD_SCOPES, verifyKey } from "../src/auth.js";
 import type { StoredKey } from "../src/key-store.js";
@@ -19,7 +18,7 @@ function makeKey(overrides: Partial<StoredKey> = {}): StoredKey {
 test("verifyKey returns null for an unknown token hash", () => {
   const key = makeKey({ hash: "different-hash" });
   const result = verifyKey("raw-token", [key]);
-  assert.equal(result, null);
+  expect(result).toBe(null);
 });
 
 test("verifyKey returns null for an expired key", () => {
@@ -31,7 +30,7 @@ test("verifyKey returns null for an expired key", () => {
   });
 
   const result = verifyKey(token, [key]);
-  assert.equal(result, null);
+  expect(result).toBe(null);
 });
 
 test("verifyKey returns null for a key with an invalid expiresAt timestamp", () => {
@@ -43,7 +42,7 @@ test("verifyKey returns null for a key with an invalid expiresAt timestamp", () 
   });
 
   const result = verifyKey(token, [key]);
-  assert.equal(result, null);
+  expect(result).toBe(null);
 });
 
 test("verifyKey returns the matching key for a valid unexpired token", () => {
@@ -55,12 +54,12 @@ test("verifyKey returns the matching key for a valid unexpired token", () => {
   });
 
   const result = verifyKey(token, [key]);
-  assert.deepEqual(result, key);
+  expect(result).toEqual(key);
 });
 
 test("checkScope passes with a matching scope", () => {
   const key = makeKey({ scopes: ["session:write"] });
-  assert.equal(checkScope(key, "session.start"), true);
+  expect(checkScope(key, "session.start")).toBe(true);
 });
 
 test("checkScope passes with a matching role", () => {
@@ -71,7 +70,7 @@ test("checkScope passes with a matching role", () => {
   };
   try {
     const key = makeKey({ scopes: ["session:read"], roles: ["operator"] });
-    assert.equal(checkScope(key, "session.start"), true);
+    expect(checkScope(key, "session.start")).toBe(true);
   } finally {
     roleStore.resolveRoles = originalResolve;
   }
@@ -79,7 +78,7 @@ test("checkScope passes with a matching role", () => {
 
 test("checkScope passes with admin scope", () => {
   const key = makeKey({ scopes: ["admin"] });
-  assert.equal(checkScope(key, "workflow.run"), true);
+  expect(checkScope(key, "workflow.run")).toBe(true);
 });
 
 test("checkScope passes with admin role", () => {
@@ -90,7 +89,7 @@ test("checkScope passes with admin role", () => {
   };
   try {
     const key = makeKey({ scopes: ["session:read"], roles: ["superadmin"] });
-    assert.equal(checkScope(key, "workflow.run"), true);
+    expect(checkScope(key, "workflow.run")).toBe(true);
   } finally {
     roleStore.resolveRoles = originalResolve;
   }
@@ -98,15 +97,15 @@ test("checkScope passes with admin role", () => {
 
 test("checkScope fails with insufficient scope", () => {
   const key = makeKey({ scopes: ["session:read"] });
-  assert.equal(checkScope(key, "session.start"), false);
+  expect(checkScope(key, "session.start")).toBe(false);
 });
 
 test("null-scope methods always pass authorization", () => {
   const key = makeKey({ scopes: [] });
-  assert.equal(checkScope(key, "bridge.capabilities"), true);
-  assert.equal(checkScope(key, "models.list"), true);
-  assert.equal(checkScope(key, "tools.list"), true);
-  assert.equal(checkScope(key, "skills.list"), true);
+  expect(checkScope(key, "bridge.capabilities")).toBe(true);
+  expect(checkScope(key, "models.list")).toBe(true);
+  expect(checkScope(key, "tools.list")).toBe(true);
+  expect(checkScope(key, "skills.list")).toBe(true);
 });
 
 test("METHOD_SCOPES covers every bridge dispatch method", () => {
@@ -153,9 +152,9 @@ test("METHOD_SCOPES covers every bridge dispatch method", () => {
   ] as const;
 
   for (const method of bridgeMethods) {
-    assert.ok(
+    expect(
       Object.prototype.hasOwnProperty.call(METHOD_SCOPES, method),
       `METHOD_SCOPES is missing ${method}`,
-    );
+    ).toBeTruthy();
   }
 });

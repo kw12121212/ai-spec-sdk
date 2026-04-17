@@ -11,9 +11,9 @@ const BRIDGE_ARGS = [path.resolve(import.meta.dir, "../../../dist/src/cli.js")];
 
 const bridgeExists = fs.existsSync(BRIDGE_ARGS[0]!);
 
-describe.skip(
-  bridgeExists ? "Integration: real bridge" : "Integration: real bridge (skipped)",
-  () => {
+const describeOrSkip = bridgeExists ? describe : describe.skip;
+
+describeOrSkip("Integration: real bridge", () => {
     let client: BridgeClient;
 
     afterAll(() => {

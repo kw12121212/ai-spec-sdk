@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, expect } from "bun:test";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
@@ -27,7 +26,7 @@ test("loadKeys returns empty array when file does not exist", () => {
   try {
     // Don't create the file — it should return []
     const keys = loadKeys(keysFile);
-    assert.deepEqual(keys, []);
+    expect(keys).toEqual([]);
   } finally {
     cleanup();
   }
@@ -39,8 +38,8 @@ test("addKey and loadKeys round-trip", () => {
     const key = sampleKey("k1");
     addKey(key, keysFile);
     const loaded = loadKeys(keysFile);
-    assert.equal(loaded.length, 1);
-    assert.deepEqual(loaded[0], key);
+    expect(loaded.length).toBe(1);
+    expect(loaded[0]).toEqual(key);
   } finally {
     cleanup();
   }
@@ -52,9 +51,9 @@ test("addKey accumulates multiple keys", () => {
     addKey(sampleKey("k1"), keysFile);
     addKey(sampleKey("k2"), keysFile);
     const loaded = loadKeys(keysFile);
-    assert.equal(loaded.length, 2);
-    assert.equal(loaded[0]!.id, "k1");
-    assert.equal(loaded[1]!.id, "k2");
+    expect(loaded.length).toBe(2);
+    expect(loaded[0]!.id).toBe("k1");
+    expect(loaded[1]!.id).toBe("k2");
   } finally {
     cleanup();
   }
@@ -66,8 +65,8 @@ test("addKey and loadKeys round-trip with roles", () => {
     const key = sampleKey("k1", { roles: ["admin"] });
     addKey(key, keysFile);
     const loaded = loadKeys(keysFile);
-    assert.equal(loaded.length, 1);
-    assert.deepEqual(loaded[0], key);
+    expect(loaded.length).toBe(1);
+    expect(loaded[0]).toEqual(key);
   } finally {
     cleanup();
   }
@@ -80,8 +79,8 @@ test("saved file does not contain raw token — only the fields of StoredKey", (
     addKey(key, keysFile);
     const raw = fs.readFileSync(keysFile, "utf8");
     // The file should contain the hash field but no field named "token"
-    assert.ok(!raw.includes('"token"'), `file should not contain "token" field`);
-    assert.ok(raw.includes("sha256hashonly"), "file should contain the hash");
+    expect(!raw.includes('"token"')).toBeTruthy();
+    expect(raw.includes("sha256hashonly")).toBeTruthy();
   } finally {
     cleanup();
   }
@@ -93,10 +92,10 @@ test("revokeKey removes the key and returns true", () => {
     addKey(sampleKey("k1"), keysFile);
     addKey(sampleKey("k2"), keysFile);
     const removed = revokeKey("k1", keysFile);
-    assert.equal(removed, true);
+    expect(removed).toBe(true);
     const loaded = loadKeys(keysFile);
-    assert.equal(loaded.length, 1);
-    assert.equal(loaded[0]!.id, "k2");
+    expect(loaded.length).toBe(1);
+    expect(loaded[0]!.id).toBe("k2");
   } finally {
     cleanup();
   }
@@ -107,8 +106,8 @@ test("revokeKey returns false when id does not exist", () => {
   try {
     addKey(sampleKey("k1"), keysFile);
     const removed = revokeKey("no-such-id", keysFile);
-    assert.equal(removed, false);
-    assert.equal(loadKeys(keysFile).length, 1);
+    expect(removed).toBe(false);
+    expect(loadKeys(keysFile).length).toBe(1);
   } finally {
     cleanup();
   }
@@ -121,7 +120,7 @@ test("saveKeys creates parent directory if it does not exist", () => {
     const nested = path.join(path.dirname(keysFile), "sub", "dir", "keys.json");
     saveKeys([sampleKey("k1")], nested);
     const loaded = loadKeys(nested);
-    assert.equal(loaded.length, 1);
+    expect(loaded.length).toBe(1);
   } finally {
     cleanup();
   }

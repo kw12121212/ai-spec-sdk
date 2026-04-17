@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, expect } from "bun:test";
 import { BridgeServer } from "../src/bridge.js";
 
 test("team.create creates a team with creator as owner", async () => {
@@ -11,19 +10,19 @@ test("team.create creates a team with creator as owner", async () => {
     params: { name: "engineering", description: "Eng team" },
   });
 
-  assert.ok(!response.error, `team.create should not error: ${JSON.stringify(response.error)}`);
+  expect(!response.error).toBeTruthy();
   const result = response.result as Record<string, unknown>;
-  assert.equal(result["name"], "engineering");
-  assert.equal(result["description"], "Eng team");
-  assert.equal(result["version"], 1);
+  expect(result["name"]).toBe("engineering");
+  expect(result["description"]).toBe("Eng team");
+  expect(result["version"]).toBe(1);
 
   const members = result["members"] as Array<Record<string, unknown>>;
-  assert.equal(members.length, 1);
-  assert.equal(members[0]["userId"], "creator");
-  assert.equal(members[0]["role"], "owner");
+  expect(members.length).toBe(1);
+  expect(members[0]["userId"]).toBe("creator");
+  expect(members[0]["role"]).toBe("owner");
 
   const workspaces = result["workspaces"] as string[];
-  assert.deepEqual(workspaces, []);
+  expect(workspaces).toEqual([]);
 });
 
 test("team.create with members and workspaces", async () => {
@@ -39,13 +38,13 @@ test("team.create with members and workspaces", async () => {
     },
   });
 
-  assert.ok(!response.error);
+  expect(!response.error).toBeTruthy();
   const result = response.result as Record<string, unknown>;
   const members = result["members"] as Array<Record<string, unknown>>;
-  assert.equal(members.length, 2);
-  assert.equal(members[0]["userId"], "creator");
-  assert.equal(members[1]["userId"], "alice");
-  assert.deepEqual(result["workspaces"], ["/proj/a"]);
+  expect(members.length).toBe(2);
+  expect(members[0]["userId"]).toBe("creator");
+  expect(members[1]["userId"]).toBe("alice");
+  expect(result["workspaces"]).toEqual(["/proj/a"]);
 });
 
 test("team.create rejects missing name", async () => {
@@ -57,8 +56,8 @@ test("team.create rejects missing name", async () => {
     params: { description: "no name" },
   });
 
-  assert.ok(response.error);
-  assert.equal(response.error!.code, -32602);
+  expect(response.error).toBeTruthy();
+  expect(response.error!.code).toBe(-32602);
 });
 
 test("team.create rejects duplicate name", async () => {
@@ -77,7 +76,7 @@ test("team.create rejects duplicate name", async () => {
     params: { name: "dup" },
   });
 
-  assert.ok(response.error);
+  expect(response.error).toBeTruthy();
 });
 
 test("team.get returns existing team", async () => {
@@ -96,8 +95,8 @@ test("team.get returns existing team", async () => {
     params: { name: "get-me" },
   });
 
-  assert.ok(!response.error);
-  assert.equal((response.result as Record<string, unknown>)["name"], "get-me");
+  expect(!response.error).toBeTruthy();
+  expect((response.result as Record<string, unknown>)["name"]).toBe("get-me");
 });
 
 test("team.get returns -32031 for missing team", async () => {
@@ -109,8 +108,8 @@ test("team.get returns -32031 for missing team", async () => {
     params: { name: "missing" },
   });
 
-  assert.ok(response.error);
-  assert.equal(response.error!.code, -32031);
+  expect(response.error).toBeTruthy();
+  expect(response.error!.code).toBe(-32031);
 });
 
 test("team.get rejects missing name", async () => {
@@ -122,8 +121,8 @@ test("team.get rejects missing name", async () => {
     params: {},
   });
 
-  assert.ok(response.error);
-  assert.equal(response.error!.code, -32602);
+  expect(response.error).toBeTruthy();
+  expect(response.error!.code).toBe(-32602);
 });
 
 test("team.update updates description and workspaces", async () => {
@@ -142,11 +141,11 @@ test("team.update updates description and workspaces", async () => {
     params: { name: "updatable", description: "new", workspaces: ["/x"] },
   });
 
-  assert.ok(!response.error);
+  expect(!response.error).toBeTruthy();
   const result = response.result as Record<string, unknown>;
-  assert.equal(result["description"], "new");
-  assert.deepEqual(result["workspaces"], ["/x"]);
-  assert.equal(result["version"], 2);
+  expect(result["description"]).toBe("new");
+  expect(result["workspaces"]).toEqual(["/x"]);
+  expect(result["version"]).toBe(2);
 });
 
 test("team.update returns -32031 for missing team", async () => {
@@ -158,8 +157,8 @@ test("team.update returns -32031 for missing team", async () => {
     params: { name: "nope", description: "x" },
   });
 
-  assert.ok(response.error);
-  assert.equal(response.error!.code, -32031);
+  expect(response.error).toBeTruthy();
+  expect(response.error!.code).toBe(-32031);
 });
 
 test("team.delete removes team", async () => {
@@ -178,8 +177,8 @@ test("team.delete removes team", async () => {
     params: { name: "deletable" },
   });
 
-  assert.ok(!delResponse.error);
-  assert.equal((delResponse.result as Record<string, unknown>)["removed"], true);
+  expect(!delResponse.error).toBeTruthy();
+  expect((delResponse.result as Record<string, unknown>)["removed"]).toBe(true);
 
   const getResponse = await server.handleMessage({
     jsonrpc: "2.0",
@@ -188,8 +187,8 @@ test("team.delete removes team", async () => {
     params: { name: "deletable" },
   });
 
-  assert.ok(getResponse.error);
-  assert.equal(getResponse.error!.code, -32031);
+  expect(getResponse.error).toBeTruthy();
+  expect(getResponse.error!.code).toBe(-32031);
 });
 
 test("team.delete returns -32031 for missing team", async () => {
@@ -201,8 +200,8 @@ test("team.delete returns -32031 for missing team", async () => {
     params: { name: "nope" },
   });
 
-  assert.ok(response.error);
-  assert.equal(response.error!.code, -32031);
+  expect(response.error).toBeTruthy();
+  expect(response.error!.code).toBe(-32031);
 });
 
 test("team.list returns teams sorted by name", async () => {
@@ -226,12 +225,12 @@ test("team.list returns teams sorted by name", async () => {
     method: "team.list",
   });
 
-  assert.ok(!response.error);
+  expect(!response.error).toBeTruthy();
   const result = response.result as Record<string, unknown>;
   const teams = result["teams"] as Array<Record<string, unknown>>;
-  assert.ok(teams.length >= 2);
-  assert.equal(teams[0]["name"], "alpha");
-  assert.equal(teams[1]["name"], "zebra");
+  expect(teams.length >= 2).toBeTruthy();
+  expect(teams[0]["name"]).toBe("alpha");
+  expect(teams[1]["name"]).toBe("zebra");
 });
 
 test("team.addMember adds member to team", async () => {
@@ -250,12 +249,12 @@ test("team.addMember adds member to team", async () => {
     params: { name: "add-members", userId: "alice", role: "admin" },
   });
 
-  assert.ok(!response.error);
+  expect(!response.error).toBeTruthy();
   const result = response.result as Record<string, unknown>;
   const members = result["members"] as Array<Record<string, unknown>>;
-  assert.equal(members.length, 2);
-  assert.equal(members[1]["userId"], "alice");
-  assert.equal(members[1]["role"], "admin");
+  expect(members.length).toBe(2);
+  expect(members[1]["userId"]).toBe("alice");
+  expect(members[1]["role"]).toBe("admin");
 });
 
 test("team.addMember rejects duplicate member", async () => {
@@ -280,8 +279,8 @@ test("team.addMember rejects duplicate member", async () => {
     params: { name: "dup-member", userId: "bob", role: "member" },
   });
 
-  assert.ok(response.error);
-  assert.equal(response.error!.code, -32602);
+  expect(response.error).toBeTruthy();
+  expect(response.error!.code).toBe(-32602);
 });
 
 test("team.addMember rejects invalid role", async () => {
@@ -300,8 +299,8 @@ test("team.addMember rejects invalid role", async () => {
     params: { name: "bad-role", userId: "x", role: "superuser" },
   });
 
-  assert.ok(response.error);
-  assert.equal(response.error!.code, -32602);
+  expect(response.error).toBeTruthy();
+  expect(response.error!.code).toBe(-32602);
 });
 
 test("team.addMember rejects missing userId", async () => {
@@ -320,8 +319,8 @@ test("team.addMember rejects missing userId", async () => {
     params: { name: "no-uid", role: "member" },
   });
 
-  assert.ok(response.error);
-  assert.equal(response.error!.code, -32602);
+  expect(response.error).toBeTruthy();
+  expect(response.error!.code).toBe(-32602);
 });
 
 test("team.addMember returns -32031 for missing team", async () => {
@@ -333,8 +332,8 @@ test("team.addMember returns -32031 for missing team", async () => {
     params: { name: "nope", userId: "x", role: "member" },
   });
 
-  assert.ok(response.error);
-  assert.equal(response.error!.code, -32031);
+  expect(response.error).toBeTruthy();
+  expect(response.error!.code).toBe(-32031);
 });
 
 test("team.removeMember removes member", async () => {
@@ -359,10 +358,10 @@ test("team.removeMember removes member", async () => {
     params: { name: "rm-member", userId: "charlie" },
   });
 
-  assert.ok(!response.error);
+  expect(!response.error).toBeTruthy();
   const members = (response.result as Record<string, unknown>)["members"] as Array<Record<string, unknown>>;
-  assert.equal(members.length, 1);
-  assert.equal(members[0]["userId"], "creator");
+  expect(members.length).toBe(1);
+  expect(members[0]["userId"]).toBe("creator");
 });
 
 test("team.removeMember rejects non-member", async () => {
@@ -381,8 +380,8 @@ test("team.removeMember rejects non-member", async () => {
     params: { name: "no-such-member", userId: "nobody" },
   });
 
-  assert.ok(response.error);
-  assert.equal(response.error!.code, -32602);
+  expect(response.error).toBeTruthy();
+  expect(response.error!.code).toBe(-32602);
 });
 
 test("team.removeMember rejects missing userId", async () => {
@@ -394,8 +393,8 @@ test("team.removeMember rejects missing userId", async () => {
     params: { name: "x" },
   });
 
-  assert.ok(response.error);
-  assert.equal(response.error!.code, -32602);
+  expect(response.error).toBeTruthy();
+  expect(response.error!.code).toBe(-32602);
 });
 
 test("team methods appear in capabilities", async () => {
@@ -406,7 +405,7 @@ test("team methods appear in capabilities", async () => {
     method: "bridge.capabilities",
   });
 
-  assert.ok(!response.error);
+  expect(!response.error).toBeTruthy();
   const result = response.result as Record<string, unknown>;
   const methods = result["methods"] as string[];
 
@@ -415,6 +414,6 @@ test("team methods appear in capabilities", async () => {
     "team.list", "team.addMember", "team.removeMember",
   ];
   for (const m of teamMethods) {
-    assert.ok(methods.includes(m), `capabilities should include ${m}`);
+    expect(methods.includes(m), `capabilities should include ${m}`).toBeTruthy();
   }
 });

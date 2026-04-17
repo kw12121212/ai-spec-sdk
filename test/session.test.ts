@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, expect } from "bun:test";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
@@ -48,10 +47,10 @@ test("session start and resume produce events and complete", async () => {
     });
 
     const startResult = start.result as Record<string, unknown>;
-    assert.equal(startResult["status"], "completed");
-    assert.equal(startResult["result"], "done:hello");
+    expect(startResult["status"]).toBe("completed");
+    expect(startResult["result"]).toBe("done:hello");
     const sessionId = startResult["sessionId"] as string;
-    assert.ok(sessionId);
+    expect(sessionId).toBeTruthy();
 
     const resume = await server.handleMessage({
       jsonrpc: "2.0",
@@ -65,8 +64,8 @@ test("session start and resume produce events and complete", async () => {
     });
 
     const resumeResult = resume.result as Record<string, unknown>;
-    assert.equal(resumeResult["status"], "completed");
-    assert.equal(resumeResult["result"], "done:continue");
+    expect(resumeResult["status"]).toBe("completed");
+    expect(resumeResult["result"]).toBe("done:continue");
 
     const status = await server.handleMessage({
       jsonrpc: "2.0",
@@ -76,13 +75,13 @@ test("session start and resume produce events and complete", async () => {
     });
 
     const statusResult = status.result as Record<string, unknown>;
-    assert.equal(statusResult["sessionId"], sessionId);
-    assert.ok((statusResult["historyLength"] as number) >= 2);
-    assert.ok(
+    expect(statusResult["sessionId"]).toBe(sessionId);
+    expect((statusResult["historyLength"] as number) >= 2).toBeTruthy();
+    expect(
       (notifications as Array<Record<string, unknown>>).some(
         (n) => n["method"] === "bridge/session_event",
       ),
-    );
+    ).toBeTruthy();
   } finally {
     // Make sure to clean up the query mock if we used it
     globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
@@ -126,12 +125,12 @@ test("session.stop transitions active session to stopped", async () => {
       params: { sessionId },
     });
 
-    assert.equal((stop.result as Record<string, unknown>)["status"], "stopped");
+    expect((stop.result as Record<string, unknown>)["status"]).toBe("stopped");
 
     const final = await startPromise;
     const finalResult = final.result as Record<string, unknown>;
-    assert.equal(finalResult["status"], "stopped");
-    assert.equal(finalResult["result"], null);
+    expect(finalResult["status"]).toBe("stopped");
+    expect(finalResult["result"]).toBeNull();
 
     const statusAfter = await server.handleMessage({
       jsonrpc: "2.0",
@@ -140,10 +139,10 @@ test("session.stop transitions active session to stopped", async () => {
       params: { sessionId },
     });
 
-    assert.equal(
+    expect(
       (statusAfter.result as Record<string, unknown>)["status"],
       "stopped",
-    );
+    ).toBe("stopped");
   } finally {
     // Make sure to clean up the query mock if we used it
     globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
@@ -194,10 +193,10 @@ test("session.spawn inherits the parent workspace and emits bridge/subagent_even
 
     const childResult = spawnResponse.result as Record<string, unknown>;
     const childSessionId = childResult["sessionId"] as string;
-    assert.equal(childResult["status"], "completed");
-    assert.equal(childResult["result"], "done:child");
-    assert.equal(invocations[1]?.options["cwd"], fixtureWorkspace);
-    assert.deepEqual(invocations[1]?.options["allowedTools"], ["Read"]);
+    expect(childResult["status"]).toBe("completed");
+    expect(childResult["result"]).toBe("done:child");
+    expect(invocations[1]?.options["cwd"]).toBe(fixtureWorkspace);
+    expect(invocations[1]?.options["allowedTools"]).toEqual(["Read"]);
 
     const statusResponse = await server.handleMessage({
       jsonrpc: "2.0",
@@ -205,16 +204,15 @@ test("session.spawn inherits the parent workspace and emits bridge/subagent_even
       method: "session.status",
       params: { sessionId: childSessionId },
     });
-    assert.equal(
+    expect(
       (statusResponse.result as Record<string, unknown>)["parentSessionId"],
-      parentSessionId,
-    );
+    ).toBe(parentSessionId);
 
     const subagentEvents = (notifications as Array<Record<string, unknown>>)
       .filter((item) => item["method"] === "bridge/subagent_event")
       .map((item) => item["params"] as Record<string, unknown>);
 
-    assert.ok(
+    expect(
       subagentEvents.some(
         (event) =>
           event["sessionId"] === parentSessionId &&
@@ -222,8 +220,8 @@ test("session.spawn inherits the parent workspace and emits bridge/subagent_even
           event["type"] === "agent_message",
       ),
       "parent session should receive child message events",
-    );
-    assert.ok(
+    ).toBeTruthy();
+    expect(
       subagentEvents.some(
         (event) =>
           event["sessionId"] === parentSessionId &&
@@ -232,7 +230,7 @@ test("session.spawn inherits the parent workspace and emits bridge/subagent_even
           event["status"] === "completed",
       ),
       "parent session should receive child completion events",
-    );
+    ).toBeTruthy();
   } finally {
     // Make sure to clean up the query mock if we used it
     globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
@@ -282,7 +280,7 @@ test("session.stop cascades to active child sessions", async () => {
 
     const startedSessionIds = await waitForSessionStartedCount(notifications, 2);
     const childSessionId = startedSessionIds.find((sessionId) => sessionId !== parentSessionId);
-    assert.ok(childSessionId, "child session should start before stop is requested");
+    expect(childSessionId, "child session should start before stop is requested").toBeTruthy();
 
     const stopResponse = await server.handleMessage({
       jsonrpc: "2.0",
@@ -290,12 +288,12 @@ test("session.stop cascades to active child sessions", async () => {
       method: "session.stop",
       params: { sessionId: parentSessionId },
     });
-    assert.equal((stopResponse.result as Record<string, unknown>)["status"], "stopped");
+    expect((stopResponse.result as Record<string, unknown>)["status"]).toBe("stopped");
 
     const parentFinal = await parentPromise;
     const childFinal = await childPromise;
-    assert.equal((parentFinal.result as Record<string, unknown>)["status"], "stopped");
-    assert.equal((childFinal.result as Record<string, unknown>)["status"], "stopped");
+    expect((parentFinal.result as Record<string, unknown>)["status"]).toBe("stopped");
+    expect((childFinal.result as Record<string, unknown>)["status"]).toBe("stopped");
 
     const childStatus = await server.handleMessage({
       jsonrpc: "2.0",
@@ -303,7 +301,7 @@ test("session.stop cascades to active child sessions", async () => {
       method: "session.status",
       params: { sessionId: childSessionId },
     });
-    assert.equal((childStatus.result as Record<string, unknown>)["status"], "stopped");
+    expect((childStatus.result as Record<string, unknown>)["status"]).toBe("stopped");
   } finally {
     // Make sure to clean up the query mock if we used it
     globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
@@ -354,9 +352,9 @@ test("session.list filters by parentSessionId", async () => {
     });
     const sessions = (listResponse.result as Record<string, unknown>)["sessions"] as Array<Record<string, unknown>>;
 
-    assert.equal(sessions.length, 1);
-    assert.equal(sessions[0]?.["sessionId"], childSessionId);
-    assert.equal(sessions[0]?.["parentSessionId"], parentSessionId);
+    expect(sessions.length).toBe(1);
+    expect(sessions[0]?.["sessionId"]).toBe(childSessionId);
+    expect(sessions[0]?.["parentSessionId"]).toBe(parentSessionId);
   } finally {
     // Make sure to clean up the query mock if we used it
     globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
@@ -385,7 +383,7 @@ test("session.start passes cwd equal to fixture workspace", async () => {
       params: { workspace: fixtureWorkspace, prompt: "hi" },
     });
 
-    assert.equal(capturedCwd, fixtureWorkspace);
+    expect(capturedCwd).toBe(fixtureWorkspace);
   } finally {
     // Make sure to clean up the query mock if we used it
     globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
@@ -425,8 +423,8 @@ test("session.resume passes SDK session_id as resume, not bridge UUID", async ()
       params: { sessionId, prompt: "second" },
     });
 
-    assert.equal(capturedResumeId, "sdk-session-xyz");
-    assert.notEqual(capturedResumeId, sessionId);
+    expect(capturedResumeId).toBe("sdk-session-xyz");
+    expect(capturedResumeId).not.toBe(sessionId);
   } finally {
     // Make sure to clean up the query mock if we used it
     globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
@@ -463,10 +461,10 @@ test("session.start with proxy sets HTTP_PROXY HTTPS_PROXY NO_PROXY in env", asy
       },
     });
 
-    assert.ok(capturedEnv, "env should be set");
-    assert.equal(capturedEnv["HTTP_PROXY"], "http://proxy.corp.com:8080");
-    assert.equal(capturedEnv["HTTPS_PROXY"], "http://proxy.corp.com:8080");
-    assert.equal(capturedEnv["NO_PROXY"], "localhost,127.0.0.1");
+    expect(capturedEnv, "env should be set").toBeTruthy();
+    expect(capturedEnv!["HTTP_PROXY"]).toBe("http://proxy.corp.com:8080");
+    expect(capturedEnv!["HTTPS_PROXY"]).toBe("http://proxy.corp.com:8080");
+    expect(capturedEnv!["NO_PROXY"]).toBe("localhost,127.0.0.1");
   } finally {
     // Make sure to clean up the query mock if we used it
     globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
@@ -488,9 +486,9 @@ test("session.start with options.cwd returns -32602 error", async () => {
     },
   });
 
-  assert.ok(response.error, "should return an error");
-  assert.equal(response.error?.code, -32602);
-  assert.ok(!response.result);
+  expect(response.error, "should return an error").toBeTruthy();
+  expect(response.error?.code).toBe(-32602);
+  expect(!response.result).toBeTruthy();
 });
 
 test("session.resume when sdkSessionId is null returns -32012 error", async () => {
@@ -519,8 +517,8 @@ test("session.resume when sdkSessionId is null returns -32012 error", async () =
       params: { sessionId, prompt: "second" },
     });
 
-    assert.ok(resume.error, "should return an error");
-    assert.equal(resume.error?.code, -32012);
+    expect(resume.error, "should return an error").toBeTruthy();
+    expect(resume.error?.code).toBe(-32012);
   } finally {
     // Make sure to clean up the query mock if we used it
     globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
@@ -553,10 +551,10 @@ test("session.start with partial proxy (only http) sets only HTTP_PROXY", async 
       },
     });
 
-    assert.ok(capturedEnv, "env should be set");
-    assert.equal(capturedEnv["HTTP_PROXY"], "http://proxy.corp.com:8080");
-    assert.equal(capturedEnv["HTTPS_PROXY"], undefined);
-    assert.equal(capturedEnv["NO_PROXY"], undefined);
+    expect(capturedEnv, "env should be set").toBeTruthy();
+    expect(capturedEnv!["HTTP_PROXY"]).toBe("http://proxy.corp.com:8080");
+    expect(capturedEnv!["HTTPS_PROXY"]).toBeUndefined();
+    expect(capturedEnv!["NO_PROXY"]).toBeUndefined();
   } finally {
     // Make sure to clean up the query mock if we used it
     globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
@@ -578,8 +576,8 @@ test("session.start with unknown proxy field returns -32602 error", async () => 
     },
   });
 
-  assert.ok(response.error, "should return an error");
-  assert.equal(response.error?.code, -32602);
+  expect(response.error, "should return an error").toBeTruthy();
+  expect(response.error?.code).toBe(-32602);
 });
 
 test("session.start proxy entries overwrite matching keys in options.env, preserving others", async () => {
@@ -609,9 +607,9 @@ test("session.start proxy entries overwrite matching keys in options.env, preser
       },
     });
 
-    assert.ok(capturedEnv, "env should be set");
-    assert.equal(capturedEnv["MY_VAR"], "kept");
-    assert.equal(capturedEnv["HTTP_PROXY"], "http://proxy.corp.com:8080");
+    expect(capturedEnv, "env should be set").toBeTruthy();
+    expect(capturedEnv!["MY_VAR"]).toBe("kept");
+    expect(capturedEnv!["HTTP_PROXY"]).toBe("http://proxy.corp.com:8080");
   } finally {
     // Make sure to clean up the query mock if we used it
     globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
@@ -648,11 +646,11 @@ test("agent_message notifications carry correct messageType for each defined sha
 
     const messageTypes = agentEvents.map((p) => p["messageType"]);
 
-    assert.ok(messageTypes.includes("system_init"), "expected system_init");
-    assert.ok(messageTypes.includes("assistant_text"), "expected assistant_text");
-    assert.ok(messageTypes.includes("tool_use"), "expected tool_use");
-    assert.ok(messageTypes.includes("tool_result"), "expected tool_result");
-    assert.ok(messageTypes.includes("result"), "expected result");
+    expect(messageTypes.includes("system_init"), "expected system_init").toBeTruthy();
+    expect(messageTypes.includes("assistant_text"), "expected assistant_text").toBeTruthy();
+    expect(messageTypes.includes("tool_use"), "expected tool_use").toBeTruthy();
+    expect(messageTypes.includes("tool_result"), "expected tool_result").toBeTruthy();
+    expect(messageTypes.includes("result"), "expected result").toBeTruthy();
   } finally {
     // Make sure to clean up the query mock if we used it
     globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
@@ -691,7 +689,7 @@ test("tool_use takes precedence over text in mixed assistant content", async () 
       .map((n) => n["params"] as Record<string, unknown>)
       .find((p) => p["type"] === "agent_message" && p["messageType"] === "tool_use");
 
-    assert.ok(mixed, "expected tool_use messageType for mixed content");
+    expect(mixed, "expected tool_use messageType for mixed content").toBeTruthy();
   } finally {
     // Make sure to clean up the query mock if we used it
     globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
@@ -722,10 +720,10 @@ test("agent_message with unrecognized shape gets messageType other", async () =>
       .map((n) => n["params"] as Record<string, unknown>)
       .filter((p) => p["type"] === "agent_message");
 
-    assert.ok(
+    expect(
       agentEvents.some((p) => p["messageType"] === "other"),
       "expected at least one other messageType",
-    );
+    ).toBeTruthy();
   } finally {
     // Make sure to clean up the query mock if we used it
     globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
@@ -750,13 +748,13 @@ test("session.list with no filter returns all sessions", async () => {
     const response = await server.handleMessage({ jsonrpc: "2.0", id: 102, method: "session.list" });
     const sessions = (response.result as Record<string, unknown>)["sessions"] as unknown[];
 
-    assert.ok(sessions.length >= 2);
+    expect(sessions.length >= 2).toBeTruthy();
     const entry = sessions[0] as Record<string, unknown>;
-    assert.ok(entry["sessionId"]);
-    assert.ok(entry["status"]);
-    assert.ok(entry["workspace"]);
-    assert.ok(entry["createdAt"]);
-    assert.ok(entry["updatedAt"]);
+    expect(entry["sessionId"]).toBeTruthy();
+    expect(entry["status"]).toBeTruthy();
+    expect(entry["workspace"]).toBeTruthy();
+    expect(entry["createdAt"]).toBeTruthy();
+    expect(entry["updatedAt"]).toBeTruthy();
   } finally {
     // Make sure to clean up the query mock if we used it
     globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
@@ -786,7 +784,7 @@ test("session.list with status active returns only active sessions", async () =>
     // Verify the stopped session exists in the unfiltered list before testing the filter
     const allResponse = await server.handleMessage({ jsonrpc: "2.0", id: 112, method: "session.list" });
     const allSessions = (allResponse.result as Record<string, unknown>)["sessions"] as Array<Record<string, unknown>>;
-    assert.ok(allSessions.some((s) => s["sessionId"] === sessionId), "stopped session must appear in unfiltered list");
+    expect(allSessions.some((s) => s["sessionId"] === sessionId), "stopped session must appear in unfiltered list").toBeTruthy();
 
     const response = await server.handleMessage({
       jsonrpc: "2.0", id: 113,
@@ -795,8 +793,8 @@ test("session.list with status active returns only active sessions", async () =>
     });
     const sessions = (response.result as Record<string, unknown>)["sessions"] as Array<Record<string, unknown>>;
 
-    assert.ok(!sessions.some((s) => s["sessionId"] === sessionId), "stopped session must not appear in active list");
-    assert.ok(sessions.every((s) => s["status"] === "active"), "only active sessions expected");
+    expect(!sessions.some((s) => s["sessionId"] === sessionId), "stopped session must not appear in active list").toBeTruthy();
+    expect(sessions.every((s) => s["status"] === "active"), "only active sessions expected").toBeTruthy();
   } finally {
     // Make sure to clean up the query mock if we used it
     globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
@@ -822,7 +820,7 @@ test("session.list with status all returns all sessions", async () => {
       params: { status: "all" },
     });
     const sessions = (response.result as Record<string, unknown>)["sessions"] as unknown[];
-    assert.ok(sessions.length >= 2);
+    expect(sessions.length >= 2).toBeTruthy();
   } finally {
     // Make sure to clean up the query mock if we used it
     globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
@@ -836,8 +834,8 @@ test("session.list with unknown status value returns -32602", async () => {
     method: "session.list",
     params: { status: "pending" },
   });
-  assert.ok(response.error, "should return an error");
-  assert.equal(response.error?.code, -32602);
+  expect(response.error, "should return an error").toBeTruthy();
+  expect(response.error?.code).toBe(-32602);
 });
 
 test("session.list caps response at 100 entries when more exist", async () => {
@@ -862,7 +860,7 @@ test("session.list caps response at 100 entries when more exist", async () => {
 
     const response = await server.handleMessage({ jsonrpc: "2.0", id: "cap-list", method: "session.list" });
     const sessions = (response.result as Record<string, unknown>)["sessions"] as unknown[];
-    assert.equal(sessions.length, 100);
+    expect(sessions.length).toBe(100);
   } finally {
     // Make sure to clean up the query mock if we used it
     globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
@@ -901,8 +899,8 @@ test("session.list returns sessions ordered by createdAt descending", async () =
     const secondIdx = returnedIds.indexOf(ids[1]);
     const thirdIdx = returnedIds.indexOf(ids[2]);
 
-    assert.ok(thirdIdx < secondIdx, "third session should appear before second");
-    assert.ok(secondIdx < firstIdx, "second session should appear before first");
+    expect(thirdIdx < secondIdx, "third session should appear before second").toBeTruthy();
+    expect(secondIdx < firstIdx, "second session should appear before first").toBeTruthy();
   } finally {
     // Make sure to clean up the query mock if we used it
     globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
@@ -936,11 +934,11 @@ test("session.history returns total and entries for a completed session", async 
     });
 
     const result = response.result as Record<string, unknown>;
-    assert.equal(result["sessionId"], sessionId);
-    assert.ok(typeof result["total"] === "number" && result["total"] > 0);
+    expect(result["sessionId"]).toBe(sessionId);
+    expect(typeof result["total"] === "number" && result["total"] > 0).toBeTruthy();
     const entries = result["entries"] as unknown[];
-    assert.ok(Array.isArray(entries));
-    assert.ok(entries.length > 0);
+    expect(Array.isArray(entries)).toBeTruthy();
+    expect(entries.length > 0).toBeTruthy();
   } finally {
     // Make sure to clean up the query mock if we used it
     globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
@@ -982,9 +980,9 @@ test("session.history with offset and limit returns correct window", async () =>
       params: { sessionId, offset: 1, limit: 2 },
     });
     const pageResult = pageResponse.result as Record<string, unknown>;
-    assert.equal(pageResult["total"], total);
+    expect(pageResult["total"]).toBe(total);
     const entries = pageResult["entries"] as unknown[];
-    assert.equal(entries.length, 2);
+    expect(entries.length).toBe(2);
   } finally {
     // Make sure to clean up the query mock if we used it
     globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
@@ -1015,7 +1013,7 @@ test("session.history with limit > 200 is capped at 200", async () => {
     });
 
     const entries = (response.result as Record<string, unknown>)["entries"] as unknown[];
-    assert.ok(entries.length <= 200, "entries must not exceed 200");
+    expect(entries.length <= 200, "entries must not exceed 200").toBeTruthy();
   } finally {
     // Make sure to clean up the query mock if we used it
     globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
@@ -1030,8 +1028,8 @@ test("session.history with unknown sessionId returns -32011", async () => {
     params: { sessionId: "does-not-exist" },
   });
 
-  assert.ok(response.error, "should return an error");
-  assert.equal(response.error?.code, -32011);
+  expect(response.error, "should return an error").toBeTruthy();
+  expect(response.error?.code).toBe(-32011);
 });
 
 test("session.list entries include prompt field with initial prompt", async () => {
@@ -1056,9 +1054,9 @@ test("session.list entries include prompt field with initial prompt", async () =
     });
     const sessions = (response.result as Record<string, unknown>)["sessions"] as Array<Record<string, unknown>>;
 
-    assert.ok(sessions.length > 0);
+    expect(sessions.length > 0).toBeTruthy();
     const entry = sessions.find((s) => s["prompt"] === "my initial prompt");
-    assert.ok(entry, "session entry should include the initial prompt");
+    expect(entry, "session entry should include the initial prompt").toBeTruthy();
   } finally {
     // Make sure to clean up the query mock if we used it
     globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
@@ -1092,8 +1090,8 @@ test("session.list prompt is null when session has no user_prompt history entry"
     const sessions = (response.result as Record<string, unknown>)["sessions"] as Array<Record<string, unknown>>;
     const entry = sessions.find((s) => s["sessionId"] === sessionId);
 
-    assert.ok(entry, "session loaded from disk should appear in list");
-    assert.equal(entry!["prompt"], null, "prompt should be null when no user_prompt entry exists");
+    expect(entry, "session loaded from disk should appear in list").toBeTruthy();
+    expect(entry!["prompt"], "prompt should be null when no user_prompt entry exists").toBeNull();
   } finally {
     fs.rmSync(sessionsDir, { recursive: true, force: true });
   }
@@ -1124,8 +1122,8 @@ test("session.list prompt is truncated to 200 chars for long prompts", async () 
     const sessions = (response.result as Record<string, unknown>)["sessions"] as Array<Record<string, unknown>>;
     const entry = sessions.find((s) => s["sessionId"] === sessionId);
 
-    assert.ok(entry, "session entry should be present");
-    assert.equal((entry!["prompt"] as string).length, 200, "prompt should be truncated to 200 chars");
+    expect(entry, "session entry should be present").toBeTruthy();
+    expect((entry!["prompt"] as string).length, "prompt should be truncated to 200 chars").toBe(200);
   } finally {
     // Make sure to clean up the query mock if we used it
     globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
@@ -1151,7 +1149,7 @@ test("session.start with model passes it to the agent query", async () => {
       method: "session.start",
       params: { workspace: ws, prompt: "hi", model: "claude-opus-4-6" },
     });
-    assert.equal(capturedOptions["model"], "claude-opus-4-6");
+    expect(capturedOptions["model"]).toBe("claude-opus-4-6");
   } finally {
     // Make sure to clean up the query mock if we used it
     globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
@@ -1175,7 +1173,7 @@ test("session.start with allowedTools passes it to the agent query", async () =>
       method: "session.start",
       params: { workspace: ws, prompt: "hi", allowedTools: ["Read", "Glob"] },
     });
-    assert.deepEqual(capturedOptions["allowedTools"], ["Read", "Glob"]);
+    expect(capturedOptions["allowedTools"]).toEqual(["Read", "Glob"]);
   } finally {
     // Make sure to clean up the query mock if we used it
     globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
@@ -1199,7 +1197,7 @@ test("session.start with disallowedTools passes it to the agent query", async ()
       method: "session.start",
       params: { workspace: ws, prompt: "hi", disallowedTools: ["Bash"] },
     });
-    assert.deepEqual(capturedOptions["disallowedTools"], ["Bash"]);
+    expect(capturedOptions["disallowedTools"]).toEqual(["Bash"]);
   } finally {
     // Make sure to clean up the query mock if we used it
     globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
@@ -1223,7 +1221,7 @@ test("session.start with permissionMode acceptEdits passes it to the agent query
       method: "session.start",
       params: { workspace: ws, prompt: "hi", permissionMode: "acceptEdits" },
     });
-    assert.equal(capturedOptions["permissionMode"], "acceptEdits");
+    expect(capturedOptions["permissionMode"]).toBe("acceptEdits");
   } finally {
     // Make sure to clean up the query mock if we used it
     globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
@@ -1247,7 +1245,7 @@ test("session.start without permissionMode defaults to bypassPermissions", async
       method: "session.start",
       params: { workspace: ws, prompt: "hi" },
     });
-    assert.equal(capturedOptions["permissionMode"], "bypassPermissions");
+    expect(capturedOptions["permissionMode"]).toBe("bypassPermissions");
   } finally {
     // Make sure to clean up the query mock if we used it
     globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
@@ -1271,7 +1269,7 @@ test("session.start with maxTurns passes it to the agent query", async () => {
       method: "session.start",
       params: { workspace: ws, prompt: "hi", maxTurns: 5 },
     });
-    assert.equal(capturedOptions["maxTurns"], 5);
+    expect(capturedOptions["maxTurns"]).toBe(5);
   } finally {
     // Make sure to clean up the query mock if we used it
     globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
@@ -1295,7 +1293,7 @@ test("session.start with systemPrompt passes it to the agent query", async () =>
       method: "session.start",
       params: { workspace: ws, prompt: "hi", systemPrompt: "You are strict." },
     });
-    assert.equal(capturedOptions["systemPrompt"], "You are strict.");
+    expect(capturedOptions["systemPrompt"]).toBe("You are strict.");
   } finally {
     // Make sure to clean up the query mock if we used it
     globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
@@ -1310,8 +1308,8 @@ test("session.start with invalid permissionMode returns -32602", async () => {
     method: "session.start",
     params: { workspace: ws, prompt: "hi", permissionMode: "superuser" },
   });
-  assert.ok(response.error, "should return an error");
-  assert.equal(response.error?.code, -32602);
+  expect(response.error, "should return an error").toBeTruthy();
+  expect(response.error?.code).toBe(-32602);
 });
 
 test("session.start with maxTurns as string returns -32602", async () => {
@@ -1322,8 +1320,8 @@ test("session.start with maxTurns as string returns -32602", async () => {
     method: "session.start",
     params: { workspace: ws, prompt: "hi", maxTurns: "five" },
   });
-  assert.ok(response.error, "should return an error");
-  assert.equal(response.error?.code, -32602);
+  expect(response.error, "should return an error").toBeTruthy();
+  expect(response.error?.code).toBe(-32602);
 });
 
 test("session.start with allowedTools as string (not array) returns -32602", async () => {
@@ -1334,8 +1332,8 @@ test("session.start with allowedTools as string (not array) returns -32602", asy
     method: "session.start",
     params: { workspace: ws, prompt: "hi", allowedTools: "Read" },
   });
-  assert.ok(response.error, "should return an error");
-  assert.equal(response.error?.code, -32602);
+  expect(response.error, "should return an error").toBeTruthy();
+  expect(response.error?.code).toBe(-32602);
 });
 
 test("control parameters apply on session.resume with the same validation", async () => {
@@ -1365,8 +1363,8 @@ test("control parameters apply on session.resume with the same validation", asyn
       params: { sessionId, prompt: "second", model: "claude-opus-4-6", permissionMode: "default" },
     });
 
-    assert.equal(resumeCaptured["model"], "claude-opus-4-6");
-    assert.equal(resumeCaptured["permissionMode"], "default");
+    expect(resumeCaptured["model"]).toBe("claude-opus-4-6");
+    expect(resumeCaptured["permissionMode"]).toBe("default");
 
     // Validation also applies: invalid permissionMode on resume
     const bad = await server.handleMessage({
@@ -1374,8 +1372,8 @@ test("control parameters apply on session.resume with the same validation", asyn
       method: "session.resume",
       params: { sessionId, prompt: "third", permissionMode: "superuser" },
     });
-    assert.ok(bad.error, "should return an error");
-    assert.equal(bad.error?.code, -32602);
+    expect(bad.error, "should return an error").toBeTruthy();
+    expect(bad.error?.code).toBe(-32602);
   } finally {
     // Make sure to clean up the query mock if we used it
     globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
@@ -1454,12 +1452,12 @@ test("session.events returns buffered events after session.start", async () => {
       params: { sessionId },
     });
 
-    assert.ok(!evResp.error, "session.events should succeed");
+    expect(!evResp.error, "session.events should succeed").toBeTruthy();
     const r = evResp.result as Record<string, unknown>;
-    assert.equal(r["sessionId"], sessionId);
+    expect(r["sessionId"]).toBe(sessionId);
     const events = r["events"] as Array<Record<string, unknown>>;
-    assert.ok(events.length >= 2, "should have at least session_started and session_completed events");
-    assert.ok(events.every((e) => typeof e["seq"] === "number"), "each event must have a seq");
+    expect(events.length >= 2, "should have at least session_started and session_completed events").toBeTruthy();
+    expect(events.every((e) => typeof e["seq"] === "number"), "each event must have a seq").toBeTruthy();
   } finally {
     // Make sure to clean up the query mock if we used it
     globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
@@ -1495,8 +1493,8 @@ test("session.events since filter returns only events from that seq onward", asy
         params: { sessionId, since },
       });
       const sinceEvents = (sinceResp.result as Record<string, unknown>)["events"] as Array<Record<string, unknown>>;
-      assert.ok(sinceEvents.every((e) => (e["seq"] as number) >= since), "all returned events must have seq >= since");
-      assert.ok(sinceEvents.length < allEvents.length, "since filter should reduce event count");
+      expect(sinceEvents.every((e) => (e["seq"] as number) >= since), "all returned events must have seq >= since").toBeTruthy();
+      expect(sinceEvents.length < allEvents.length, "since filter should reduce event count").toBeTruthy();
     }
   } finally {
     // Make sure to clean up the query mock if we used it
@@ -1511,7 +1509,7 @@ test("session.events returns error -32011 for unknown session", async () => {
     params: { sessionId: "no-such-session" },
   });
 
-  assert.equal(resp.error?.code, -32011);
+  expect(resp.error?.code).toBe(-32011);
 });
 
 test("session.events respects limit parameter", async () => {
@@ -1535,7 +1533,7 @@ test("session.events respects limit parameter", async () => {
       params: { sessionId, limit: 1 },
     });
     const events = (limitResp.result as Record<string, unknown>)["events"] as unknown[];
-    assert.ok(events.length <= 1, "limit:1 must return at most 1 event");
+    expect(events.length <= 1, "limit:1 must return at most 1 event").toBeTruthy();
   } finally {
     // Make sure to clean up the query mock if we used it
     globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
@@ -1562,17 +1560,17 @@ test("session.start response includes usage when SDK provides it", async () => {
 
     const r = resp.result as Record<string, unknown>;
     const usage = r["usage"] as Record<string, unknown>;
-    assert.ok(usage !== null && typeof usage === "object", "usage must be present");
-    assert.equal(usage["inputTokens"], 10);
-    assert.equal(usage["outputTokens"], 20);
+    expect(usage !== null && typeof usage === "object", "usage must be present").toBeTruthy();
+    expect(usage["inputTokens"]).toBe(10);
+    expect(usage["outputTokens"]).toBe(20);
 
     const completedNotif = (notifications as Array<Record<string, unknown>>).find(
       (n) => (n["params"] as Record<string, unknown>)?.["type"] === "session_completed",
     );
-    assert.ok(completedNotif, "session_completed notification must be emitted");
+    expect(completedNotif, "session_completed notification must be emitted").toBeTruthy();
     const notifUsage = (completedNotif!["params"] as Record<string, unknown>)["usage"] as Record<string, unknown>;
-    assert.equal(notifUsage["inputTokens"], 10);
-    assert.equal(notifUsage["outputTokens"], 20);
+    expect(notifUsage["inputTokens"]).toBe(10);
+    expect(notifUsage["outputTokens"]).toBe(20);
   } finally {
     // Make sure to clean up the query mock if we used it
     globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
@@ -1595,7 +1593,7 @@ test("session.start response has usage: null when SDK omits usage", async () => 
     });
 
     const r = resp.result as Record<string, unknown>;
-    assert.equal(r["usage"], null, "usage must be null when SDK does not provide it");
+    expect(r["usage"], "usage must be null when SDK does not provide it").toBeNull();
   } finally {
     // Make sure to clean up the query mock if we used it
     globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
@@ -1653,7 +1651,7 @@ function makeApprovalServer(): {
 test("session.approveTool allows a pending canUseTool call and session completes", async () => {
   // Reset any global mock first
   delete globalThis.__AI_SPEC_SDK_QUERY__;
-  
+
   const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-approve-"));
   type CanUseTool = (tool: string, input: Record<string, unknown>, opts: { signal: AbortSignal; toolUseID: string }) => Promise<{ behavior: string }>;
 
@@ -1682,8 +1680,8 @@ test("session.approveTool allows a pending canUseTool call and session completes
     const approvalParams = await waitForApproval();
     const sessionId = approvalParams["sessionId"] as string;
     const requestId = approvalParams["requestId"] as string;
-    assert.ok(typeof sessionId === "string", "approval notification must carry sessionId");
-    assert.equal(approvalParams["toolName"], "Bash");
+    expect(typeof sessionId === "string", "approval notification must carry sessionId").toBeTruthy();
+    expect(approvalParams["toolName"]).toBe("Bash");
 
     // Approve the tool — this resolves the pending canUseTool Promise
     const approveResp = await server.handleMessage({
@@ -1691,13 +1689,13 @@ test("session.approveTool allows a pending canUseTool call and session completes
       method: "session.approveTool",
       params: { sessionId, requestId },
     });
-    assert.ok(!approveResp.error, "session.approveTool must not error");
-    assert.equal((approveResp.result as Record<string, unknown>)["behavior"], "allow");
+    expect(!approveResp.error, "session.approveTool must not error").toBeTruthy();
+    expect((approveResp.result as Record<string, unknown>)["behavior"]).toBe("allow");
 
     // Now the session should complete
     const startResult = await startPromise;
-    assert.ok(!startResult.error, "session should complete without error");
-    assert.equal((startResult.result as Record<string, unknown>)["status"], "completed");
+    expect(!startResult.error, "session should complete without error").toBeTruthy();
+    expect((startResult.result as Record<string, unknown>)["status"]).toBe("completed");
   } finally {
     // Make sure to clean up the query mock if we used it
     globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
@@ -1738,11 +1736,11 @@ test("session.rejectTool denies a pending canUseTool call", async () => {
       method: "session.rejectTool",
       params: { sessionId, requestId, message: "Not allowed" },
     });
-    assert.ok(!rejectResp.error, "session.rejectTool must not error");
-    assert.equal((rejectResp.result as Record<string, unknown>)["behavior"], "deny");
+    expect(!rejectResp.error, "session.rejectTool must not error").toBeTruthy();
+    expect((rejectResp.result as Record<string, unknown>)["behavior"]).toBe("deny");
 
     const startResult = await startPromise;
-    assert.ok(!startResult.error, "session should complete (with denied tool)");
+    expect(!startResult.error, "session should complete (with denied tool)").toBeTruthy();
   } finally {
     // Make sure to clean up the query mock if we used it
     globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
@@ -1773,8 +1771,8 @@ test("session.approveTool returns -32020 for an unknown requestId", async () => 
       method: "session.approveTool",
       params: { sessionId, requestId: "nonexistent-request-id" },
     });
-    assert.ok(resp.error, "must return an error for unknown requestId");
-    assert.equal(resp.error!.code, -32020);
+    expect(resp.error, "must return an error for unknown requestId").toBeTruthy();
+    expect(resp.error!.code).toBe(-32020);
   } finally {
     // Make sure to clean up the query mock if we used it
     globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
@@ -1814,9 +1812,9 @@ test("session.rejectTool returns -32020 for sessionId mismatch", async () => {
       method: "session.rejectTool",
       params: { sessionId: "wrong-session-id", requestId },
     });
-    assert.ok(resp.error, "must return an error for session not found");
+    expect(resp.error, "must return an error for session not found").toBeTruthy();
     // -32011 session not found or -32020 approval not found
-    assert.ok(resp.error!.code === -32011 || resp.error!.code === -32020);
+    expect(resp.error!.code === -32011 || resp.error!.code === -32020).toBeTruthy();
 
     // Clean up: approve with correct sessionId so session can finish
     const correctSessionId = approvalParams["sessionId"] as string;
@@ -1869,11 +1867,11 @@ test("session.stop auto-denies pending tool approvals", async () => {
       method: "session.stop",
       params: { sessionId },
     });
-    assert.ok(!stopResp.error, "session.stop must succeed");
+    expect(!stopResp.error, "session.stop must succeed").toBeTruthy();
 
     // The pending approval should have been auto-denied; session finishes
     await startPromise;
-    assert.equal(permissionBehavior, "deny", "auto-denied approval must produce deny behavior");
+    expect(permissionBehavior, "auto-denied approval must produce deny behavior").toBe("deny");
 
     // The requestId is no longer in pendingApprovals — a second call should error
     const lateApprove = await server.handleMessage({
@@ -1881,7 +1879,7 @@ test("session.stop auto-denies pending tool approvals", async () => {
       method: "session.approveTool",
       params: { sessionId, requestId },
     });
-    assert.ok(lateApprove.error, "late approval after stop must return an error");
+    expect(lateApprove.error, "late approval after stop must return an error").toBeTruthy();
   } finally {
     // Make sure to clean up the query mock if we used it
     globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
@@ -1942,30 +1940,30 @@ test("session.start with stream: true emits stream_chunk events", async () => {
     });
 
     const result = response.result as Record<string, unknown>;
-    assert.equal(result["status"], "completed");
+    expect(result["status"]).toBe("completed");
 
     // Find stream_chunk notifications
     const streamChunks = notifications.filter((n) => {
       const params = (n as Record<string, unknown>)["params"] as Record<string, unknown>;
       return params?.["messageType"] === "stream_chunk";
     });
-    assert.equal(streamChunks.length, 2, "should emit 2 stream_chunk events");
+    expect(streamChunks.length, "should emit 2 stream_chunk events").toBe(2);
 
     // Verify content and index
     const chunk0 = (streamChunks[0] as Record<string, unknown>)["params"] as Record<string, unknown>;
-    assert.equal(chunk0["content"], "Hel");
-    assert.equal(chunk0["index"], 0);
+    expect(chunk0["content"]).toBe("Hel");
+    expect(chunk0["index"]).toBe(0);
 
     const chunk1 = (streamChunks[1] as Record<string, unknown>)["params"] as Record<string, unknown>;
-    assert.equal(chunk1["content"], "lo!");
-    assert.equal(chunk1["index"], 1);
+    expect(chunk1["content"]).toBe("lo!");
+    expect(chunk1["index"]).toBe(1);
 
     // Verify the full assistant_text was also emitted
     const assistantTexts = notifications.filter((n) => {
       const params = (n as Record<string, unknown>)["params"] as Record<string, unknown>;
       return params?.["messageType"] === "assistant_text";
     });
-    assert.equal(assistantTexts.length, 1, "should emit 1 complete assistant_text");
+    expect(assistantTexts.length, "should emit 1 complete assistant_text").toBe(1);
   } finally {
     // Make sure to clean up the query mock if we used it
     globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
@@ -2005,7 +2003,7 @@ test("session.start without stream (default) emits no stream_chunk events", asyn
       const params = (n as Record<string, unknown>)["params"] as Record<string, unknown>;
       return params?.["messageType"] === "stream_chunk";
     });
-    assert.equal(streamChunks.length, 0, "should emit 0 stream_chunk events when stream is not set");
+    expect(streamChunks.length, "should emit 0 stream_chunk events when stream is not set").toBe(0);
   } finally {
     // Make sure to clean up the query mock if we used it
     globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
@@ -2066,14 +2064,14 @@ test("stream_chunk index resets per turn", async () => {
       const params = (n as Record<string, unknown>)["params"] as Record<string, unknown>;
       return params?.["messageType"] === "stream_chunk";
     });
-    assert.equal(streamChunks.length, 2);
+    expect(streamChunks.length).toBe(2);
 
     const chunk0 = (streamChunks[0] as Record<string, unknown>)["params"] as Record<string, unknown>;
-    assert.equal(chunk0["index"], 0, "first turn chunk should have index 0");
+    expect(chunk0["index"], "first turn chunk should have index 0").toBe(0);
 
     // After assistant_text resets the counter, the second turn's first chunk should be index 0
     const chunk1 = (streamChunks[1] as Record<string, unknown>)["params"] as Record<string, unknown>;
-    assert.equal(chunk1["index"], 0, "second turn chunk should reset to index 0");
+    expect(chunk1["index"], "second turn chunk should reset to index 0").toBe(0);
   } finally {
     // Make sure to clean up the query mock if we used it
     globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
@@ -2089,7 +2087,7 @@ test("bridge.capabilities includes streaming: true", async () => {
     method: "bridge.capabilities",
   });
   const result = response.result as Record<string, unknown>;
-  assert.equal(result["streaming"], true);
+  expect(result["streaming"]).toBe(true);
 });
 
 test("stream_chunk events stored in event buffer and replayable via session.events", async () => {
@@ -2142,7 +2140,7 @@ test("stream_chunk events stored in event buffer and replayable via session.even
       const payload = e["payload"] as Record<string, unknown>;
       return payload?.["messageType"] === "stream_chunk";
     });
-    assert.ok(streamChunks.length > 0, "event buffer should contain stream_chunk events");
+    expect(streamChunks.length > 0, "event buffer should contain stream_chunk events").toBeTruthy();
   } finally {
     // Make sure to clean up the query mock if we used it
     globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
@@ -2159,9 +2157,9 @@ test("session.start with template applies template parameters", async () => {
     options: Record<string, unknown>;
   }) {
     // Verify that template parameters were passed
-    assert.equal(options["model"], "claude-3-opus");
-    assert.deepEqual(options["allowedTools"], ["Read", "Glob"]);
-    assert.equal(options["maxTurns"], 5);
+    expect(options["model"]).toBe("claude-3-opus");
+    expect(options["allowedTools"]).toEqual(["Read", "Glob"]);
+    expect(options["maxTurns"]).toBe(5);
     yield { type: "system", subtype: "init" };
     yield { result: "success" };
   };
@@ -2193,9 +2191,9 @@ test("session.start with template applies template parameters", async () => {
       },
     });
 
-    assert.ok(!response.error, "session.start with template should not error");
+    expect(!response.error, "session.start with template should not error").toBeTruthy();
     const result = response.result as Record<string, unknown>;
-    assert.equal(result["status"], "completed");
+    expect(result["status"]).toBe("completed");
   } finally {
     // Make sure to clean up the query mock if we used it
     globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
@@ -2210,8 +2208,8 @@ test("session.start explicit parameters override template", async () => {
     options: Record<string, unknown>;
   }) {
     // Verify that explicit parameter overrides template
-    assert.equal(options["model"], "claude-3-sonnet"); // explicit value, not template value
-    assert.equal(options["maxTurns"], 10); // template value (not overridden)
+    expect(options["model"]).toBe("claude-3-sonnet"); // explicit value, not template value
+    expect(options["maxTurns"]).toBe(10); // template value (not overridden)
     yield { type: "system", subtype: "init" };
     yield { result: "success" };
   };
@@ -2243,9 +2241,9 @@ test("session.start explicit parameters override template", async () => {
       },
     });
 
-    assert.ok(!response.error);
+    expect(!response.error).toBeTruthy();
     const result = response.result as Record<string, unknown>;
-    assert.equal(result["status"], "completed");
+    expect(result["status"]).toBe("completed");
   } finally {
     // Make sure to clean up the query mock if we used it
     globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
@@ -2270,9 +2268,9 @@ test("session.start with non-existent template returns -32021", async () => {
       },
     });
 
-    assert.ok(response.error, "should return error for missing template");
-    assert.equal(response.error!.code, -32021);
-    assert.ok((response.error!.message as string).includes("Template not found"));
+    expect(response.error, "should return error for missing template").toBeTruthy();
+    expect(response.error!.code).toBe(-32021);
+    expect((response.error!.message as string).includes("Template not found")).toBeTruthy();
   } finally {
     fs.rmSync(ws, { recursive: true, force: true });
   }
@@ -2299,9 +2297,9 @@ test("session.start without template works as before", async () => {
       },
     });
 
-    assert.ok(!response.error);
+    expect(!response.error).toBeTruthy();
     const result = response.result as Record<string, unknown>;
-    assert.equal(result["status"], "completed");
+    expect(result["status"]).toBe("completed");
   } finally {
     // Make sure to clean up the query mock if we used it
     globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;

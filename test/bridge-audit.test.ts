@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, expect } from "bun:test";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -32,11 +31,11 @@ test("audit.query returns entries for a session", async () => {
       params: { sessionId: "test-sess" },
     });
 
-    assert.ok(!resp.error);
+    expect(!resp.error).toBeTruthy();
     const result = resp.result as Record<string, unknown>;
-    assert.equal(result["total"], 1);
+    expect(result["total"]).toBe(1);
     const entries = result["entries"] as AuditEntry[];
-    assert.equal(entries[0].eventType, "tool_use");
+    expect(entries[0].eventType).toBe("tool_use");
   } finally {
     fs.rmSync(auditDir, { recursive: true, force: true });
   }
@@ -54,8 +53,8 @@ test("audit.query with invalid sessionId type returns error", async () => {
       params: { sessionId: 12345 },
     });
 
-    assert.ok(resp.error);
-    assert.equal(resp.error.code, -32602);
+    expect(resp.error).toBeTruthy();
+    expect(resp.error.code).toBe(-32602);
   } finally {
     fs.rmSync(auditDir, { recursive: true, force: true });
   }
@@ -77,9 +76,9 @@ test("audit.query with category filter works", async () => {
       params: { category: "security" },
     });
 
-    assert.ok(!resp.error);
+    expect(!resp.error).toBeTruthy();
     const result = resp.result as Record<string, unknown>;
-    assert.equal(result["total"], 1);
+    expect(result["total"]).toBe(1);
   } finally {
     fs.rmSync(auditDir, { recursive: true, force: true });
   }
@@ -109,7 +108,7 @@ test("session.start emits session_started audit entry", async () => {
 
     const auditLog = new AuditLog(auditDir);
     const startedEntries = auditLog.query({ eventType: "session_started" });
-    assert.ok(startedEntries.total >= 1, "should have at least one session_started entry");
+    expect(startedEntries.total >= 1, "should have at least one session_started entry").toBeTruthy();
   } finally {
     fs.rmSync(wsDir, { recursive: true, force: true });
     fs.rmSync(auditDir, { recursive: true, force: true });
@@ -137,7 +136,7 @@ test("session.stop emits session_stopped audit entry", async () => {
     });
     delete globalThis.__AI_SPEC_SDK_QUERY__;
 
-    assert.ok(!startResp.error);
+    expect(!startResp.error).toBeTruthy();
 
     const stopResp = await server.handleMessage({
       jsonrpc: "2.0",
@@ -146,11 +145,11 @@ test("session.stop emits session_stopped audit entry", async () => {
       params: { sessionId: (startResp.result as Record<string, unknown>)["sessionId"] },
     });
 
-    assert.ok(!stopResp.error);
+    expect(!stopResp.error).toBeTruthy();
 
     const auditLog = new AuditLog(auditDir);
     const stoppedEntries = auditLog.query({ eventType: "session_stopped" });
-    assert.ok(stoppedEntries.total >= 1, "should have session_stopped entry");
+    expect(stoppedEntries.total >= 1, "should have session_stopped entry").toBeTruthy();
   } finally {
     fs.rmSync(wsDir, { recursive: true, force: true });
     fs.rmSync(auditDir, { recursive: true, force: true });
@@ -169,10 +168,10 @@ test("audit notification is emitted on write", async () => {
     const auditNotifs = notifications.filter(
       (n) => (n as Record<string, unknown>)["method"] === "bridge/audit_event",
     );
-    assert.ok(auditNotifs.length > 0, "should have bridge/audit_event notification");
+    expect(auditNotifs.length > 0, "should have bridge/audit_event notification").toBeTruthy();
 
     const params = (auditNotifs[0] as Record<string, unknown>)["params"] as AuditEntry;
-    assert.equal(params.eventType, "tool_use");
+    expect(params.eventType).toBe("tool_use");
   } finally {
     fs.rmSync(auditDir, { recursive: true, force: true });
   }

@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, expect } from "bun:test";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -46,26 +45,26 @@ test("blocking pre_tool_use hook that exits 0 allows tool use to proceed", async
     // Wait for async hook execution to complete
     await sleep(200);
 
-    assert.ok(!startResp.error, "session.start should succeed");
+    expect(!startResp.error, "session.start should succeed").toBeTruthy();
     const result = startResp.result as Record<string, unknown>;
-    assert.equal(result["status"], "completed");
+    expect(result["status"]).toBe("completed");
 
     // Verify hook notification includes execution result
     const hookNotifs = notifications.filter(
       (n) => (n as Record<string, unknown>)["method"] === "bridge/hook_triggered",
     );
-    assert.ok(hookNotifs.length > 0, "should have hook_triggered notifications");
+    expect(hookNotifs.length > 0, "should have hook_triggered notifications").toBeTruthy();
 
     // Find the completed hook notification (has exitCode)
     const completedNotif = hookNotifs.find(
       (n) => ((n as Record<string, unknown>)["params"] as Record<string, unknown>)["exitCode"] === 0,
     );
-    assert.ok(completedNotif, "should have a completed hook notification with exitCode 0");
+    expect(completedNotif, "should have a completed hook notification with exitCode 0").toBeTruthy();
 
     const params = (completedNotif as Record<string, unknown>)["params"] as Record<string, unknown>;
-    assert.equal(params["exitCode"], 0);
-    assert.equal(typeof params["durationMs"], "number");
-    assert.equal(params["timedOut"], false);
+    expect(params["exitCode"]).toBe(0);
+    expect(typeof params["durationMs"]).toBe("number");
+    expect(params["timedOut"]).toBe(false);
   } finally {
     fs.rmSync(wsDir, { recursive: true, force: true });
     // Clean up user hooks
@@ -120,12 +119,12 @@ test("blocking pre_tool_use hook that exits 1 aborts tool use", async () => {
     const hookNotifs = notifications.filter(
       (n) => (n as Record<string, unknown>)["method"] === "bridge/hook_triggered",
     );
-    assert.ok(hookNotifs.length > 0, "should have hook_triggered notifications");
+    expect(hookNotifs.length > 0, "should have hook_triggered notifications").toBeTruthy();
 
     const failedNotif = hookNotifs.find(
       (n) => ((n as Record<string, unknown>)["params"] as Record<string, unknown>)["exitCode"] === 1,
     );
-    assert.ok(failedNotif, "should have a hook notification with exitCode 1");
+    expect(failedNotif, "should have a hook notification with exitCode 1").toBeTruthy();
   } finally {
     fs.rmSync(wsDir, { recursive: true, force: true });
     try {
@@ -181,7 +180,7 @@ test("non-blocking hooks fire without awaiting", async () => {
              ((n as Record<string, unknown>)["params"] as Record<string, unknown>)?.["type"] === "session_started",
     );
     const sessionId = ((startedNotif as Record<string, unknown>)["params"] as Record<string, unknown>)?.["sessionId"] as string;
-    assert.ok(sessionId, "should have a session ID");
+    expect(sessionId, "should have a session ID").toBeTruthy();
 
     // Stop the session — this fires the stop hook
     await server.handleMessage({
@@ -203,13 +202,13 @@ test("non-blocking hooks fire without awaiting", async () => {
       (n) => (n as Record<string, unknown>)["method"] === "bridge/hook_triggered",
     );
     // Should have at least one notification (initial pending + completed)
-    assert.ok(hookNotifs.length >= 1, "should have hook_triggered notifications");
+    expect(hookNotifs.length >= 1, "should have hook_triggered notifications").toBeTruthy();
 
     // Verify completed notification has exitCode
     const completedNotif = hookNotifs.find(
       (n) => ((n as Record<string, unknown>)["params"] as Record<string, unknown>)["exitCode"] === 0,
     );
-    assert.ok(completedNotif, "should have a completed stop hook notification");
+    expect(completedNotif, "should have a completed stop hook notification").toBeTruthy();
   } finally {
     fs.rmSync(wsDir, { recursive: true, force: true });
     try {
@@ -266,17 +265,17 @@ test("hook notification includes exitCode, stdout, stderr, durationMs", async ()
     const completedNotif = hookNotifs.find(
       (n) => ((n as Record<string, unknown>)["params"] as Record<string, unknown>)["exitCode"] === 0,
     );
-    assert.ok(completedNotif, "should have a completed hook notification");
+    expect(completedNotif, "should have a completed hook notification").toBeTruthy();
 
     const params = (completedNotif as Record<string, unknown>)["params"] as Record<string, unknown>;
-    assert.equal(params["exitCode"], 0);
-    assert.equal(typeof params["durationMs"], "number");
-    assert.ok(params["durationMs"]! as number >= 0);
-    assert.equal(params["timedOut"], false);
-    assert.ok(typeof params["stdout"] === "string");
-    assert.ok((params["stdout"] as string).includes("hello hook"));
-    assert.ok(typeof params["stderr"] === "string");
-    assert.ok((params["stderr"] as string).includes("err output"));
+    expect(params["exitCode"]).toBe(0);
+    expect(typeof params["durationMs"]).toBe("number");
+    expect(params["durationMs"]! as number >= 0).toBeTruthy();
+    expect(params["timedOut"]).toBe(false);
+    expect(typeof params["stdout"] === "string").toBeTruthy();
+    expect((params["stdout"] as string).includes("hello hook")).toBeTruthy();
+    expect(typeof params["stderr"] === "string").toBeTruthy();
+    expect((params["stderr"] as string).includes("err output")).toBeTruthy();
   } finally {
     fs.rmSync(wsDir, { recursive: true, force: true });
     try {
@@ -348,8 +347,8 @@ test("multiple blocking hooks execute sequentially and chain stops on failure", 
       (n) => ((n as Record<string, unknown>)["params"] as Record<string, unknown>)["exitCode"] === 1,
     );
 
-    assert.ok(exit0Notifs.length > 0, "first hook should have exited 0");
-    assert.ok(exit1Notifs.length > 0, "second hook should have exited 1");
+    expect(exit0Notifs.length > 0, "first hook should have exited 0").toBeTruthy();
+    expect(exit1Notifs.length > 0, "second hook should have exited 1").toBeTruthy();
   } finally {
     fs.rmSync(wsDir, { recursive: true, force: true });
     try {
