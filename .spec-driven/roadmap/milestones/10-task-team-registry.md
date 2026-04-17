@@ -25,7 +25,7 @@ Enable collaborative agent workflows through task templates, team registries, an
 
 ## Planned Changes
 - `task-template-registry` - Declared: complete - save and version task templates
-- `team-registry` - Declared: planned - team management and membership
+- `team-registry` - Declared: complete - team management and membership
 - `cron-scheduler` - Declared: planned - scheduled task execution
 - `task-queue` - Declared: planned - priority queue with retry logic
 - `task-dependencies` - Declared: planned - cross-session task orchestration
@@ -45,5 +45,6 @@ Enable collaborative agent workflows through task templates, team registries, an
 - Declared: proposed
 
 ## Notes
+
 
 

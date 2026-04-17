@@ -23,6 +23,11 @@ describe("HooksStore", () => {
       origUserHooks = undefined;
     }
 
+    // Ensure clean hooks file for each test
+    const hooksDir = path.dirname(userHooksPath);
+    fs.mkdirSync(hooksDir, { recursive: true });
+    fs.writeFileSync(userHooksPath, "[]", "utf8");
+
     store = new HooksStore();
   });
 

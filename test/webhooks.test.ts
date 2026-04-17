@@ -132,6 +132,8 @@ test("WebhookManager: HMAC signature is verifiable", async () => {
 
     let receivedBody = "";
     let receivedSig = "";
+    let resolveDelivery: () => void;
+    const deliveryPromise = new Promise<void>((r) => { resolveDelivery = r; });
 
     const server = http.createServer((req, res) => {
       const chunks: Buffer[] = [];
@@ -141,6 +143,7 @@ test("WebhookManager: HMAC signature is verifiable", async () => {
         receivedSig = req.headers["x-webhook-signature"] as string;
         res.writeHead(200);
         res.end("ok");
+        resolveDelivery();
       });
     });
 
@@ -155,8 +158,11 @@ test("WebhookManager: HMAC signature is verifiable", async () => {
       params: { type: "session_started", sessionId: "test-1" },
     });
 
-    // Wait for async delivery
-    await new Promise((r) => setTimeout(r, 200));
+    // Wait for async delivery with a generous timeout
+    await Promise.race([
+      deliveryPromise,
+      new Promise<void>((r) => setTimeout(r, 3000)),
+    ]);
 
     const expectedSig = crypto.createHmac("sha256", secret).update(receivedBody).digest("hex");
     assert.equal(receivedSig, expectedSig);
@@ -174,11 +180,14 @@ test("WebhookManager: does not retry on success", async () => {
   try {
     const mgr = new WebhookManager(dir);
     let callCount = 0;
+    let resolveDelivery: () => void;
+    const deliveryPromise = new Promise<void>((r) => { resolveDelivery = r; });
 
     const server = http.createServer((req, res) => {
       callCount++;
       res.writeHead(200);
       res.end("ok");
+      resolveDelivery();
     });
 
     await new Promise<void>((resolve) => server.listen(0, resolve));
@@ -191,7 +200,10 @@ test("WebhookManager: does not retry on success", async () => {
       params: { type: "session_completed", sessionId: "test-1" },
     });
 
-    await new Promise((r) => setTimeout(r, 500));
+    await Promise.race([
+      deliveryPromise,
+      new Promise<void>((r) => setTimeout(r, 3000)),
+    ]);
     assert.equal(callCount, 1);
     server.close();
   } finally {
@@ -204,9 +216,12 @@ test("WebhookManager: retries on failure up to 3 times", async () => {
   try {
     const mgr = new WebhookManager(dir);
     let callCount = 0;
+    let resolveFirstCall: () => void;
+    const firstCallPromise = new Promise<void>((r) => { resolveFirstCall = r; });
 
     const server = http.createServer((req, res) => {
       callCount++;
+      if (callCount === 1) resolveFirstCall();
       res.writeHead(500);
       res.end("error");
     });
@@ -221,8 +236,15 @@ test("WebhookManager: retries on failure up to 3 times", async () => {
       params: { type: "session_completed", sessionId: "test-1" },
     });
 
-    // Wait for initial + first retry (1s delay)
-    await new Promise((r) => setTimeout(r, 2000));
+    // Wait for the initial delivery to arrive
+    await Promise.race([
+      firstCallPromise,
+      new Promise<void>((r) => setTimeout(r, 5000)),
+    ]);
+    assert.ok(callCount >= 1, `Expected at least 1 call, got ${callCount}`);
+
+    // Wait for first retry (1s delay) with generous buffer
+    await new Promise((r) => setTimeout(r, 2500));
     const countAfterFirstRetry = callCount;
     assert.ok(countAfterFirstRetry >= 2, `Expected at least 2 calls after first retry, got ${countAfterFirstRetry}`);
     server.close();

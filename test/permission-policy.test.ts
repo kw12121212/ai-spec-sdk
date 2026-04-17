@@ -291,24 +291,28 @@ describe("Bridge: policy parameter validation", () => {
     const policyName = `test-start-${Date.now()}`;
     registerPolicy(policyName, () => makeFixedPolicy(policyName, "pass"));
 
-    const bridge = createBridge();
-    
-    // We expect a validation error (-32602) to NOT occur.
-    // However, because we don't have a mocked provider, startSession will fail
-    // later due to missing Anthropic API key, returning -32603 (Internal Error).
-    // The lack of -32602 means the validation step succeeded.
+    // Mock the query function to prevent real provider connections when running
+    // in the full suite where provider-registry tests leak global providers.
+    const prevMock = globalThis.__AI_SPEC_SDK_QUERY__;
+    globalThis.__AI_SPEC_SDK_QUERY__ = async function* () {
+      yield { type: "system", subtype: "init", session_id: "mock" };
+      yield { result: "done" };
+    };
+
     try {
+      const bridge = createBridge();
+
+      // The key assertion: policy validation succeeds (no -32602 error).
+      // With the mock, session.start completes successfully.
       const resp = await call(bridge, "session.start", {
         workspace,
         prompt: "test",
         policies: [{ name: policyName }],
       });
-      // Should NOT get a -32602 (validation error); a -32603 (API key) means validation passed
-      expect(resp.error).toBeDefined();
-      expect(resp.error!.code).not.toBe(-32602);
-    } catch (e: any) {
-      // In case it throws directly instead of returning an error response
-      expect(e.code).not.toBe(-32602);
+      expect(resp.error).toBeUndefined();
+      expect(resp.result).toBeDefined();
+    } finally {
+      globalThis.__AI_SPEC_SDK_QUERY__ = prevMock;
     }
   });
 });

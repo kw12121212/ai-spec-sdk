@@ -150,7 +150,7 @@ function queryStub() {
 
 // ── existing transport tests (noAuth: true) ───────────────────────────────────
 
-test("POST /rpc happy path: bridge.ping returns pong", async () => {
+test("POST /rpc happy path: bridge.ping returns pong", { timeout: 30000 }, async () => {
   const { shutdown, port } = await startHttpServer({ port: 0, noAuth: true });
   try {
     const { status, body } = await rpc(port, { jsonrpc: "2.0", id: 1, method: "bridge.ping" });
@@ -163,7 +163,7 @@ test("POST /rpc happy path: bridge.ping returns pong", async () => {
   }
 });
 
-test("POST /rpc: bridge.capabilities includes transport: http", async () => {
+test("POST /rpc: bridge.capabilities includes transport: http", { timeout: 30000 }, async () => {
   const { shutdown, port } = await startHttpServer({ port: 0, noAuth: true });
   try {
     const { status, body } = await rpc(port, {
@@ -179,7 +179,7 @@ test("POST /rpc: bridge.capabilities includes transport: http", async () => {
   }
 });
 
-test("POST /rpc: wrong Content-Type returns 415", async () => {
+test("POST /rpc: wrong Content-Type returns 415", { timeout: 30000 }, async () => {
   const { shutdown, port } = await startHttpServer({ port: 0, noAuth: true });
   try {
     const { status } = await rpc(

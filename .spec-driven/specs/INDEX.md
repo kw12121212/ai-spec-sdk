@@ -53,6 +53,7 @@
 ## workflow
 - [spec-driven-workflows.md](workflow/spec-driven-workflows.md) - spec-driven-workflows
 - [task-templates.md](workflow/task-templates.md) - task-templates
+- [team-registry.md](workflow/team-registry.md) - team-registry
 
 ## webhook
 - [webhook-delivery.md](webhook/webhook-delivery.md) - webhook-delivery
