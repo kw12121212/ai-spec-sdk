@@ -49,6 +49,7 @@ import {
 } from "./permission-policy.js";
 import { validateRoleStrings } from "./role-store.js";
 import { ApprovalStore } from "./approval-store.js";
+import { CronScheduler } from "./cron-scheduler.js";
 
 const METHOD_NOT_FOUND = -32601;
 const INTERNAL_ERROR = -32603;
@@ -386,6 +387,7 @@ export class BridgeServer {
   private abortControllers: Map<string, AbortController>;
   private timeoutIds: Map<string, NodeJS.Timeout>;
   private approvalStore: ApprovalStore;
+  private cronScheduler: CronScheduler;
 
   constructor({ notify = () => {}, sessionsDir, workspacesDir, logger, transport = "stdio", runtimeInfoOptions, auditDir }: BridgeServerOptions = {}) {
     this.notify = notify;
@@ -427,6 +429,22 @@ export class BridgeServer {
     if (removedCount > 0) {
       this.logger.info(`cleaned up ${removedCount} stale audit log files`);
     }
+
+    this.cronScheduler = new CronScheduler(this.taskTemplateStore, (template) => {
+      this.handleMessage({
+        jsonrpc: "2.0",
+        id: `cron-${Date.now()}`,
+        method: "session.start",
+        params: {
+          prompt: `Running scheduled task: ${template.name}`,
+          options: {
+            systemPrompt: template.systemPrompt,
+            allowedTools: template.tools,
+          },
+        },
+      }).catch((e) => this.logger.error("cron execution failed", { error: e }));
+    });
+    this.cronScheduler.start();
   }
 
   private _buildApprovalCallback(sessionId: string): (

@@ -4,6 +4,7 @@ export interface TaskTemplate {
   systemPrompt?: string;
   tools?: string[];
   parameters?: Record<string, any>;
+  cronSchedule?: string;
   version: number;
   createdAt: string;
   updatedAt: string;
@@ -23,4 +24,5 @@ export interface UpdateTaskTemplateParams {
   systemPrompt?: string;
   tools?: string[];
   parameters?: Record<string, any>;
+  cronSchedule?: string;
 }
