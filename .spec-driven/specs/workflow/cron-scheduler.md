@@ -14,12 +14,12 @@ mapping:
 ## Requirements
 
 ### Requirement: schedule-task-templates
-The system MUST support defining a cron schedule on a task template and executing it automatically when due.
+The system MUST support defining a cron schedule on a task template and automatically enqueuing it into the task queue when due.
 
 #### Scenario: trigger-scheduled-task
 - GIVEN a task template with a valid cron schedule (e.g., `* * * * *`) registered in the system
 - WHEN the cron schedule becomes due according to the system clock
-- THEN the system MUST automatically create and start an agent session using that task template.
+- THEN the system MUST automatically enqueue it into the task queue for execution.
 
 ### Requirement: parse-cron-expressions
 The system MUST parse standard cron expressions correctly.

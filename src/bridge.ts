@@ -50,6 +50,8 @@ import {
 import { validateRoleStrings } from "./role-store.js";
 import { ApprovalStore } from "./approval-store.js";
 import { CronScheduler } from "./cron-scheduler.js";
+import { TaskQueueStore } from "./task-queue-store.js";
+import { TaskQueueWorker } from "./task-queue-worker.js";
 
 const METHOD_NOT_FOUND = -32601;
 const INTERNAL_ERROR = -32603;
@@ -388,6 +390,8 @@ export class BridgeServer {
   private timeoutIds: Map<string, NodeJS.Timeout>;
   private approvalStore: ApprovalStore;
   private cronScheduler: CronScheduler;
+  private taskQueueStore: TaskQueueStore;
+  private taskQueueWorker: TaskQueueWorker;
 
   constructor({ notify = () => {}, sessionsDir, workspacesDir, logger, transport = "stdio", runtimeInfoOptions, auditDir }: BridgeServerOptions = {}) {
     this.notify = notify;
@@ -419,6 +423,7 @@ export class BridgeServer {
     this.webhookManager = new WebhookManager(sessionsDir);
     this.templateStore = new TemplateStore(sessionsDir ? path.join(sessionsDir, "templates") : undefined);
     this.taskTemplateStore = new TaskTemplateStore(sessionsDir ? path.join(sessionsDir, "task-templates") : undefined);
+    this.taskQueueStore = new TaskQueueStore(sessionsDir ? path.join(sessionsDir, "task-queue") : undefined);
     this.teamStore = new TeamStore(sessionsDir ? path.join(sessionsDir, "teams") : undefined);
     this.abortControllers = new Map();
     this.timeoutIds = new Map();
@@ -430,10 +435,16 @@ export class BridgeServer {
       this.logger.info(`cleaned up ${removedCount} stale audit log files`);
     }
 
-    this.cronScheduler = new CronScheduler(this.taskTemplateStore, (template) => {
-      this.handleMessage({
+    this.taskQueueWorker = new TaskQueueWorker(this.taskQueueStore, async (item) => {
+      const template = item.templateSnapshot ?? this.taskTemplateStore.get(item.templateName);
+      if (!template) throw new Error(`Task template not found: ${item.templateName}`);
+      
+      const reqId = `queue-${item.id}`;
+      // In JSON-RPC 2.0, we just simulate handling a session.start message.
+      // Wait for it to finish successfully
+      await this.handleMessage({
         jsonrpc: "2.0",
-        id: `cron-${Date.now()}`,
+        id: reqId,
         method: "session.start",
         params: {
           prompt: `Running scheduled task: ${template.name}`,
@@ -442,8 +453,11 @@ export class BridgeServer {
             allowedTools: template.tools,
           },
         },
-      }).catch((e) => this.logger.error("cron execution failed", { error: e }));
+      });
     });
+    this.taskQueueWorker.start();
+
+    this.cronScheduler = new CronScheduler(this.taskTemplateStore, this.taskQueueStore);
     this.cronScheduler.start();
   }
 

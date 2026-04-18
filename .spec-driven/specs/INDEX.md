@@ -53,6 +53,7 @@
 ## workflow
 - [spec-driven-workflows.md](workflow/spec-driven-workflows.md) - spec-driven-workflows
 - [task-templates.md](workflow/task-templates.md) - task-templates
+- [task-queue.md](workflow/task-queue.md) - task-queue
 - [team-registry.md](workflow/team-registry.md) - team-registry
 - [cron-scheduler.md](workflow/cron-scheduler.md) - cron-scheduler
 

@@ -1,6 +1,6 @@
 import { CronExpressionParser } from "cron-parser";
 import { TaskTemplateStore } from "./task-template-store.js";
-import { TaskTemplate } from "./task-template-types.js";
+import { TaskQueueStore } from "./task-queue-store.js";
 import { defaultLogger as logger } from "./logger.js";
 
 export class CronScheduler {
@@ -9,7 +9,7 @@ export class CronScheduler {
 
   constructor(
     private taskTemplateStore: TaskTemplateStore,
-    private onDue: (template: TaskTemplate) => void | Promise<void>,
+    private taskQueueStore: TaskQueueStore,
   ) {
     this.lastCheck = new Date();
   }
@@ -59,19 +59,15 @@ export class CronScheduler {
       }
 
       if (due) {
-        logger.info("triggering scheduled task template", { name: template.name });
+        logger.info("enqueuing scheduled task template", { name: template.name });
         try {
-          const result = this.onDue(template);
-          if (result instanceof Promise) {
-            result.catch((e) => {
-              logger.error("error triggering scheduled task (async)", {
-                name: template.name,
-                error: e instanceof Error ? e.message : String(e),
-              });
-            });
-          }
+          this.taskQueueStore.enqueue({
+            templateName: template.name,
+            priority: 0,
+            templateSnapshot: template,
+          });
         } catch (error) {
-          logger.error("error triggering scheduled task", {
+          logger.error("error enqueuing scheduled task", {
             name: template.name,
             error: error instanceof Error ? error.message : String(error),
           });

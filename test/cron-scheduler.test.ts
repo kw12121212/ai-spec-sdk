@@ -1,7 +1,11 @@
 import { test, expect, beforeEach, afterEach, setSystemTime } from "bun:test";
 import { CronScheduler } from "../src/cron-scheduler.js";
 import { TaskTemplateStore } from "../src/task-template-store.js";
+import { TaskQueueStore } from "../src/task-queue-store.js";
 import type { TaskTemplate } from "../src/task-template-types.js";
+import fs from "node:fs";
+import path from "node:path";
+import os from "node:os";
 
 class MockTaskTemplateStore extends TaskTemplateStore {
   private templatesList: TaskTemplate[] = [];
@@ -16,11 +20,18 @@ class MockTaskTemplateStore extends TaskTemplateStore {
   }
 }
 
-afterEach(() => {
-  setSystemTime(); // reset system time
+let tempDir: string;
+
+beforeEach(() => {
+  tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "cron-test-"));
 });
 
-test("cron scheduler triggers tasks that are due", () => {
+afterEach(() => {
+  setSystemTime(); // reset system time
+  fs.rmSync(tempDir, { recursive: true, force: true });
+});
+
+test("cron scheduler enqueues tasks that are due", () => {
   setSystemTime(new Date("2026-04-18T12:00:00Z"));
 
   const store = new MockTaskTemplateStore();
@@ -29,27 +40,31 @@ test("cron scheduler triggers tasks that are due", () => {
     { name: "task2", version: 1, createdAt: "", updatedAt: "", cronSchedule: "0 * * * *" },
   ]);
 
-  const triggered: string[] = [];
-  const scheduler = new CronScheduler(store, (t) => triggered.push(t.name));
+  const queueStore = new TaskQueueStore(tempDir);
+  const scheduler = new CronScheduler(store, queueStore);
 
   // No time elapsed since creation
   scheduler.tick();
-  expect(triggered).toEqual([]);
+  expect(queueStore.list().length).toBe(0);
 
   // 1 minute elapsed
   setSystemTime(new Date("2026-04-18T12:01:00Z"));
   scheduler.tick();
-  expect(triggered).toEqual(["task1"]);
-
-  // Reset triggered
-  triggered.length = 0;
+  
+  const queued1 = queueStore.list();
+  expect(queued1.length).toBe(1);
+  expect(queued1[0].templateName).toBe("task1");
 
   // 59 minutes elapsed (now 13:00:00)
   setSystemTime(new Date("2026-04-18T13:00:00Z"));
   scheduler.tick();
-  // Both tasks should be triggered once.
-  expect(triggered.includes("task1")).toBe(true);
-  expect(triggered.includes("task2")).toBe(true);
+  
+  const queued2 = queueStore.list();
+  // task1 triggered again, task2 triggered once. Total items = 3.
+  expect(queued2.length).toBe(3);
+  const names = queued2.map(q => q.templateName);
+  expect(names.filter(n => n === "task1").length).toBe(2);
+  expect(names.filter(n => n === "task2").length).toBe(1);
 });
 
 test("cron scheduler handles invalid cron safely", () => {
@@ -60,33 +75,11 @@ test("cron scheduler handles invalid cron safely", () => {
     { name: "task1", version: 1, createdAt: "", updatedAt: "", cronSchedule: "invalid cron" },
   ]);
 
-  const triggered: string[] = [];
-  const scheduler = new CronScheduler(store, (t) => triggered.push(t.name));
+  const queueStore = new TaskQueueStore(tempDir);
+  const scheduler = new CronScheduler(store, queueStore);
 
   setSystemTime(new Date("2026-04-18T12:01:00Z"));
   scheduler.tick();
   
-  expect(triggered).toEqual([]);
-});
-
-test("cron scheduler handles async onDue errors gracefully", async () => {
-  setSystemTime(new Date("2026-04-18T12:00:00Z"));
-
-  const store = new MockTaskTemplateStore();
-  store.setTemplates([
-    { name: "task1", version: 1, createdAt: "", updatedAt: "", cronSchedule: "* * * * *" },
-  ]);
-
-  let called = false;
-  const scheduler = new CronScheduler(store, async () => {
-    called = true;
-    throw new Error("async error");
-  });
-
-  setSystemTime(new Date("2026-04-18T12:01:00Z"));
-  // Tick should not throw
-  expect(() => scheduler.tick()).not.toThrow();
-  // Wait a tick for async rejection
-  await new Promise((resolve) => setTimeout(resolve, 0));
-  expect(called).toBe(true);
+  expect(queueStore.list().length).toBe(0);
 });
