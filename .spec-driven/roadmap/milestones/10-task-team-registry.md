@@ -29,7 +29,7 @@ Enable collaborative agent workflows through task templates, team registries, an
 - `cron-scheduler` - Declared: complete - scheduled task execution
 - `task-queue` - Declared: complete - priority queue with retry logic
 - `task-dependencies` - Declared: complete - cross-session task orchestration
-- `team-quotas` - Declared: planned - resource limits per team
+- `team-quotas` - Declared: complete - resource limits per team
 
 ## Dependencies
 - 07-agent-lifecycle — leverages agent state management for task execution
@@ -42,9 +42,11 @@ Enable collaborative agent workflows through task templates, team registries, an
 - Team quotas need careful accounting to prevent overuse
 
 ## Status
-- Declared: proposed
+- Declared: complete
 
 ## Notes
+
+
 
 
 

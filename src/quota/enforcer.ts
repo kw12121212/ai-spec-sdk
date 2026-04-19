@@ -15,6 +15,17 @@ export interface EnforcerOptions {
   onBlocked?: (notification: import("./types.js").QuotaBlockedNotification) => void;
 }
 
+export type SessionGetter = (sessionId: string) => { teamId?: string } | undefined;
+export type SessionListGetter = (options: { teamId?: string }) => Array<{ id: string; teamId?: string }>;
+
+let getSession: SessionGetter = () => undefined;
+let getSessionList: SessionListGetter = () => [];
+
+export function setSessionAccessors(getter: SessionGetter, listGetter: SessionListGetter) {
+  getSession = getter;
+  getSessionList = listGetter;
+}
+
 function resolveUsage(rule: QuotaRule, sessionId: string, providerId?: string): number {
   const store = getTokenStore();
   switch (rule.scope) {
@@ -33,6 +44,18 @@ function resolveUsage(rule: QuotaRule, sessionId: string, providerId?: string): 
       for (const p of allProviders) total += p.totalTokens;
       return total;
     }
+    case "team": {
+      if (!rule.scopeId) return 0;
+      const teamSessions = getSessionList({ teamId: rule.scopeId });
+      let total = 0;
+      for (const session of teamSessions) {
+        const usage = store.getSessionUsage(session.id);
+        if (usage) {
+          total += usage.totalTokens;
+        }
+      }
+      return total;
+    }
   }
 }
 
@@ -42,7 +65,8 @@ export function preQueryCheck(
   options: EnforcerOptions = {},
 ): QuotaEnforceResult {
   const registry = getQuotaRegistry();
-  const matchingRules = registry.getMatchingRules(sessionId, providerId);
+  const session = getSession(sessionId);
+  const matchingRules = registry.getMatchingRules(sessionId, providerId, session?.teamId);
 
   if (matchingRules.length === 0) {
     return { allowed: true, warnings: [] };
@@ -111,7 +135,8 @@ export function postQueryCheck(
   options: EnforcerOptions = {},
 ): QuotaWarning[] {
   const registry = getQuotaRegistry();
-  const matchingRules = registry.getMatchingRules(sessionId, providerId);
+  const session = getSession(sessionId);
+  const matchingRules = registry.getMatchingRules(sessionId, providerId, session?.teamId);
 
   const warnings: QuotaWarning[] = [];
 

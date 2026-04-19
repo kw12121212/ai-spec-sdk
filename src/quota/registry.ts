@@ -42,7 +42,7 @@ class QuotaRegistry {
     return removed;
   }
 
-  getMatchingRules(sessionId: string, providerId?: string): QuotaRule[] {
+  getMatchingRules(sessionId: string, providerId?: string, teamId?: string): QuotaRule[] {
     const matched: QuotaRule[] = [];
     for (const rule of this.rules.values()) {
       switch (rule.scope) {
@@ -51,6 +51,9 @@ class QuotaRegistry {
           break;
         case "provider":
           if (providerId && rule.scopeId === providerId) matched.push(rule);
+          break;
+        case "team":
+          if (teamId && rule.scopeId === teamId) matched.push(rule);
           break;
         case "global":
           matched.push(rule);

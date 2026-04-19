@@ -19,6 +19,7 @@ export interface Session {
   workspace: string;
   parentSessionId?: string;
   providerId?: string;
+  teamId?: string;
   activeProviderId?: string;
   activeBalancerId?: string;
   sdkSessionId: string | null;
@@ -117,6 +118,7 @@ export class SessionStore {
     stream: boolean = false,
     parentSessionId?: string,
     providerId?: string,
+    teamId?: string,
   ): Session {
     const sessionId = crypto.randomUUID();
     const createdAt = nowIso();
@@ -126,6 +128,7 @@ export class SessionStore {
       workspace,
       ...(parentSessionId !== undefined ? { parentSessionId } : {}),
       ...(providerId !== undefined ? { providerId } : {}),
+      ...(teamId !== undefined ? { teamId } : {}),
       sdkSessionId: null,
       createdAt,
       updatedAt: createdAt,
@@ -285,7 +288,7 @@ export class SessionStore {
     return session;
   }
 
-  list(options: { status?: "active" | "all"; parentSessionId?: string } = {}): Session[] {
+  list(options: { status?: "active" | "all"; parentSessionId?: string; teamId?: string } = {}): Session[] {
     const all = Array.from(this.sessions.values());
     const filtered = all.filter((session) => {
       if (options.status === "active" && session.status !== "active") {
@@ -295,6 +298,9 @@ export class SessionStore {
         options.parentSessionId !== undefined &&
         session.parentSessionId !== options.parentSessionId
       ) {
+        return false;
+      }
+      if (options.teamId !== undefined && session.teamId !== options.teamId) {
         return false;
       }
       return true;

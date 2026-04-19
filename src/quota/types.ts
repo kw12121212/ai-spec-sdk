@@ -1,4 +1,4 @@
-export type QuotaScope = "session" | "provider" | "global";
+export type QuotaScope = "session" | "provider" | "global" | "team";
 
 export type QuotaAction = "warn" | "block" | "warn+block";
 
@@ -67,7 +67,7 @@ export interface QuotaBlockedNotification extends QuotaNotificationPayload {
   violationId: string;
 }
 
-const VALID_SCOPES: ReadonlySet<string> = new Set(["session", "provider", "global"]);
+const VALID_SCOPES: ReadonlySet<string> = new Set(["session", "provider", "global", "team"]);
 const VALID_ACTIONS: ReadonlySet<string> = new Set(["warn", "block", "warn+block"]);
 const DEFAULT_WARN_THRESHOLD = 0.8;
 
@@ -113,3 +113,4 @@ export function computeQuotaStatus(currentUsage: number, limit: number, warnThre
 export function generateViolationId(): string {
   return `qv-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
+

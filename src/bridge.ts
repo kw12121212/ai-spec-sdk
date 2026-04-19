@@ -30,7 +30,7 @@ import { getTokenStore } from "./token-tracking/store.js";
 import { counterRegistry } from "./token-tracking/counters/index.js";
 import { getQuotaRegistry } from "./quota/registry.js";
 import { validateQuotaRule } from "./quota/types.js";
-import { buildQuotaStatuses } from "./quota/enforcer.js";
+import { buildQuotaStatuses, setSessionAccessors } from "./quota/enforcer.js";
 import type { QuotaStatus, QuotaWarning, QuotaBlockedNotification } from "./quota/types.js";
 import {
   isScopeDenied,
@@ -401,6 +401,10 @@ export class BridgeServer {
     const resolvedAuditDir = auditDir ?? (sessionsDir ? path.join(sessionsDir, "audit") : undefined);
     this.auditLog = new AuditLog(resolvedAuditDir ?? ".audit", notify, API_VERSION);
     this.sessionStore = new SessionStore(sessionsDir, this.auditLog);
+    setSessionAccessors(
+      (id) => this.sessionStore.get(id) ?? undefined,
+      (options) => this.sessionStore.list(options)
+    );
     providerRegistry.setSessionGetter((id) => this.sessionStore.get(id) ?? undefined);
     balancerRegistry.setEventCallbacks({
       onExcluded: (bid, pid, reason, excludedUntil) => {
