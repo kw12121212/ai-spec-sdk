@@ -94,3 +94,75 @@ test("loads from disk on init", () => {
   expect(loaded?.templateName).toBe("test-task");
   expect(loaded?.status).toBe("pending");
 });
+
+test("blocks task if dependencies are not completed", () => {
+  const store = new TaskQueueStore(tempDir);
+  const parent = store.enqueue({ templateName: "parent" });
+  const child = store.enqueue({ templateName: "child", dependsOn: [parent.id] });
+
+  expect(child.status).toBe("blocked");
+  
+  // child should not be dequeued
+  let dq = store.dequeue();
+  expect(dq?.id).toBe(parent.id);
+
+  dq = store.dequeue();
+  expect(dq).toBeNull();
+});
+
+test("unblocks task when dependencies complete", () => {
+  const store = new TaskQueueStore(tempDir);
+  const parent = store.enqueue({ templateName: "parent" });
+  const child = store.enqueue({ templateName: "child", dependsOn: [parent.id] });
+
+  expect(child.status).toBe("blocked");
+  
+  store.dequeue(); // parent is running
+  store.markCompleted(parent.id);
+
+  const updatedChild = store.get(child.id);
+  expect(updatedChild?.status).toBe("pending");
+
+  const dq = store.dequeue();
+  expect(dq?.id).toBe(child.id);
+});
+
+test("rejects circular dependencies", () => {
+  const store = new TaskQueueStore(tempDir);
+  // enqueue A out of order, so we set an ID
+  const taskAId = "task-A";
+  const taskBId = "task-B";
+  
+  expect(() => {
+    store.enqueue({ id: taskAId, templateName: "A", dependsOn: [taskBId] });
+    store.enqueue({ id: taskBId, templateName: "B", dependsOn: [taskAId] });
+  }).toThrow("Circular dependency detected");
+});
+
+test("cascades failure to dependent tasks", () => {
+  const store = new TaskQueueStore(tempDir);
+  const parent = store.enqueue({ templateName: "parent", maxRetries: 0 });
+  const child = store.enqueue({ templateName: "child", dependsOn: [parent.id] });
+
+  expect(child.status).toBe("blocked");
+
+  store.dequeue(); // parent running
+  store.markFailed(parent.id, "fatal error"); // max retries 0, so fails permanently
+
+  const updatedChild = store.get(child.id);
+  expect(updatedChild?.status).toBe("failed");
+  expect(updatedChild?.error).toBe(`Parent task ${parent.id} failed`);
+});
+
+test("fails immediately if parent already failed", () => {
+  const store = new TaskQueueStore(tempDir);
+  const parent = store.enqueue({ templateName: "parent", maxRetries: 0 });
+  
+  store.dequeue(); 
+  store.markFailed(parent.id, "fatal error");
+
+  const child = store.enqueue({ templateName: "child", dependsOn: [parent.id] });
+  expect(child.status).toBe("failed");
+  expect(child.error).toBe(`Parent task ${parent.id} failed`);
+});
+
