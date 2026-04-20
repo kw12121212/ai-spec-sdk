@@ -41,3 +41,4 @@ export type {
 } from "./permission-policy.js";
 export * from './lsp-types.js';
 export * from './lsp-client.js';
+export * from './lsp-tools.js';

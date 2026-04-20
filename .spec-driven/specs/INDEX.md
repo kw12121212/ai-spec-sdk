@@ -4,6 +4,7 @@
 - [http-sse-transport.md](bridge/http-sse-transport.md) - http-sse-transport
 - [json-rpc-stdio.md](bridge/json-rpc-stdio.md) - json-rpc-stdio
 - [lsp-client.md](bridge/lsp-client.md) - lsp-client
+- [lsp-tools.md](bridge/lsp-tools.md) - lsp-tools
 - [websocket-transport.md](bridge/websocket-transport.md) - websocket-transport
 
 ## build
