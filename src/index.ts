@@ -39,3 +39,5 @@ export type {
   PolicyFactory,
   ChainRunResult,
 } from "./permission-policy.js";
+export * from './lsp-types.js';
+export * from './lsp-client.js';

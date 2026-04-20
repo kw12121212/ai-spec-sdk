@@ -23,7 +23,7 @@ Integrate Language Server Protocol (LSP) clients and Model Context Protocol (MCP
 - MCP resource updates trigger agent notifications
 
 ## Planned Changes
-- `lsp-client` - Declared: planned - LSP client implementation
+- `lsp-client` - Declared: complete - LSP client implementation
 - `lsp-tools` - Declared: planned - code analysis, completion, hover tools
 - `mcp-adapter` - Declared: planned - MCP protocol adapter
 - `mcp-tool-discovery` - Declared: planned - dynamic MCP tool registration
@@ -43,4 +43,5 @@ Integrate Language Server Protocol (LSP) clients and Model Context Protocol (MCP
 - Declared: proposed
 
 ## Notes
+
 
