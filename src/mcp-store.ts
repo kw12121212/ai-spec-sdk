@@ -2,6 +2,35 @@ import { ChildProcess, spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { defaultLogger as logger } from "./logger.js";
+import {
+  createProtocolConnection,
+  StreamMessageReader,
+  StreamMessageWriter,
+  Logger as ProtocolLogger,
+  ProtocolConnection,
+  RequestType,
+  NotificationType,
+} from "vscode-languageserver-protocol/node.js";
+
+export const InitializeRequest = new RequestType<
+  { protocolVersion: string; capabilities: any; clientInfo: { name: string; version: string } },
+  { protocolVersion: string; capabilities: any; serverInfo: { name: string; version: string } },
+  void
+>("initialize");
+
+export const InitializedNotification = new NotificationType<void>("notifications/initialized");
+
+export const ToolsListRequest = new RequestType<
+  { cursor?: string },
+  { tools: Array<{ name: string; description?: string; inputSchema: any }>; nextCursor?: string },
+  void
+>("tools/list");
+
+export const ToolsCallRequest = new RequestType<
+  { name: string; arguments?: any },
+  { content: Array<{ type: string; text?: string; data?: string; mimeType?: string }>; isError?: boolean },
+  void
+>("tools/call");
 
 export interface McpServerConfig {
   name: string;
@@ -23,6 +52,7 @@ export interface McpServerEntry {
 export class McpStore {
   private servers: Map<string, Map<string, McpServerEntry>>;
   private processes: Map<string, ChildProcess>;
+  private connections: Map<string, ProtocolConnection>;
   private onNotification: (method: string, params: Record<string, unknown>) => void;
 
   constructor(
@@ -30,6 +60,7 @@ export class McpStore {
   ) {
     this.servers = new Map();
     this.processes = new Map();
+    this.connections = new Map();
     this.onNotification = onNotification;
     this._loadAllFromDisk();
   }
@@ -190,6 +221,20 @@ export class McpStore {
     return Array.from(workspaceMap.values());
   }
 
+  async listTools(workspace: string, name: string): Promise<any> {
+    const key = this._key(workspace, name);
+    const connection = this.connections.get(key);
+    if (!connection) throw new Error(`MCP server '${name}' not connected or still initializing`);
+    return await connection.sendRequest(ToolsListRequest, {});
+  }
+
+  async callTool(workspace: string, name: string, toolName: string, args: any): Promise<any> {
+    const key = this._key(workspace, name);
+    const connection = this.connections.get(key);
+    if (!connection) throw new Error(`MCP server '${name}' not connected or still initializing`);
+    return await connection.sendRequest(ToolsCallRequest, { name: toolName, arguments: args });
+  }
+
   private _startProcess(workspace: string, name: string): void {
     const workspaceMap = this.servers.get(workspace);
     if (!workspaceMap) return;
@@ -206,11 +251,43 @@ export class McpStore {
       entry.pid = child.pid ?? null;
       logger.info("mcp server started", { workspace, name, pid: entry.pid });
 
+      if (child.stdout && child.stdin) {
+        const reader = new StreamMessageReader(child.stdout);
+        const writer = new StreamMessageWriter(child.stdin);
+        const protocolLogger: ProtocolLogger = {
+          error: (message) => logger.error("mcp protocol error", { message }),
+          warn: (message) => logger.warn("mcp protocol warn", { message }),
+          info: (message) => logger.info("mcp protocol info", { message }),
+          log: (message) => logger.debug("mcp protocol log", { message }),
+        };
+
+        const connection = createProtocolConnection(reader, writer, protocolLogger);
+        const key = this._key(workspace, name);
+        this.connections.set(key, connection);
+        connection.listen();
+
+        connection.sendRequest(InitializeRequest, {
+          protocolVersion: "2024-11-05",
+          capabilities: {},
+          clientInfo: { name: "ai-spec-sdk", version: "0.2.0" }
+        }).then(() => {
+          return connection.sendNotification(InitializedNotification);
+        }).catch(err => {
+          logger.error("mcp initialize failed", { workspace, name, error: err.message });
+        });
+      }
+
       child.on("error", (err) => {
         entry.status = "error";
         entry.error = err.message;
         entry.pid = null;
-        this.processes.delete(this._key(workspace, name));
+        const key = this._key(workspace, name);
+        const conn = this.connections.get(key);
+        if (conn) {
+          conn.dispose();
+          this.connections.delete(key);
+        }
+        this.processes.delete(key);
         logger.error("mcp server error", { workspace, name, error: err.message });
         this.onNotification("mcp/server_error", {
           workspace,
@@ -224,7 +301,13 @@ export class McpStore {
           entry.status = "stopped";
         }
         entry.pid = null;
-        this.processes.delete(this._key(workspace, name));
+        const key = this._key(workspace, name);
+        const conn = this.connections.get(key);
+        if (conn) {
+          conn.dispose();
+          this.connections.delete(key);
+        }
+        this.processes.delete(key);
         logger.info("mcp server exited", { workspace, name, exitCode: code ?? 0 });
         this.onNotification("mcp/server_stopped", {
           workspace,
@@ -257,6 +340,11 @@ export class McpStore {
       child.kill();
     }
     this.processes.delete(key);
+    const conn = this.connections.get(key);
+    if (conn) {
+      conn.dispose();
+      this.connections.delete(key);
+    }
   }
 
   shutdown(): void {
@@ -266,5 +354,9 @@ export class McpStore {
       }
       this.processes.delete(key);
     }
+    for (const conn of this.connections.values()) {
+      conn.dispose();
+    }
+    this.connections.clear();
   }
 }

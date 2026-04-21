@@ -5,6 +5,7 @@
 - [json-rpc-stdio.md](bridge/json-rpc-stdio.md) - json-rpc-stdio
 - [lsp-client.md](bridge/lsp-client.md) - lsp-client
 - [lsp-tools.md](bridge/lsp-tools.md) - lsp-tools
+- [mcp-adapter.md](bridge/mcp-adapter.md) - mcp-adapter
 - [websocket-transport.md](bridge/websocket-transport.md) - websocket-transport
 
 ## build

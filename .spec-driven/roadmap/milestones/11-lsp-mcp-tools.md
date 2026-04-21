@@ -25,7 +25,7 @@ Integrate Language Server Protocol (LSP) clients and Model Context Protocol (MCP
 ## Planned Changes
 - `lsp-client` - Declared: complete - LSP client implementation
 - `lsp-tools` - Declared: complete - code analysis, completion, hover tools
-- `mcp-adapter` - Declared: planned - MCP protocol adapter
+- `mcp-adapter` - Declared: complete - MCP protocol adapter
 - `mcp-tool-discovery` - Declared: planned - dynamic MCP tool registration
 - `unified-tool-interface` - Declared: planned - common interface for LSP/MCP
 - `lsp-diagnostics` - Declared: planned - diagnostic aggregation and reporting
@@ -43,6 +43,7 @@ Integrate Language Server Protocol (LSP) clients and Model Context Protocol (MCP
 - Declared: proposed
 
 ## Notes
+
 
 
 

@@ -3038,6 +3038,33 @@ export class BridgeServer {
     return { servers };
   }
 
+  private async mcpToolsList(params: Record<string, unknown>): Promise<unknown> {
+    const { workspace, name } = params;
+    if (!workspace || typeof workspace !== "string") throw new BridgeError(-32602, "'workspace' must be provided");
+    if (!name || typeof name !== "string") throw new BridgeError(-32602, "'name' must be provided");
+    const resolvedWorkspace = path.resolve(workspace);
+    try {
+      const result = await this.mcpStore.listTools(resolvedWorkspace, name);
+      return result;
+    } catch (err) {
+      throw new BridgeError(-32602, (err as Error).message);
+    }
+  }
+
+  private async mcpToolsCall(params: Record<string, unknown>): Promise<unknown> {
+    const { workspace, name, toolName, args } = params;
+    if (!workspace || typeof workspace !== "string") throw new BridgeError(-32602, "'workspace' must be provided");
+    if (!name || typeof name !== "string") throw new BridgeError(-32602, "'name' must be provided");
+    if (!toolName || typeof toolName !== "string") throw new BridgeError(-32602, "'toolName' must be provided");
+    const resolvedWorkspace = path.resolve(workspace);
+    try {
+      const result = await this.mcpStore.callTool(resolvedWorkspace, name, toolName, args ?? {});
+      return result;
+    } catch (err) {
+      throw new BridgeError(-32602, (err as Error).message);
+    }
+  }
+
   // --- Config methods ---
 
   private configGet(params: Record<string, unknown>): unknown {
