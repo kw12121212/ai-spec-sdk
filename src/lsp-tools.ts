@@ -1,5 +1,6 @@
 import { HoverRequest, DefinitionRequest, ReferencesRequest } from 'vscode-languageserver-protocol/node.js';
 import type { LspClient } from './lsp-client.js';
+import { toolRegistry } from './unified-tool-registry.js';
 
 export interface LspToolInput {
   uri: string;
@@ -8,9 +9,9 @@ export interface LspToolInput {
 }
 
 export function createLspTools(client: LspClient) {
-  return [
+  const tools = [
     {
-      name: 'lsp_hover',
+      name: 'hover',
       description: 'Get hover information for a specific position in a file. Use this to understand symbol types and documentation.',
       inputSchema: {
         type: 'object',
@@ -35,7 +36,7 @@ export function createLspTools(client: LspClient) {
       }
     },
     {
-      name: 'lsp_definition',
+      name: 'definition',
       description: 'Locate the definition of a symbol at a specific position in a file.',
       inputSchema: {
         type: 'object',
@@ -60,7 +61,7 @@ export function createLspTools(client: LspClient) {
       }
     },
     {
-      name: 'lsp_references',
+      name: 'references',
       description: 'Find all references to a symbol at a specific position in a file.',
       inputSchema: {
         type: 'object',
@@ -86,4 +87,6 @@ export function createLspTools(client: LspClient) {
       }
     }
   ];
+
+  return tools.map(t => toolRegistry.register('lsp', t));
 }

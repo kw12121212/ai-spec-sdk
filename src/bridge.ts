@@ -8,6 +8,7 @@ import { getCapabilities, BUILTIN_SPEC_SKILLS, SUPPORTED_MODELS, BUILTIN_TOOLS, 
 import { runWorkflow } from "./workflow.js";
 import { SessionStore } from "./session-store.js";
 import { WorkspaceStore, type CustomTool } from "./workspace-store.js";
+import { toolRegistry } from "./unified-tool-registry.js";
 import { McpStore } from "./mcp-store.js";
 import type { McpServerConfig } from "./mcp-store.js";
 import { ConfigStore } from "./config-store.js";
@@ -3572,14 +3573,15 @@ export class BridgeServer {
 
     const resolvedWorkspace = path.resolve(workspace);
     const customTools = this.workspaceStore.listTools(resolvedWorkspace);
-    const mcpServers = this.mcpStore.list(resolvedWorkspace);
-    const mcpTools = mcpServers.flatMap(s => s.tools ? s.tools.map(t => ({ name: t.name, description: t.description ?? "" })) : []);
+    
+    // Get all registered tools from the unified registry
+    const registeredTools = toolRegistry.list();
 
-    // Merge built-in tools with custom tools
+    // Merge built-in tools with custom tools and unified tools
     const allTools = [
       ...BUILTIN_TOOLS,
       ...customTools.map((t) => ({ name: t.name, description: t.description })),
-      ...mcpTools,
+      ...registeredTools.map((t) => ({ name: t.name, description: t.description ?? "" })),
     ];
 
     return { tools: allTools };

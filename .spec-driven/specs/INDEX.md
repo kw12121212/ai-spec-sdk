@@ -6,6 +6,7 @@
 - [lsp-client.md](bridge/lsp-client.md) - lsp-client
 - [lsp-tools.md](bridge/lsp-tools.md) - lsp-tools
 - [mcp-adapter.md](bridge/mcp-adapter.md) - mcp-adapter
+- [unified-tool-interface.md](bridge/unified-tool-interface.md) - unified-tool-interface
 - [websocket-transport.md](bridge/websocket-transport.md) - websocket-transport
 
 ## build

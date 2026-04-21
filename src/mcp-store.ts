@@ -2,6 +2,7 @@ import { ChildProcess, spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { defaultLogger as logger } from "./logger.js";
+import { toolRegistry } from "./unified-tool-registry.js";
 import {
   createProtocolConnection,
   StreamMessageReader,
@@ -299,6 +300,7 @@ export class McpStore {
         entry.status = "error";
         entry.error = err.message;
         entry.pid = null;
+        toolRegistry.removeProvider(`mcp_${name}`);
         const key = this._key(workspace, name);
         const conn = this.connections.get(key);
         if (conn) {
