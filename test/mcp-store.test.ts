@@ -162,6 +162,54 @@ describe("McpStore", () => {
     expect(servers2[0].command).toBe("echo");
   });
 
+  test("mcp tool discovery maps tools correctly", async () => {
+    const mockMcpScript = `
+      let buffer = Buffer.alloc(0);
+      process.stdin.on('data', (chunk) => {
+        buffer = Buffer.concat([buffer, chunk]);
+        while(true) {
+          const headerEnd = buffer.indexOf('\\r\\n\\r\\n');
+          if (headerEnd === -1) break;
+          const headers = buffer.slice(0, headerEnd).toString();
+          const match = headers.match(/Content-Length: (\\d+)/i);
+          if (!match) break;
+          const contentLength = parseInt(match[1], 10);
+          if (buffer.length < headerEnd + 4 + contentLength) break;
+          const payload = buffer.slice(headerEnd + 4, headerEnd + 4 + contentLength).toString();
+          buffer = buffer.slice(headerEnd + 4 + contentLength);
+          const msg = JSON.parse(payload);
+          if (msg.method === 'initialize') {
+            const resp = { jsonrpc: '2.0', id: msg.id, result: { protocolVersion: '2024-11-05', capabilities: {}, serverInfo: { name: 'test', version: '1.0' } } };
+            const out = JSON.stringify(resp);
+            process.stdout.write(\`Content-Length: \${out.length}\\r\\n\\r\\n\${out}\`);
+          } else if (msg.method === 'tools/list') {
+            const resp = { jsonrpc: '2.0', id: msg.id, result: { tools: [{ name: 'my_tool', description: 'desc', inputSchema: {} }] } };
+            const out = JSON.stringify(resp);
+            process.stdout.write(\`Content-Length: \${out.length}\\r\\n\\r\\n\${out}\`);
+          }
+        }
+      });
+      setInterval(() => {}, 1000);
+    `;
+    const scriptPath = path.join(tmpDir, 'mock-mcp.js');
+    fs.writeFileSync(scriptPath, mockMcpScript);
+
+    store.add(workspace, {
+      name: "mock-mcp",
+      command: "node",
+      args: [scriptPath],
+      env: {},
+    });
+
+    // Wait for the LSP initialization and tools list
+    await new Promise(r => setTimeout(r, 1000));
+
+    const servers = store.list(workspace);
+    expect(servers).toHaveLength(1);
+    expect(servers[0].tools).toHaveLength(1);
+    expect(servers[0].tools![0].name).toBe("mcp_mock-mcp_my_tool");
+  });
+
   test("shutdown kills all processes", async () => {
     store.add(workspace, {
       name: "s1",

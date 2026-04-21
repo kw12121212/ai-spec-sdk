@@ -47,6 +47,12 @@ export interface McpServerEntry {
   status: "running" | "stopped" | "error";
   pid: number | null;
   error: string | null;
+  tools?: Array<{
+    name: string;
+    description?: string;
+    inputSchema: any;
+    call: (input: any) => Promise<any>;
+  }>;
 }
 
 export class McpStore {
@@ -153,6 +159,7 @@ export class McpStore {
       status: "running",
       pid: null,
       error: null,
+      tools: [],
     };
 
     workspaceMap.set(config.name, entry);
@@ -272,6 +279,17 @@ export class McpStore {
           clientInfo: { name: "ai-spec-sdk", version: "0.2.0" }
         }).then(() => {
           return connection.sendNotification(InitializedNotification);
+        }).then(() => {
+          return connection.sendRequest(ToolsListRequest, {});
+        }).then((res) => {
+          entry.tools = res.tools.map((t) => ({
+            name: `mcp_${name}_${t.name}`,
+            description: t.description,
+            inputSchema: t.inputSchema,
+            call: async (args: any) => {
+              return await this.callTool(workspace, name, t.name, args);
+            }
+          }));
         }).catch(err => {
           logger.error("mcp initialize failed", { workspace, name, error: err.message });
         });

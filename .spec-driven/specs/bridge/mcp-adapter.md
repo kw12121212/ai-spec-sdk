@@ -26,3 +26,11 @@ The system MUST route tool execution requests to the corresponding MCP server.
 - WHEN the bridge receives a request to execute `external_tool`
 - THEN the system MUST forward the request to the MCP server using the MCP protocol `tools/call` method
 - AND return the result to the caller
+### Requirement: mcp-tool-discovery
+The system MUST discover available tools from an MCP server upon connection.
+
+#### Scenario: tool-list
+- GIVEN a connected and initialized MCP server
+- WHEN the server is marked as ready
+- THEN the system MUST send a \`tools/list\` request to the MCP server
+- AND expose the returned tools for use by the agent SDK

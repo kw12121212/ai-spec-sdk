@@ -1320,6 +1320,20 @@ export class BridgeServer {
       };
     }
 
+    // Expose MCP tools to the agent SDK so they can be invoked natively
+    const mcpServers = this.mcpStore.list(context.cwd);
+    const mcpSdkTools = mcpServers.flatMap(s => s.tools || []);
+    
+    if (mcpSdkTools.length > 0) {
+      resolvedOptions = {
+        ...resolvedOptions,
+        tools: [
+          ...(Array.isArray(resolvedOptions.tools) ? resolvedOptions.tools : []),
+          ...mcpSdkTools
+        ]
+      };
+    }
+
     // Track per-turn chunk index for streaming
     let streamChunkIndex = 0;
 
@@ -3558,11 +3572,14 @@ export class BridgeServer {
 
     const resolvedWorkspace = path.resolve(workspace);
     const customTools = this.workspaceStore.listTools(resolvedWorkspace);
+    const mcpServers = this.mcpStore.list(resolvedWorkspace);
+    const mcpTools = mcpServers.flatMap(s => s.tools ? s.tools.map(t => ({ name: t.name, description: t.description ?? "" })) : []);
 
     // Merge built-in tools with custom tools
     const allTools = [
       ...BUILTIN_TOOLS,
       ...customTools.map((t) => ({ name: t.name, description: t.description })),
+      ...mcpTools,
     ];
 
     return { tools: allTools };
