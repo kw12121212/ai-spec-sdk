@@ -410,7 +410,7 @@ export class BridgeServer {
   private taskQueueWorker: TaskQueueWorker;
   private streamControlStates: Map<string, {
     state: "active" | "paused" | "throttled";
-    buffer: { content: string; index: number }[];
+    buffer: { content: string; index: number; kind: "stream_chunk" | "reasoning_chunk" }[];
     tokensPerSecond?: number;
     resumeResolver?: () => void;
   }>;
@@ -1404,31 +1404,37 @@ export class BridgeServer {
         // Handle streaming partial messages (SDKPartialAssistantMessage with content_block_delta)
         if (isStreaming && isStreamEvent(message)) {
           const textDelta = extractTextDelta(message);
-          if (textDelta !== null) {
+          const reasoningDelta = extractReasoningDelta(message);
+          const delta = textDelta ?? reasoningDelta;
+          const chunkKind: "stream_chunk" | "reasoning_chunk" = textDelta !== null ? "stream_chunk" : "reasoning_chunk";
+
+          if (delta !== null) {
             const idx = streamChunkIndex++;
-            const emitChunk = (chunk: string, i: number) => {
+            const emitTypedChunk = (chunk: string, i: number, kind: "stream_chunk" | "reasoning_chunk") => {
+              const eKind = kind === "stream_chunk" ? "agent_message" : "agent_reasoning";
               this.sessionStore.appendEvent(session.id, {
-                type: "stream_chunk",
+                type: kind,
                 message: { content: chunk, index: i },
               });
               this.emit(
                 "bridge/session_event",
                 {
                   sessionId: session.id,
-                  type: "agent_message",
-                  messageType: "stream_chunk",
+                  type: eKind,
+                  messageType: kind,
                   content: chunk,
                   index: i,
                 },
                 requestId,
               );
             };
+            const emitChunk = (chunk: string, i: number) => emitTypedChunk(chunk, i, chunkKind);
 
             const controlState = this.streamControlStates.get(session.id);
             if (controlState && controlState.state === "paused") {
-              controlState.buffer.push({ content: textDelta, index: idx });
+              controlState.buffer.push({ content: delta, index: idx, kind: chunkKind });
             } else if (controlState && controlState.state === "throttled" && controlState.tokensPerSecond) {
-              controlState.buffer.push({ content: textDelta, index: idx });
+              controlState.buffer.push({ content: delta, index: idx, kind: chunkKind });
               if (!controlState.resumeResolver) {
                 const drain = () => {
                   const state = this.streamControlStates.get(session.id);
@@ -1438,14 +1444,14 @@ export class BridgeServer {
                     return;
                   }
                   if (state.state === "active") {
-                    for (const item of state.buffer) emitChunk(item.content, item.index);
+                    for (const item of state.buffer) emitTypedChunk(item.content, item.index, item.kind);
                     state.buffer = [];
                     state.resumeResolver = undefined;
                     return;
                   }
                   if (state.buffer.length > 0) {
                     const item = state.buffer.shift()!;
-                    emitChunk(item.content, item.index);
+                    emitTypedChunk(item.content, item.index, item.kind);
                   }
                   if (state.buffer.length > 0) {
                     const msPerToken = 1000 / state.tokensPerSecond!;
@@ -1460,7 +1466,7 @@ export class BridgeServer {
                 controlState.resumeResolver = drain;
               }
             } else {
-              emitChunk(textDelta, idx);
+              emitChunk(delta, idx);
             }
           }
           return; // Don't emit agent_message for partial events
@@ -1903,12 +1909,13 @@ export class BridgeServer {
       controlState.state = "active";
       if (controlState.buffer.length > 0) {
         for (const chunk of controlState.buffer) {
+          const eKind = chunk.kind === "stream_chunk" ? "agent_message" : "agent_reasoning";
           this.emit(
             "bridge/session_event",
             {
               sessionId: session.id,
-              type: "agent_message",
-              messageType: "stream_chunk",
+              type: eKind,
+              messageType: chunk.kind,
               content: chunk.content,
               index: chunk.index,
             },

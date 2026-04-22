@@ -3,8 +3,10 @@ mapping:
   implementation:
     - src/bridge.ts
     - src/session-store.ts
+    - src/llm-provider/adapters/anthropic.ts
   tests:
     - test/session.test.ts
+    - test/anthropic-adapter.test.ts
 ---
 
 ## ADDED Requirements
