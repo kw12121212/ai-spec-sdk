@@ -9,14 +9,16 @@ import {
   InitializeParams,
   ExitNotification,
   ShutdownRequest,
+  PublishDiagnosticsNotification,
 } from 'vscode-languageserver-protocol/node.js';
-import type { LspClientOptions, LspClientState } from './lsp-types.js';
+import type { LspClientOptions, LspClientState, Diagnostic } from './lsp-types.js';
 import { EventEmitter } from 'node:events';
 
 export class LspClient extends EventEmitter {
   private process?: ChildProcess;
   private connection?: ProtocolConnection;
   private state: LspClientState = { status: 'disconnected' };
+  private diagnostics = new Map<string, Diagnostic[]>();
 
   constructor(private options: LspClientOptions) {
     super();
@@ -24,6 +26,10 @@ export class LspClient extends EventEmitter {
 
   public getState(): LspClientState {
     return this.state;
+  }
+
+  public getDiagnostics(uri: string): Diagnostic[] {
+    return this.diagnostics.get(uri) || [];
   }
 
   public async start(initializeParams: InitializeParams): Promise<void> {
@@ -78,6 +84,10 @@ export class LspClient extends EventEmitter {
 
         this.connection = createProtocolConnection(reader, writer, logger);
         
+        this.connection.onNotification(PublishDiagnosticsNotification.type, (params) => {
+          this.diagnostics.set(params.uri, params.diagnostics);
+        });
+
         this.connection.listen();
 
         // Initialize handshake

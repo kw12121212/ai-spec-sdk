@@ -11,8 +11,28 @@ describe('createLspTools', () => {
   };
 
   const mockClient = {
-    getConnection: () => mockConnection
+    getConnection: () => mockConnection,
+    getDiagnostics: mock()
   } as unknown as LspClient;
+
+  test('lsp_diagnostics returns diagnostics on success', async () => {
+    const mockGetDiagnostics = mockClient.getDiagnostics as import('bun:test').Mock<any>;
+    mockGetDiagnostics.mockReturnValueOnce([{
+      message: 'Syntax error',
+      range: { start: { line: 1, character: 1 }, end: { line: 1, character: 10 } },
+      severity: 1
+    }]);
+
+    const tools = createLspTools(mockClient);
+    const diagTool = tools.find(t => t.name === 'lsp_diagnostics');
+    expect(diagTool).toBeDefined();
+
+    const result = await diagTool!.call({ uri: 'file:///test.ts' } as any);
+    
+    expect(mockGetDiagnostics).toHaveBeenCalledWith('file:///test.ts');
+    expect(result).toContain('Syntax error');
+    expect(result).toContain('"severity": 1');
+  });
 
   test('lsp_hover returns hover info on success', async () => {
     mockSendRequest.mockResolvedValueOnce({

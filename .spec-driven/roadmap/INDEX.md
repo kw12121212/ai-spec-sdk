@@ -11,7 +11,7 @@
 - [08-llm-provider.md](milestones/08-llm-provider.md) - LLM Provider Abstraction Layer - complete
 - [09-permissions-hooks.md](milestones/09-permissions-hooks.md) - Permissions Model and Execution Hooks - complete
 - [10-task-team-registry.md](milestones/10-task-team-registry.md) - Task and Team Registry - complete
-- [11-lsp-mcp-tools.md](milestones/11-lsp-mcp-tools.md) - LSP and MCP Tool Integration - proposed
+- [11-lsp-mcp-tools.md](milestones/11-lsp-mcp-tools.md) - LSP and MCP Tool Integration - complete
 - [12-streaming-token.md](milestones/12-streaming-token.md) - Streaming and Token Management Enhancement - proposed
 - [13-question-resolution.md](milestones/13-question-resolution.md) - Question Resolution Protocol - proposed
 - [14-persistence-cache.md](milestones/14-persistence-cache.md) - Persistence and Cache Layer - proposed

@@ -28,7 +28,7 @@ Integrate Language Server Protocol (LSP) clients and Model Context Protocol (MCP
 - `mcp-adapter` - Declared: complete - MCP protocol adapter
 - `mcp-tool-discovery` - Declared: complete - dynamic MCP tool registration
 - `unified-tool-interface` - Declared: complete - common interface for LSP/MCP
-- `lsp-diagnostics` - Declared: planned - diagnostic aggregation and reporting
+- `lsp-diagnostics` - Declared: complete - diagnostic aggregation and reporting
 
 ## Dependencies
 - 03-platform-reach — builds on custom tool registration infrastructure
@@ -40,9 +40,11 @@ Integrate Language Server Protocol (LSP) clients and Model Context Protocol (MCP
 - External server lifecycle management adds complexity
 
 ## Status
-- Declared: proposed
+- Declared: complete
 
 ## Notes
+
+
 
 
 

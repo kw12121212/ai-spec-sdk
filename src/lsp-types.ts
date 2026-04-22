@@ -1,4 +1,4 @@
-import type { InitializeParams, InitializeResult, DocumentSymbol } from 'vscode-languageserver-protocol';
+import type { InitializeParams, InitializeResult, DocumentSymbol, Diagnostic, DiagnosticSeverity, PublishDiagnosticsParams } from 'vscode-languageserver-protocol';
 
 export interface LspClientOptions {
   command: string;
@@ -12,4 +12,4 @@ export interface LspClientState {
   capabilities?: InitializeResult['capabilities'];
 }
 
-export type { InitializeParams, InitializeResult, DocumentSymbol };
+export type { InitializeParams, InitializeResult, DocumentSymbol, Diagnostic, DiagnosticSeverity, PublishDiagnosticsParams };

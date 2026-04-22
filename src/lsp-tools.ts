@@ -11,6 +11,25 @@ export interface LspToolInput {
 export function createLspTools(client: LspClient) {
   const tools = [
     {
+      name: 'diagnostics',
+      description: 'Get the current diagnostics (errors, warnings, hints) for a specific file.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          uri: { type: 'string', description: 'The document URI (e.g., file:///path/to/file.ts).' }
+        },
+        required: ['uri']
+      },
+      call: async (input: { uri: string }) => {
+        try {
+          const diagnostics = client.getDiagnostics(input.uri);
+          return JSON.stringify(diagnostics, null, 2);
+        } catch (e: any) {
+          return `Error retrieving diagnostics: ${e.message}`;
+        }
+      }
+    },
+    {
       name: 'hover',
       description: 'Get hover information for a specific position in a file. Use this to understand symbol types and documentation.',
       inputSchema: {
