@@ -26,7 +26,7 @@ Enhance streaming capabilities with granular token flow control, reasoning proce
 ## Planned Changes
 - `stream-control` - Declared: complete - pause, resume, throttle streaming
 - `reasoning-stream` - Declared: complete - thinking process output
-- `token-budget` - Declared: planned - budget allocation and alerts
+- `token-budget` - Declared: complete - budget allocation and alerts
 - `token-attribution` - Declared: planned - per-message usage tracking
 - `backpressure-handling` - Declared: planned - flow control for slow consumers
 - `token-prediction` - Declared: planned - pre-execution usage estimates
@@ -44,6 +44,7 @@ Enhance streaming capabilities with granular token flow control, reasoning proce
 - Declared: proposed
 
 ## Notes
+
 
 
 

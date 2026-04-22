@@ -33,6 +33,10 @@ import { getQuotaRegistry } from "./quota/registry.js";
 import { validateQuotaRule } from "./quota/types.js";
 import { buildQuotaStatuses, setSessionAccessors } from "./quota/enforcer.js";
 import type { QuotaStatus, QuotaWarning, QuotaBlockedNotification } from "./quota/types.js";
+import { getBudgetRegistry } from "./budget/registry.js";
+import { validateBudgetPool } from "./budget/types.js";
+import { buildBudgetStatuses } from "./budget/enforcer.js";
+import type { BudgetAlertPayload } from "./budget/types.js";
 import {
   isScopeDenied,
   validateScopeStrings,
@@ -74,6 +78,8 @@ const APPROVAL_NOT_FOUND = -32020;
 const DEFAULT_PERMISSION_MODE = "bypassPermissions";
 const QUOTA_EXCEEDED = -32060;
 const QUOTA_NOT_FOUND = -32061;
+const BUDGET_NOT_FOUND = -32072;
+const BUDGET_EXHAUSTED = -32073;
 const BALANCER_ALL_EXCLUDED = -32005;
 
 interface AgentControlParams {
@@ -559,6 +565,11 @@ export class BridgeServer {
           ...(typeof err.quotaData === "object" && err.quotaData !== null ? err.quotaData as Record<string, unknown> : {}),
           message: err.message,
         });
+      } else if (err.code === BUDGET_EXHAUSTED) {
+        bridgeError = new BridgeError(BUDGET_EXHAUSTED, "Budget exhausted", {
+          ...(typeof (err as Error & { budgetData?: unknown }).budgetData === "object" && (err as Error & { budgetData?: unknown }).budgetData !== null ? (err as Error & { budgetData?: unknown }).budgetData as Record<string, unknown> : {}),
+          message: err.message,
+        });
       } else if (error instanceof BridgeError) {
         bridgeError = error;
       } else {
@@ -792,6 +803,18 @@ export class BridgeServer {
         return this.quotaGetStatus(params);
       case "quota.getViolations":
         return this.quotaGetViolations(params);
+      case "budget.create":
+        return this.budgetCreate(params);
+      case "budget.get":
+        return this.budgetGet(params);
+      case "budget.list":
+        return this.budgetList(params);
+      case "budget.adjust":
+        return this.budgetAdjust(params);
+      case "budget.remove":
+        return this.budgetRemove(params);
+      case "budget.getStatus":
+        return this.budgetGetStatus(params);
       case "balancer.create":
         return this.balancerCreate(params);
       case "balancer.remove":
@@ -1693,6 +1716,12 @@ export class BridgeServer {
         onQuotaBlocked: (notification: QuotaBlockedNotification) => {
           this.emit("bridge/quota_blocked", notification as unknown as Record<string, unknown>, requestId);
         },
+        onBudgetAlert: (alert: BudgetAlertPayload) => {
+          this.emit("bridge/budget_alert", alert as unknown as Record<string, unknown>, requestId);
+        },
+        onBudgetThrottle: (sid: string) => {
+          this.sessionStore.setStreamState(sid, "throttled", 10);
+        },
       };
 
       // Build ordered candidate list for reactive fallback
@@ -2486,6 +2515,78 @@ export class BridgeServer {
     const { sessionId } = params;
     const registry = getQuotaRegistry();
     return registry.getViolations(typeof sessionId === "string" ? sessionId : undefined);
+  }
+
+  private budgetCreate(params: Record<string, unknown>): unknown {
+    const pool = validateBudgetPool(params);
+    if (!pool) {
+      throw new BridgeError(-32602, "Invalid budget pool parameters");
+    }
+    const registry = getBudgetRegistry();
+    if (!registry.create(pool)) {
+      throw new BridgeError(-32602, "Budget pool already exists", { budgetId: pool.budgetId });
+    }
+    return { success: true, budgetId: pool.budgetId, remaining: pool.allocated };
+  }
+
+  private budgetGet(params: Record<string, unknown>): unknown {
+    const { budgetId } = params;
+    if (typeof budgetId !== "string" || !budgetId) {
+      throw new BridgeError(-32602, "'budgetId' must be a non-empty string");
+    }
+    const registry = getBudgetRegistry();
+    const pool = registry.get(budgetId);
+    if (!pool) {
+      throw new BridgeError(BUDGET_NOT_FOUND, "Budget pool not found", { budgetId });
+    }
+    return pool;
+  }
+
+  private budgetList(params: Record<string, unknown>): unknown {
+    const { scope } = params;
+    const registry = getBudgetRegistry();
+    if (scope !== undefined && typeof scope === "string") {
+      return registry.list(scope);
+    }
+    return registry.list();
+  }
+
+  private budgetAdjust(params: Record<string, unknown>): unknown {
+    const { budgetId, allocated } = params;
+    if (typeof budgetId !== "string" || !budgetId) {
+      throw new BridgeError(-32602, "'budgetId' must be a non-empty string");
+    }
+    if (typeof allocated !== "number" || !Number.isInteger(allocated) || allocated <= 0) {
+      throw new BridgeError(-32602, "'allocated' must be a positive integer");
+    }
+    const registry = getBudgetRegistry();
+    const pool = registry.adjust(budgetId, allocated);
+    if (!pool) {
+      throw new BridgeError(BUDGET_NOT_FOUND, "Budget pool not found", { budgetId });
+    }
+    return { success: true, budgetId, allocated: pool.allocated };
+  }
+
+  private budgetRemove(params: Record<string, unknown>): unknown {
+    const { budgetId } = params;
+    if (typeof budgetId !== "string" || !budgetId) {
+      throw new BridgeError(-32602, "'budgetId' must be a non-empty string");
+    }
+    const registry = getBudgetRegistry();
+    if (!registry.remove(budgetId)) {
+      throw new BridgeError(BUDGET_NOT_FOUND, "Budget pool not found", { budgetId });
+    }
+    return { success: true, budgetId };
+  }
+
+  private budgetGetStatus(params: Record<string, unknown>): unknown {
+    const { scope, sessionId, providerId } = params;
+    const registry = getBudgetRegistry();
+    const pools = registry.list(typeof scope === "string" ? scope : undefined);
+    if (pools.length === 0) return [];
+    const sid = typeof sessionId === "string" ? sessionId : "";
+    const pid = typeof providerId === "string" ? providerId : undefined;
+    return buildBudgetStatuses(pools, sid, pid);
   }
 
   private balancerCreate(params: Record<string, unknown>): unknown {

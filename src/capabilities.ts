@@ -202,6 +202,12 @@ export function getCapabilities(transport = "stdio"): Capabilities {
       "quota.clear",
       "quota.getStatus",
       "quota.getViolations",
+      "budget.create",
+      "budget.get",
+      "budget.list",
+      "budget.adjust",
+      "budget.remove",
+      "budget.getStatus",
       "permissions.scopes",
     ],
     agentControlParams: [

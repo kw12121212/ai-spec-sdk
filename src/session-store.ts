@@ -5,6 +5,7 @@ import { defaultLogger as logger } from "./logger.js";
 import { AgentStateMachine, type AgentExecutionState } from "./agent-state-machine.js";
 import type { AuditLog } from "./audit-log.js";
 import { getQuotaRegistry } from "./quota/registry.js";
+import { getBudgetRegistry } from "./budget/registry.js";
 import type { PolicyDescriptor } from "./permission-policy.js";
 
 export interface SessionHistoryEntry {
@@ -362,6 +363,7 @@ export class SessionStore {
     this.sessions.delete(sessionId);
 
     getQuotaRegistry().removeBySession(sessionId);
+    getBudgetRegistry().removeBySession(sessionId);
 
     if (this.sessionsDir) {
       const filePath = path.join(this.sessionsDir, `${sessionId}.json`);

@@ -8,6 +8,8 @@ import type { TokenUsage } from "./token-tracking/types.js";
 import { computeTotalTokens } from "./token-tracking/types.js";
 import { preQueryCheck, postQueryCheck } from "./quota/enforcer.js";
 import type { QuotaEnforceResult, QuotaBlockedNotification } from "./quota/types.js";
+import { preQueryBudgetCheck, postQueryBudgetCheck } from "./budget/enforcer.js";
+import type { BudgetAlertPayload } from "./budget/types.js";
 
 type QueryFunction = typeof query;
 
@@ -54,6 +56,8 @@ export interface RunClaudeQueryOptions {
   provider?: LLMProvider;
   onQuotaWarning?: (warning: import("./quota/types.js").QuotaWarning) => void;
   onQuotaBlocked?: (notification: QuotaBlockedNotification) => void;
+  onBudgetAlert?: (alert: BudgetAlertPayload) => void;
+  onBudgetThrottle?: (sessionId: string) => void;
 }
 
 export interface QueryResult {
@@ -73,6 +77,8 @@ export async function runClaudeQuery({
   provider,
   onQuotaWarning,
   onQuotaBlocked,
+  onBudgetAlert,
+  onBudgetThrottle,
 }: RunClaudeQueryOptions): Promise<QueryResult> {
   const queryFn = getQueryFunction();
   logger.debug("query started", { promptLength: prompt.length });
@@ -94,6 +100,26 @@ export async function runClaudeQuery({
           scope: (quotaResult.violation as unknown as Record<string, unknown>).scope,
           limit: quotaResult.violation.limit,
           currentUsage: quotaResult.violation.usageAtViolation,
+        }
+      : undefined;
+    throw err;
+  }
+
+  const budgetResult = preQueryBudgetCheck(sessionId, effectiveProviderId, {
+    onAlert: onBudgetAlert,
+    onThrottle: onBudgetThrottle,
+  });
+
+  if (!budgetResult.allowed) {
+    const err: Error & { code?: number; budgetData?: unknown } = new Error("Budget exhausted");
+    err.code = -32073;
+    const blockingAlert = budgetResult.alerts.find((a) => a.depletionAction === "block");
+    err.budgetData = blockingAlert
+      ? {
+          budgetId: blockingAlert.budgetId,
+          scope: blockingAlert.scope,
+          allocated: blockingAlert.allocated,
+          consumed: blockingAlert.consumed,
         }
       : undefined;
     throw err;
@@ -157,6 +183,7 @@ export async function runClaudeQuery({
       );
 
       postQueryCheck(sessionId, effectiveProviderId, { onWarning: onQuotaWarning });
+      postQueryBudgetCheck(sessionId, effectiveProviderId, { onAlert: onBudgetAlert });
 
       return { status: result.status, result: terminalResult, usage: terminalUsage };
     }
@@ -202,6 +229,7 @@ export async function runClaudeQuery({
     );
 
     postQueryCheck(sessionId, effectiveProviderId, { onWarning: onQuotaWarning });
+    postQueryBudgetCheck(sessionId, effectiveProviderId, { onAlert: onBudgetAlert });
 
     return {
       status: "completed",
