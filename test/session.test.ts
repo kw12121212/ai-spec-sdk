@@ -2306,3 +2306,193 @@ test("session.start without template works as before", async () => {
     fs.rmSync(ws, { recursive: true, force: true });
   }
 });
+
+// ── Stream Control tests ──────────────────────────────────────────────────────
+
+// Requirement: stream-pause-resume
+test("stream.pause buffers stream chunks without emitting", async () => {
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-stream-pause-"));
+  const notifications: unknown[] = [];
+  
+  let resolvePause!: () => void;
+  const pausePromise = new Promise<void>(res => { resolvePause = res; });
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* queryStub({ options }: {
+    prompt: string;
+    options: Record<string, unknown>;
+  }) {
+    yield { type: "system", subtype: "init", session_id: "sdk-stream-pause" };
+    if (options["includePartialMessages"]) {
+      yield {
+        type: "stream_event",
+        event: { type: "content_block_delta", delta: { type: "text_delta", text: "1" } },
+        session_id: "sdk-stream-pause",
+      };
+      await pausePromise;
+      yield {
+        type: "stream_event",
+        event: { type: "content_block_delta", delta: { type: "text_delta", text: "2" } },
+        session_id: "sdk-stream-pause",
+      };
+      yield {
+        type: "stream_event",
+        event: { type: "content_block_delta", delta: { type: "text_delta", text: "3" } },
+        session_id: "sdk-stream-pause",
+      };
+    }
+    yield {
+      type: "assistant",
+      message: { role: "assistant", content: [{ type: "text", text: "123" }] },
+    };
+    yield { result: "done" };
+  };
+
+  try {
+    const server = new BridgeServer({
+      notify: (message) => notifications.push(message),
+    });
+
+    const startPromise = server.handleMessage({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "session.start",
+      params: { workspace: ws, prompt: "test", stream: true },
+    });
+
+    // wait until the first chunk occurs to get the UUID and ensure it's not paused yet
+    const getSessionIdAfterFirstChunk = async () => {
+      while (true) {
+        const startResponse = notifications.find(n => (n as any)?.method === "bridge/session_event" && (n as any)?.params?.type === "session_started");
+        const firstChunk = notifications.find(n => (n as any)?.method === "bridge/session_event" && (n as any)?.params?.messageType === "stream_chunk");
+        if (startResponse && firstChunk) return (startResponse as any).params.sessionId;
+        await new Promise<void>(resolve => setTimeout(resolve, 5));
+      }
+    };
+    const sessionId = await getSessionIdAfterFirstChunk();
+
+    // Pause the stream
+    await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 2,
+      method: "stream.pause",
+      params: { sessionId },
+    });
+
+    // Let the mock yield chunk 2 and 3
+    resolvePause();
+    
+    // Wait for the mock to yield them
+    await new Promise<void>(resolve => setTimeout(resolve, 20));
+
+    // While paused, only 1 chunk should be emitted (the first one)
+    const chunksWhilePaused = notifications.filter(n => (n as any)?.method === "bridge/session_event" && (n as any)?.params?.messageType === "stream_chunk");
+    expect(chunksWhilePaused.length).toBe(1);
+
+    // Resume the stream
+    await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 3,
+      method: "stream.resume",
+      params: { sessionId },
+    });
+
+    await startPromise;
+
+    const allChunks = notifications.filter(n => (n as any)?.method === "bridge/session_event" && (n as any)?.params?.messageType === "stream_chunk");
+    expect(allChunks.length).toBe(3); // All chunks now emitted
+    
+  } finally {
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
+    fs.rmSync(ws, { recursive: true, force: true });
+  }
+});
+
+// Requirement: stream-throttle
+test("stream.throttle limits token emission rate", async () => {
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-stream-throttle-"));
+  const notifications: unknown[] = [];
+  
+  let resolveThrottle!: () => void;
+  const throttlePromise = new Promise<void>(res => { resolveThrottle = res; });
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* queryStub({ options }: {
+    prompt: string;
+    options: Record<string, unknown>;
+  }) {
+    yield { type: "system", subtype: "init", session_id: "sdk-stream-throttle" };
+    if (options["includePartialMessages"]) {
+      yield {
+        type: "stream_event",
+        event: { type: "content_block_delta", delta: { type: "text_delta", text: "A" } },
+        session_id: "sdk-stream-throttle",
+      };
+      await throttlePromise;
+      yield {
+        type: "stream_event",
+        event: { type: "content_block_delta", delta: { type: "text_delta", text: "B" } },
+        session_id: "sdk-stream-throttle",
+      };
+      yield {
+        type: "stream_event",
+        event: { type: "content_block_delta", delta: { type: "text_delta", text: "C" } },
+        session_id: "sdk-stream-throttle",
+      };
+    }
+    yield {
+      type: "assistant",
+      message: { role: "assistant", content: [{ type: "text", text: "ABC" }] },
+    };
+    yield { result: "done" };
+  };
+
+  try {
+    const server = new BridgeServer({
+      notify: (message) => notifications.push(message),
+    });
+
+    const startPromise = server.handleMessage({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "session.start",
+      params: { workspace: ws, prompt: "test", stream: true },
+    });
+
+    const getSessionIdAfterFirstChunk = async () => {
+      while (true) {
+        const startResponse = notifications.find(n => (n as any)?.method === "bridge/session_event" && (n as any)?.params?.type === "session_started");
+        const firstChunk = notifications.find(n => (n as any)?.method === "bridge/session_event" && (n as any)?.params?.messageType === "stream_chunk");
+        if (startResponse && firstChunk) return (startResponse as any).params.sessionId;
+        await new Promise<void>(resolve => setTimeout(resolve, 5));
+      }
+    };
+    const sessionId = await getSessionIdAfterFirstChunk();
+    
+    // Throttle to 10 tokens/sec
+    await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 2,
+      method: "stream.throttle",
+      params: { sessionId, tokensPerSecond: 10 },
+    });
+
+    const startTime = Date.now();
+    resolveThrottle();
+    
+    // Wait until all 3 chunks are emitted
+    while (true) {
+      const allChunks = notifications.filter(n => (n as any)?.method === "bridge/session_event" && (n as any)?.params?.messageType === "stream_chunk");
+      if (allChunks.length >= 3) break;
+      await new Promise<void>(resolve => setTimeout(resolve, 5));
+    }
+
+    const elapsed = Date.now() - startTime;
+    // 2 buffered chunks at 100ms interval each -> at least ~100ms elapsed
+    expect(elapsed > 80).toBeTruthy();
+
+    await startPromise;
+    
+  } finally {
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
+    fs.rmSync(ws, { recursive: true, force: true });
+  }
+});

@@ -136,7 +136,7 @@ export async function runClaudeQuery({
             }
           }
         }
-        if (event.type === "text_delta" || event.type === "error") {
+        if (event.type === "text_delta" || event.type === "reasoning_delta" || event.type === "error") {
           onEvent(event.data);
         }
       }, abortController?.signal);

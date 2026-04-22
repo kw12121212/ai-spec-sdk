@@ -138,6 +138,7 @@ export class AnthropicAdapter implements LLMProvider {
         }
 
         onEvent({ type: "text_delta", data: message });
+        onEvent({ type: "reasoning_delta", data: message });
 
         if (
           message !== null &&

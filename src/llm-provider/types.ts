@@ -37,7 +37,7 @@ export interface QueryOptions {
 }
 
 export interface StreamEvent {
-  type: "text_delta" | "usage_delta" | "complete" | "error";
+  type: "text_delta" | "reasoning_delta" | "usage_delta" | "complete" | "error";
   data: unknown;
 }
 

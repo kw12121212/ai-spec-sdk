@@ -280,6 +280,21 @@ function extractTextDelta(message: unknown): string | null {
   return typeof delta["text"] === "string" ? delta["text"] : null;
 }
 
+/**
+ * Extract the reasoning delta from a streaming partial message.
+ * Returns null if the event is not a reasoning/thinking delta.
+ */
+function extractReasoningDelta(message: unknown): string | null {
+  if (message === null || typeof message !== "object") return null;
+  const msg = message as Record<string, unknown>;
+  const event = msg["event"] as Record<string, unknown> | undefined;
+  if (!event || typeof event !== "object") return null;
+  const delta = event["delta"] as Record<string, unknown> | undefined;
+  if (!delta || typeof delta !== "object") return null;
+  if (delta["type"] !== "thinking_delta" && delta["type"] !== "reasoning_delta") return null;
+  return typeof delta["thinking"] === "string" ? delta["thinking"] : (typeof delta["reasoning"] === "string" ? delta["reasoning"] : null);
+}
+
 export interface ProxyParams {
   http?: string;
   https?: string;
@@ -393,6 +408,12 @@ export class BridgeServer {
   private cronScheduler: CronScheduler;
   private taskQueueStore: TaskQueueStore;
   private taskQueueWorker: TaskQueueWorker;
+  private streamControlStates: Map<string, {
+    state: "active" | "paused" | "throttled";
+    buffer: { content: string; index: number }[];
+    tokensPerSecond?: number;
+    resumeResolver?: () => void;
+  }>;
 
   constructor({ notify = () => {}, sessionsDir, workspacesDir, logger, transport = "stdio", runtimeInfoOptions, auditDir }: BridgeServerOptions = {}) {
     this.notify = notify;
@@ -433,6 +454,7 @@ export class BridgeServer {
     this.abortControllers = new Map();
     this.timeoutIds = new Map();
     this.approvalStore = new ApprovalStore();
+    this.streamControlStates = new Map();
 
     const activeSessionIds = new Set(this.sessionStore.list({ status: "all" }).map((s) => s.id));
     const removedCount = this.auditLog.cleanup(30, activeSessionIds);
@@ -601,6 +623,12 @@ export class BridgeServer {
         return this.spawnSession(params, requestId);
       case "session.resume":
         return this.resumeSession(params, requestId);
+      case "stream.pause":
+        return this.streamPause(params);
+      case "stream.resume":
+        return this.streamResume(params);
+      case "stream.throttle":
+        return this.streamThrottle(params);
       case "session.pause":
         return this.pauseSession(params);
       case "session.stop":
@@ -1377,24 +1405,63 @@ export class BridgeServer {
         if (isStreaming && isStreamEvent(message)) {
           const textDelta = extractTextDelta(message);
           if (textDelta !== null) {
-            this.sessionStore.appendEvent(session.id, {
-              type: "stream_chunk",
-              message: { content: textDelta, index: streamChunkIndex },
-            });
+            const idx = streamChunkIndex++;
+            const emitChunk = (chunk: string, i: number) => {
+              this.sessionStore.appendEvent(session.id, {
+                type: "stream_chunk",
+                message: { content: chunk, index: i },
+              });
+              this.emit(
+                "bridge/session_event",
+                {
+                  sessionId: session.id,
+                  type: "agent_message",
+                  messageType: "stream_chunk",
+                  content: chunk,
+                  index: i,
+                },
+                requestId,
+              );
+            };
 
-            this.emit(
-              "bridge/session_event",
-              {
-                sessionId: session.id,
-                type: "agent_message",
-                messageType: "stream_chunk",
-                content: textDelta,
-                index: streamChunkIndex,
-              },
-              requestId,
-            );
-
-            streamChunkIndex++;
+            const controlState = this.streamControlStates.get(session.id);
+            if (controlState && controlState.state === "paused") {
+              controlState.buffer.push({ content: textDelta, index: idx });
+            } else if (controlState && controlState.state === "throttled" && controlState.tokensPerSecond) {
+              controlState.buffer.push({ content: textDelta, index: idx });
+              if (!controlState.resumeResolver) {
+                const drain = () => {
+                  const state = this.streamControlStates.get(session.id);
+                  if (!state) return;
+                  if (state.state === "paused") {
+                    state.resumeResolver = undefined;
+                    return;
+                  }
+                  if (state.state === "active") {
+                    for (const item of state.buffer) emitChunk(item.content, item.index);
+                    state.buffer = [];
+                    state.resumeResolver = undefined;
+                    return;
+                  }
+                  if (state.buffer.length > 0) {
+                    const item = state.buffer.shift()!;
+                    emitChunk(item.content, item.index);
+                  }
+                  if (state.buffer.length > 0) {
+                    const msPerToken = 1000 / state.tokensPerSecond!;
+                    setTimeout(drain, msPerToken);
+                    state.resumeResolver = drain; // just a marker
+                  } else {
+                    state.resumeResolver = undefined;
+                  }
+                };
+                const msPerToken = 1000 / controlState.tokensPerSecond;
+                setTimeout(drain, msPerToken);
+                controlState.resumeResolver = drain;
+              }
+            } else {
+              emitChunk(textDelta, idx);
+            }
           }
           return; // Don't emit agent_message for partial events
         }
@@ -1805,6 +1872,80 @@ export class BridgeServer {
     }
   }
 
+  // Requirement: stream-pause-resume
+  private streamPause(params: Record<string, unknown>): unknown {
+    const { sessionId } = params;
+    if (!sessionId || typeof sessionId !== "string") throw new BridgeError(-32602, "'sessionId' must be provided");
+    const session = this.sessionStore.get(sessionId);
+    if (!session) throw new BridgeError(-32011, "Session not found", { sessionId });
+    
+    this.sessionStore.setStreamState(sessionId, "paused");
+    
+    if (!this.streamControlStates.has(sessionId)) {
+      this.streamControlStates.set(sessionId, { state: "paused", buffer: [] });
+    } else {
+      this.streamControlStates.get(sessionId)!.state = "paused";
+    }
+    return { sessionId, streamState: "paused" };
+  }
+
+  // Requirement: stream-pause-resume
+  private streamResume(params: Record<string, unknown>): unknown {
+    const { sessionId } = params;
+    if (!sessionId || typeof sessionId !== "string") throw new BridgeError(-32602, "'sessionId' must be provided");
+    const session = this.sessionStore.get(sessionId);
+    if (!session) throw new BridgeError(-32011, "Session not found", { sessionId });
+    
+    this.sessionStore.setStreamState(sessionId, "active");
+    
+    const controlState = this.streamControlStates.get(sessionId);
+    if (controlState) {
+      controlState.state = "active";
+      if (controlState.buffer.length > 0) {
+        for (const chunk of controlState.buffer) {
+          this.emit(
+            "bridge/session_event",
+            {
+              sessionId: session.id,
+              type: "agent_message",
+              messageType: "stream_chunk",
+              content: chunk.content,
+              index: chunk.index,
+            },
+            null,
+          );
+        }
+        controlState.buffer = [];
+      }
+      if (controlState.resumeResolver) {
+        controlState.resumeResolver();
+        controlState.resumeResolver = undefined;
+      }
+    }
+    return { sessionId, streamState: "active" };
+  }
+
+  // Requirement: stream-throttle
+  private streamThrottle(params: Record<string, unknown>): unknown {
+    const { sessionId, tokensPerSecond } = params;
+    if (!sessionId || typeof sessionId !== "string") throw new BridgeError(-32602, "'sessionId' must be provided");
+    if (typeof tokensPerSecond !== "number" || tokensPerSecond <= 0) throw new BridgeError(-32602, "'tokensPerSecond' must be a positive number");
+    
+    const session = this.sessionStore.get(sessionId);
+    if (!session) throw new BridgeError(-32011, "Session not found", { sessionId });
+    
+    this.sessionStore.setStreamState(sessionId, "throttled", tokensPerSecond);
+    
+    if (!this.streamControlStates.has(sessionId)) {
+      this.streamControlStates.set(sessionId, { state: "throttled", tokensPerSecond, buffer: [] });
+    } else {
+      const state = this.streamControlStates.get(sessionId)!;
+      state.state = "throttled";
+      state.tokensPerSecond = tokensPerSecond;
+    }
+    return { sessionId, streamState: "throttled", tokensPerSecond };
+  }
+
   private stopSession(params: Record<string, unknown>): unknown {
     const { sessionId } = params;
     if (!sessionId || typeof sessionId !== "string") {
@@ -1929,6 +2070,7 @@ export class BridgeServer {
       abortController.abort();
       this.abortControllers.delete(sessionId);
     }
+    this.streamControlStates.delete(sessionId);
 
     const timeoutId = this.timeoutIds.get(sessionId);
     if (timeoutId) {

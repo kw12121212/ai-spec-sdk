@@ -29,6 +29,8 @@ export interface Session {
   executionState: AgentExecutionState;
   stopRequested: boolean;
   stream: boolean;
+  streamState?: "active" | "paused" | "throttled";
+  streamTokensPerSecond?: number;
   history: SessionHistoryEntry[];
   result: unknown;
   pausedAt?: string;
@@ -169,6 +171,20 @@ export class SessionStore {
         );
       });
     }
+    return session;
+  }
+
+  // Requirement: stream-pause-resume
+  // Requirement: stream-throttle
+  setStreamState(sessionId: string, state: "active" | "paused" | "throttled", rate?: number): Session | null {
+    const session = this.get(sessionId);
+    if (!session) return null;
+    session.streamState = state;
+    if (rate !== undefined) {
+      session.streamTokensPerSecond = rate;
+    }
+    session.updatedAt = nowIso();
+    this._persist(session);
     return session;
   }
 

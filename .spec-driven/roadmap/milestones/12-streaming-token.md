@@ -24,7 +24,7 @@ Enhance streaming capabilities with granular token flow control, reasoning proce
 - Backpressure prevents memory issues with slow consumers
 
 ## Planned Changes
-- `stream-control` - Declared: planned - pause, resume, throttle streaming
+- `stream-control` - Declared: complete - pause, resume, throttle streaming
 - `reasoning-stream` - Declared: planned - thinking process output
 - `token-budget` - Declared: planned - budget allocation and alerts
 - `token-attribution` - Declared: planned - per-message usage tracking
@@ -44,4 +44,5 @@ Enhance streaming capabilities with granular token flow control, reasoning proce
 - Declared: proposed
 
 ## Notes
+
 
