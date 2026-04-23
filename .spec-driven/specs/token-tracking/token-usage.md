@@ -101,6 +101,25 @@ The SDK MUST provide aggregated token usage per session.
 - WHEN the client calls `token.getSessionSummary("non-existent")`
 - THEN the bridge returns error `-32051` with message "Session not found"
 
+### Requirement: Message-Level Token Attribution
+The system MUST attribute token usage to specific message identifiers when available during query execution.
+
+#### Scenario: Query includes messageId in options
+- GIVEN a query executed via the runner includes `options.messageId: "msg-123"`
+- WHEN the query completes with token usage
+- THEN the TokenStore records the token usage with `messageId: "msg-123"`
+
+#### Scenario: Get message usage
+- GIVEN the `token.getMessageUsage` bridge method is exposed
+- AND a session "session-456" has a record with `messageId: "msg-123"`
+- WHEN the client calls `token.getMessageUsage("session-456", "msg-123")`
+- THEN the response returns the matching `TokenRecord` object.
+
+#### Scenario: Get message usage for missing message
+- GIVEN a session "session-456" does not have a record with `messageId: "msg-missing"`
+- WHEN the client calls `token.getMessageUsage("session-456", "msg-missing")`
+- THEN the bridge returns error `-32052` with message "Message not found".
+
 ### Requirement: Message-Level Token Details
 The SDK MUST support querying token usage for individual messages.
 
@@ -143,7 +162,7 @@ The SDK MUST provide token usage statistics grouped by provider.
 - THEN the bridge returns an array with single entry showing all zeros
 
 ### Requirement: Token Store Lifecycle Management
-The SDK MUST manage token data lifecycle aligned with session lifecycle.
+The system MUST manage token data lifecycle aligned with session lifecycle and preserve `messageId` granularity on all stored records.
 
 #### Scenario: Clear token data when session is destroyed
 - GIVEN session "session-123" has 10 token records
