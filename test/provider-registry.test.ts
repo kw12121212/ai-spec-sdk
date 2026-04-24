@@ -319,4 +319,18 @@ describe("ProviderRegistry", () => {
       expect(listResult.apiKey).toMatch(/^sk-ant-\.\.\.$/);
     });
   });
+
+  describe("predictTokens()", () => {
+    it("should fallback to generic heuristic if provider does not implement predictTokens natively", async () => {
+      const config = createConfig();
+      registry.register(config);
+
+      const prediction = await registry.predictTokens(config.id, {
+        messages: [{ role: "user", content: "Hello world" }],
+      });
+
+      // "Hello world" has 11 chars. 11 / 4 = 2.75 -> ceil -> 3
+      expect(prediction.inputTokens).toBe(3);
+    });
+  });
 });

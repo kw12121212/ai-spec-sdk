@@ -2498,7 +2498,7 @@ test("stream.throttle limits token emission rate", async () => {
 });
 
 test("stream.backpressure buffers stream chunks without emitting and releases them on resume", async () => {
-  const ws = path.join(os.tmpdir(), `ai-spec-sdk-stream-bp-${crypto.randomBytes(3).toString("hex")}`);
+  const ws = path.join(os.tmpdir(), `ai-spec-sdk-stream-bp-${Math.random().toString(36).substring(7)}`);
   const notifications: unknown[] = [];
   const server = new BridgeServer({
     sessionsDir: ws,

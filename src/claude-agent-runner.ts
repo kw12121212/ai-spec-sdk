@@ -58,6 +58,7 @@ export interface RunClaudeQueryOptions {
   onQuotaBlocked?: (notification: QuotaBlockedNotification) => void;
   onBudgetAlert?: (alert: BudgetAlertPayload) => void;
   onBudgetThrottle?: (sessionId: string) => void;
+  waitForResume?: () => Promise<void>;
 }
 
 export interface QueryResult {
@@ -148,6 +149,14 @@ export async function runClaudeQuery({
         ...(options.temperature !== undefined ? { temperature: options.temperature as number } : {}),
         ...(options.maxTokens !== undefined ? { maxTokens: options.maxTokens as number } : {}),
       };
+
+      try {
+        const { providerRegistry } = await import("./llm-provider/provider-registry.js");
+        const prediction = await providerRegistry.predictTokens(provider.id, queryOptions);
+        onEvent({ type: "token_prediction", data: prediction });
+      } catch (err) {
+        logger.debug("Failed to predict tokens", { error: String(err) });
+      }
 
       const result = await provider.queryStream(queryOptions, (event: { type: string; data?: unknown }) => {
         if (event.type === "complete" && event.data) {

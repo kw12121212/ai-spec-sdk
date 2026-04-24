@@ -29,7 +29,7 @@ Enhance streaming capabilities with granular token flow control, reasoning proce
 - `token-budget` - Declared: complete - budget allocation and alerts
 - `token-attribution` - Declared: complete - per-message usage tracking
 - `backpressure-handling` - Declared: complete - flow control for slow consumers
-- `token-prediction` - Declared: planned - pre-execution usage estimates
+- `token-prediction` - Declared: complete - pre-execution usage estimates
 
 ## Dependencies
 - 02-production-ready — builds on existing streaming infrastructure
@@ -41,9 +41,11 @@ Enhance streaming capabilities with granular token flow control, reasoning proce
 - Token prediction accuracy varies by provider
 
 ## Status
-- Declared: proposed
+- Declared: complete
 
 ## Notes
+
+
 
 
 

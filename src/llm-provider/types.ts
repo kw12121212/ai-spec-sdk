@@ -66,6 +66,11 @@ export interface BalancerStatus {
   providers: BalancerProviderStatus[];
 }
 
+export interface TokenPrediction {
+  inputTokens: number;
+  estimatedCost?: number;
+}
+
 export interface LLMProvider {
   readonly id: string;
   readonly config: ProviderConfig;
@@ -76,6 +81,7 @@ export interface LLMProvider {
 
   query(options: QueryOptions): Promise<QueryResult>;
   queryStream(options: QueryOptions, onEvent: (event: StreamEvent) => void, signal?: AbortSignal): Promise<QueryResult>;
+  predictTokens?(options: QueryOptions): Promise<TokenPrediction>;
 
   destroy(): void;
 }

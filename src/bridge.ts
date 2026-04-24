@@ -370,6 +370,7 @@ export interface JsonRpcResponse {
 
 export interface BridgeServerOptions {
   notify?: (message: unknown) => void;
+  getTransportBuffer?: (sessionId: string) => number;
   sessionsDir?: string;
   workspacesDir?: string;
   logger?: Logger;
@@ -391,6 +392,7 @@ interface PendingApproval {
 
 export class BridgeServer {
   private notify: (message: unknown) => void;
+  private getTransportBuffer?: (sessionId: string) => number;
   private logger: Logger;
   private transport: string;
   private runtimeInfoOptions: RuntimeInfoOptions;
@@ -641,6 +643,8 @@ export class BridgeServer {
         return this.streamResume(params);
       case "stream.throttle":
         return this.streamThrottle(params);
+      case "stream.backpressure":
+        return this.streamBackpressure(params);
       case "session.pause":
         return this.pauseSession(params);
       case "session.stop":

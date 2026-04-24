@@ -227,6 +227,28 @@ export class ProviderRegistry {
     }
   }
 
+  async predictTokens(providerId: string, options: import("./types.js").QueryOptions): Promise<import("./types.js").TokenPrediction> {
+    if (!this.configs.has(providerId)) {
+      throw new ProviderRegistryError("NOT_FOUND", `Provider not found: ${providerId}`);
+    }
+
+    const instance = await this.getOrCreateInstance(providerId);
+    
+    if (instance.predictTokens) {
+      return instance.predictTokens(options);
+    }
+
+    // Generic fallback heuristic
+    let charCount = 0;
+    for (const msg of options.messages) {
+      charCount += msg.content.length;
+    }
+    
+    return {
+      inputTokens: Math.ceil(charCount / 4)
+    };
+  }
+
   private async getOrCreateInstance(providerId: string): Promise<LLMProvider> {
     const cached = this.instances.get(providerId);
     if (cached) {
