@@ -1912,3 +1912,69 @@ test("audit log policy_decision entry is created for allow and deny policy decis
     fs.rmSync(auditDir, { recursive: true, force: true });
   }
 });
+
+test("stream.backpressure triggers hard disconnect when CRITICAL_MARK is exceeded", async () => {
+  const wsDir = path.join(os.tmpdir(), `ai-spec-sdk-bridge-bp-${Math.random().toString(36).slice(2, 8)}`);
+  const notifications: unknown[] = [];
+  
+  let bufferSize = 0;
+  
+  const server = new BridgeServer({
+    sessionsDir: wsDir,
+    notify: (msg) => notifications.push(msg),
+    getTransportBuffer: () => bufferSize,
+  });
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* (params: any) {
+    // 1st chunk - fine
+    yield {
+      type: "stream_event",
+      event: { type: "content_block_delta", delta: { type: "text_delta", text: "chunk1 " } },
+    };
+    
+    // Simulate transport buffer growing dangerously large
+    bufferSize = 1024 * 1024 * 6; // 6MB, above 5MB CRITICAL_MARK
+    
+    // 2nd chunk - should trigger disconnect
+    yield {
+      type: "stream_event",
+      event: { type: "content_block_delta", delta: { type: "text_delta", text: "chunk2 " } },
+    };
+    
+    // Should be stopped
+    await new Promise<void>(r => setTimeout(r, 100));
+    
+    yield {
+      result: "chunk1 chunk2",
+      usage: null,
+    };
+  } as any;
+
+  try {
+    const startResp = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "session.start",
+      params: { workspace: wsDir, prompt: "test stream", stream: true },
+    });
+
+    const result = startResp.result as Record<string, unknown>;
+    expect(result["status"]).toBe("stopped"); // Because the server disconnected the session
+
+    const sessionId = result["sessionId"] as string;
+    
+    const statusResp = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 2,
+      method: "session.status",
+      params: { sessionId },
+    });
+    
+    const statusResult = statusResp.result as Record<string, unknown>;
+    expect(statusResult["status"]).toBe("stopped");
+
+  } finally {
+    delete globalThis.__AI_SPEC_SDK_QUERY__;
+    fs.rmSync(wsDir, { recursive: true, force: true });
+  }
+});

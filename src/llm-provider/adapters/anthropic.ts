@@ -132,6 +132,9 @@ export class AnthropicAdapter implements LLMProvider {
 
     try {
       for await (const message of queryFn({ prompt, options: sdkOptions } as Parameters<QueryFunction>[0])) {
+        const waitForResume = options.waitForResume as (() => Promise<void>) | undefined;
+        if (waitForResume) await waitForResume();
+
         if (signal?.aborted) {
           onEvent({ type: "error", data: { message: "Query aborted by signal" } });
           return { status: "stopped", result: null, usage: null };

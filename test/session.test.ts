@@ -2496,3 +2496,101 @@ test("stream.throttle limits token emission rate", async () => {
     fs.rmSync(ws, { recursive: true, force: true });
   }
 });
+
+test("stream.backpressure buffers stream chunks without emitting and releases them on resume", async () => {
+  const ws = path.join(os.tmpdir(), `ai-spec-sdk-stream-bp-${crypto.randomBytes(3).toString("hex")}`);
+  const notifications: unknown[] = [];
+  const server = new BridgeServer({
+    sessionsDir: ws,
+    notify: (msg) => notifications.push(msg),
+  });
+
+  const fallbackMock = globalThis.__AI_SPEC_SDK_QUERY__;
+  let resolvePause: () => void;
+  let checkPaused: Promise<void> = new Promise((r) => {
+    resolvePause = r;
+  });
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* (params: any) {
+    yield {
+      type: "stream_event",
+      event: { type: "content_block_delta", delta: { type: "text_delta", text: "chunk1 " } },
+    };
+    await checkPaused;
+    yield {
+      type: "stream_event",
+      event: { type: "content_block_delta", delta: { type: "text_delta", text: "chunk2 " } },
+    };
+    yield {
+      type: "stream_event",
+      event: { type: "content_block_delta", delta: { type: "text_delta", text: "chunk3 " } },
+    };
+    yield {
+      result: "chunk1 chunk2 chunk3 ",
+      usage: { input_tokens: 10, output_tokens: 20 },
+    };
+  } as any;
+
+  try {
+    const startPromise = server.handleMessage({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "session.start",
+      params: { workspace: ws, prompt: "test stream", stream: true },
+    });
+
+    // Wait until chunk1 is emitted
+    let sessionId: string | undefined;
+    while (!sessionId) {
+      const startEvt = notifications.find((n: any) => n.method === "bridge/session_event" && n.params?.type === "session_started");
+      if (startEvt) sessionId = (startEvt as any).params.sessionId;
+      await new Promise<void>(resolve => setTimeout(resolve, 5));
+    }
+
+    while (true) {
+      const chunk1 = notifications.find((n: any) => n?.params?.content === "chunk1 ");
+      if (chunk1) break;
+      await new Promise<void>(resolve => setTimeout(resolve, 5));
+    }
+
+    // Apply backpressure
+    const pauseRes = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 2,
+      method: "stream.backpressure",
+      params: { sessionId, action: "apply" },
+    });
+    expect((pauseRes as any).result.streamState).toBe("backpressure");
+
+    resolvePause!();
+
+    // Give it time to buffer chunk2 and chunk3
+    await new Promise<void>(resolve => setTimeout(resolve, 50));
+
+    // Verify chunk2 and chunk3 are NOT emitted yet
+    const bufferedChunks = notifications.filter((n: any) => n?.method === "bridge/session_event" && n?.params?.messageType === "stream_chunk");
+    expect(bufferedChunks.length).toBe(1);
+
+    // Release backpressure
+    const resumeRes = await server.handleMessage({
+      jsonrpc: "2.0",
+      id: 3,
+      method: "stream.backpressure",
+      params: { sessionId, action: "release" },
+    });
+    expect((resumeRes as any).result.streamState).toBe("active");
+
+    // Wait for all 3 chunks to be emitted
+    while (true) {
+      const allChunks = notifications.filter((n: any) => n?.method === "bridge/session_event" && n?.params?.messageType === "stream_chunk");
+      if (allChunks.length >= 3) break;
+      await new Promise<void>(resolve => setTimeout(resolve, 5));
+    }
+
+    await startPromise;
+    
+  } finally {
+    globalThis.__AI_SPEC_SDK_QUERY__ = fallbackMock;
+    fs.rmSync(ws, { recursive: true, force: true });
+  }
+});

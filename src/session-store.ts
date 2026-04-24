@@ -30,7 +30,7 @@ export interface Session {
   executionState: AgentExecutionState;
   stopRequested: boolean;
   stream: boolean;
-  streamState?: "active" | "paused" | "throttled";
+  streamState?: "active" | "paused" | "throttled" | "backpressure";
   streamTokensPerSecond?: number;
   history: SessionHistoryEntry[];
   result: unknown;
@@ -177,7 +177,7 @@ export class SessionStore {
 
   // Requirement: stream-pause-resume
   // Requirement: stream-throttle
-  setStreamState(sessionId: string, state: "active" | "paused" | "throttled", rate?: number): Session | null {
+  setStreamState(sessionId: string, state: "active" | "paused" | "throttled" | "backpressure", rate?: number): Session | null {
     const session = this.get(sessionId);
     if (!session) return null;
     session.streamState = state;

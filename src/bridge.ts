@@ -415,14 +415,15 @@ export class BridgeServer {
   private taskQueueStore: TaskQueueStore;
   private taskQueueWorker: TaskQueueWorker;
   private streamControlStates: Map<string, {
-    state: "active" | "paused" | "throttled";
+    state: "active" | "paused" | "throttled" | "backpressure";
     buffer: { content: string; index: number; kind: "stream_chunk" | "reasoning_chunk" }[];
     tokensPerSecond?: number;
     resumeResolver?: () => void;
   }>;
 
-  constructor({ notify = () => {}, sessionsDir, workspacesDir, logger, transport = "stdio", runtimeInfoOptions, auditDir }: BridgeServerOptions = {}) {
+  constructor({ notify = () => {}, getTransportBuffer, sessionsDir, workspacesDir, logger, transport = "stdio", runtimeInfoOptions, auditDir }: BridgeServerOptions = {}) {
     this.notify = notify;
+    this.getTransportBuffer = getTransportBuffer;
     this.logger = logger ?? defaultLogger;
     this.transport = transport;
     this.runtimeInfoOptions = { transport, sessionsDir, ...runtimeInfoOptions };
@@ -1408,6 +1409,24 @@ export class BridgeServer {
           return;
         }
 
+        if (this.getTransportBuffer) {
+          const buffered = this.getTransportBuffer(session.id);
+          const HIGH_WATER_MARK = 1024 * 512; // 512KB
+          const CRITICAL_MARK = 1024 * 1024 * 5; // 5MB
+
+          if (buffered >= CRITICAL_MARK) {
+            this.logger.error("Transport buffer critical limit exceeded, disconnecting session", { sessionId: session.id, buffered });
+            this.streamBackpressure({ sessionId: session.id, action: "disconnect" });
+            return;
+          } else if (buffered >= HIGH_WATER_MARK && current?.streamState !== "backpressure") {
+            this.logger.warn("Transport buffer high water mark exceeded, applying backpressure", { sessionId: session.id, buffered });
+            this.streamBackpressure({ sessionId: session.id, action: "apply" });
+          } else if (buffered < HIGH_WATER_MARK * 0.5 && current?.streamState === "backpressure") {
+            this.logger.debug("Transport buffer drained, releasing backpressure", { sessionId: session.id, buffered });
+            this.streamBackpressure({ sessionId: session.id, action: "release" });
+          }
+        }
+
         // Transition to waiting_for_input when tool approval is needed
         if (
           message !== null &&
@@ -1462,7 +1481,7 @@ export class BridgeServer {
                 const drain = () => {
                   const state = this.streamControlStates.get(session.id);
                   if (!state) return;
-                  if (state.state === "paused") {
+                  if (state.state === "paused" || state.state === "backpressure") {
                     state.resumeResolver = undefined;
                     return;
                   }
@@ -1699,6 +1718,19 @@ export class BridgeServer {
         shouldStop: () => {
           const current = this.sessionStore.get(session.id);
           return Boolean(current?.stopRequested);
+        },
+        waitForResume: async () => {
+          return new Promise<void>((resolve) => {
+            const check = () => {
+              const sess = this.sessionStore.get(session.id);
+              if (sess?.stopRequested || sess?.status === "stopped" || sess?.streamState !== "backpressure") {
+                resolve();
+              } else {
+                setTimeout(check, 50);
+              }
+            };
+            check();
+          });
         },
         signal: abortController.signal,
         onEvent,
@@ -1980,6 +2012,60 @@ export class BridgeServer {
       state.tokensPerSecond = tokensPerSecond;
     }
     return { sessionId, streamState: "throttled", tokensPerSecond };
+  }
+
+  // Requirement: stream-backpressure
+  private streamBackpressure(params: Record<string, unknown>): unknown {
+    const { sessionId, action } = params;
+    if (!sessionId || typeof sessionId !== "string") throw new BridgeError(-32602, "'sessionId' must be provided");
+    if (action !== "apply" && action !== "release" && action !== "disconnect") throw new BridgeError(-32602, "'action' must be 'apply', 'release', or 'disconnect'");
+    
+    const session = this.sessionStore.get(sessionId);
+    if (!session) throw new BridgeError(-32011, "Session not found", { sessionId });
+
+    if (action === "disconnect") {
+      this.sessionStore.stop(sessionId);
+      return { sessionId, streamState: "disconnected" };
+    }
+
+    const state = action === "apply" ? "backpressure" : "active";
+    this.sessionStore.setStreamState(sessionId, state);
+    
+    const controlState = this.streamControlStates.get(sessionId);
+    if (state === "backpressure") {
+      if (!controlState) {
+        this.streamControlStates.set(sessionId, { state: "backpressure", buffer: [] });
+      } else {
+        controlState.state = "backpressure";
+      }
+    } else {
+      // release
+      if (controlState) {
+        controlState.state = "active";
+        if (controlState.buffer.length > 0) {
+          for (const chunk of controlState.buffer) {
+            const eKind = chunk.kind === "stream_chunk" ? "agent_message" : "agent_reasoning";
+            this.emit(
+              "bridge/session_event",
+              {
+                sessionId: session.id,
+                type: eKind,
+                messageType: chunk.kind,
+                content: chunk.content,
+                index: chunk.index,
+              },
+              null,
+            );
+          }
+          controlState.buffer = [];
+        }
+        if (controlState.resumeResolver) {
+          controlState.resumeResolver();
+          controlState.resumeResolver = undefined;
+        }
+      }
+    }
+    return { sessionId, streamState: state };
   }
 
   private stopSession(params: Record<string, unknown>): unknown {

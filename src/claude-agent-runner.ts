@@ -79,6 +79,7 @@ export async function runClaudeQuery({
   onQuotaBlocked,
   onBudgetAlert,
   onBudgetThrottle,
+  waitForResume,
 }: RunClaudeQueryOptions): Promise<QueryResult> {
   const queryFn = getQueryFunction();
   logger.debug("query started", { promptLength: prompt.length });
@@ -189,6 +190,7 @@ export async function runClaudeQuery({
     }
 
     for await (const message of queryFn({ prompt, options: sdkOptions } as Parameters<QueryFunction>[0])) {
+      if (waitForResume) await waitForResume();
       if (shouldStop() || signal?.aborted) {
         logger.debug("query stopped by caller or aborted");
         return {
