@@ -15,6 +15,13 @@ export interface SessionHistoryEntry {
   message?: unknown;
 }
 
+export interface QuestionPayload {
+  question: string;
+  impact: string;
+  recommendation: string;
+  options?: string[];
+}
+
 export interface Session {
   id: string;
   workspace: string;
@@ -26,7 +33,7 @@ export interface Session {
   sdkSessionId: string | null;
   createdAt: string;
   updatedAt: string;
-  status: "active" | "completed" | "stopped" | "interrupted";
+  status: "active" | "completed" | "stopped" | "interrupted" | "paused";
   executionState: AgentExecutionState;
   stopRequested: boolean;
   stream: boolean;
@@ -305,10 +312,13 @@ export class SessionStore {
     return session;
   }
 
-  list(options: { status?: "active" | "all"; parentSessionId?: string; teamId?: string } = {}): Session[] {
+  list(options: { status?: "active" | "all" | "paused"; parentSessionId?: string; teamId?: string } = {}): Session[] {
     const all = Array.from(this.sessions.values());
     const filtered = all.filter((session) => {
       if (options.status === "active" && session.status !== "active") {
+        return false;
+      }
+      if (options.status === "paused" && session.status !== "paused") {
         return false;
       }
       if (

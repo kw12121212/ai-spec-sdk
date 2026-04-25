@@ -216,7 +216,7 @@ The SDK MUST persist each session to disk as a JSON file so that sessions surviv
 
 When the bridge starts and loads sessions from disk, any session whose persisted status is `active` MUST be changed to `interrupted` and the updated state MUST be written back to disk before any client requests are served.
 
-The session status type MUST include `interrupted` as a valid value: `"active" | "completed" | "stopped" | "interrupted"`.
+The session status type MUST include `interrupted` as a valid value: `"active" | "completed" | "stopped" | "interrupted" | "paused"`.
 
 #### Scenario: Session survives bridge restart
 - GIVEN a client has started a session and the bridge process is restarted
@@ -252,6 +252,14 @@ Session persistence MUST include pause-related fields:
 - GIVEN a session file on disk containing `pausedAt`
 - WHEN the bridge starts and loads that session
 - THEN the session's `pausedAt` and `pauseReason` are correctly restored
+
+### Requirement: session-paused-status
+The system MUST support a `paused` status for sessions awaiting external input.
+
+#### Scenario: pause
+- GIVEN an active session
+- WHEN the agent emits a question
+- THEN the session status changes to `paused`
 
 ### Requirement: Session History Retrieval
 The bridge MUST expose a `session.history` method that returns the stored event log for a session with offset/limit pagination.

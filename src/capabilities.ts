@@ -37,6 +37,7 @@ export const BUILTIN_TOOLS: readonly ToolInfo[] = [
   { name: "TodoWrite", description: "Write or update the task list" },
   { name: "NotebookRead", description: "Read a Jupyter notebook" },
   { name: "NotebookEdit", description: "Edit a Jupyter notebook cell" },
+  { name: "ask_question", description: "Ask a question to the human operator, pausing execution until resolved" },
 ];
 
 export const SUPPORTED_WORKFLOWS: readonly string[] = [
@@ -145,6 +146,7 @@ export function getCapabilities(transport = "stdio"): Capabilities {
       "session.cleanup",
       "session.approveTool",
       "session.rejectTool",
+      "session.resolveQuestion",
       "session.branch",
       "session.search",
       "session.setProvider",

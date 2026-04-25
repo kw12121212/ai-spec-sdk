@@ -390,6 +390,11 @@ interface PendingApproval {
   sessionId: string;
 }
 
+interface PendingQuestion {
+  resolve: (answer: string) => void;
+  sessionId: string;
+}
+
 export class BridgeServer {
   private notify: (message: unknown) => void;
   private getTransportBuffer?: (sessionId: string) => number;
@@ -405,6 +410,7 @@ export class BridgeServer {
   private eventLog: Map<string, BufferedEvent[]>;
   private eventSeq: Map<string, number>;
   private pendingApprovals: Map<string, PendingApproval>;
+  private pendingQuestions: Map<string, PendingQuestion>;
   private webhookManager: WebhookManager;
   private templateStore: TemplateStore;
   private taskTemplateStore: TaskTemplateStore;
@@ -455,6 +461,7 @@ export class BridgeServer {
     this.eventLog = new Map();
     this.eventSeq = new Map();
     this.pendingApprovals = new Map();
+    this.pendingQuestions = new Map();
     this.webhookManager = new WebhookManager(sessionsDir);
     this.templateStore = new TemplateStore(sessionsDir ? path.join(sessionsDir, "templates") : undefined);
     this.taskTemplateStore = new TaskTemplateStore(sessionsDir ? path.join(sessionsDir, "task-templates") : undefined);
@@ -682,6 +689,8 @@ export class BridgeServer {
           behavior: "deny",
           message: typeof params["message"] === "string" ? params["message"] : "Tool use rejected by user",
         });
+      case "session.resolveQuestion":
+        return this.resolveQuestion(params);
       case "mcp.add":
         return this.mcpAdd(params);
       case "mcp.remove":
@@ -1381,12 +1390,66 @@ export class BridgeServer {
     const mcpServers = this.mcpStore.list(context.cwd);
     const mcpSdkTools = mcpServers.flatMap(s => s.tools || []);
     
-    if (mcpSdkTools.length > 0) {
+    const askQuestionTool = {
+      name: "ask_question",
+      description: "Ask a question to the human operator, pausing execution until resolved. Use this when you need human direction, approval, or clarification.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          question: { type: "string", description: "The specific question to ask the user" },
+          impact: { type: "string", description: "The impact of the answer on the current task" },
+          recommendation: { type: "string", description: "Your recommendation or preferred option" },
+          options: { type: "array", items: { type: "string" }, description: "Optional predefined options to choose from" }
+        },
+        required: ["question", "impact", "recommendation"]
+      },
+      call: async (input: Record<string, unknown>) => {
+        const questionId = crypto.randomUUID();
+        return new Promise<unknown>((resolve) => {
+          this.pendingQuestions.set(questionId, { resolve, sessionId: session.id });
+          
+          this.sessionStore.transitionExecutionState(session.id, "paused", "agent_question");
+          const sess = this.sessionStore.get(session.id);
+          if (sess) {
+            sess.status = "paused";
+            sess.pausedAt = new Date().toISOString();
+            sess.pauseReason = "agent_question";
+            this.sessionStore.persist(sess);
+          }
+
+          const payload = {
+            question: input.question as string,
+            impact: input.impact as string,
+            recommendation: input.recommendation as string,
+            options: input.options as string[] | undefined,
+          };
+
+          this.emit(
+            "bridge/session_event",
+            { sessionId: session.id, type: "session_paused", reason: "agent_question" },
+            requestId
+          );
+
+          this.notify({
+            jsonrpc: "2.0",
+            method: "session.question",
+            params: {
+              sessionId: session.id,
+              questionId,
+              ...payload
+            }
+          });
+        });
+      }
+    };
+
+    if (mcpSdkTools.length > 0 || true) {
       resolvedOptions = {
         ...resolvedOptions,
         tools: [
           ...(Array.isArray(resolvedOptions.tools) ? resolvedOptions.tools : []),
-          ...mcpSdkTools
+          ...mcpSdkTools,
+          askQuestionTool
         ]
       };
     }
@@ -2952,6 +3015,56 @@ export class BridgeServer {
     return { requestId, behavior: result.behavior };
   }
 
+  private resolveQuestion(params: Record<string, unknown>): unknown {
+    const { sessionId, questionId, answer } = params;
+
+    if (!sessionId || typeof sessionId !== "string") {
+      throw new BridgeError(-32602, "'sessionId' must be provided");
+    }
+    if (!questionId || typeof questionId !== "string") {
+      throw new BridgeError(-32602, "'questionId' must be provided");
+    }
+    if (typeof answer !== "string") {
+      throw new BridgeError(-32602, "'answer' must be provided as a string");
+    }
+
+    if (!this.sessionStore.get(sessionId)) {
+      throw new BridgeError(-32011, "Session not found", { sessionId });
+    }
+
+    const pending = this.pendingQuestions.get(questionId);
+    if (!pending || pending.sessionId !== sessionId) {
+      throw new BridgeError(-32021, "Pending question not found", { questionId });
+    }
+
+    this.pendingQuestions.delete(questionId);
+
+    const session = this.sessionStore.get(sessionId)!;
+    if (session.executionState === "paused" && session.pauseReason === "agent_question") {
+      this.sessionStore.transitionExecutionState(sessionId, "running", "user_resume");
+      session.pausedAt = undefined;
+      session.pauseReason = undefined;
+      session.status = "active";
+      this.sessionStore.persist(session);
+
+      this.auditLog.write(
+        this.auditLog.createEntry(sessionId, "session_resumed", "lifecycle", {
+          workspace: session.workspace,
+        }, { workspace: session.workspace }),
+      );
+
+      this.emit(
+        "bridge/session_event",
+        { sessionId: session.id, type: "session_resumed" },
+        null,
+      );
+    }
+
+    pending.resolve(answer);
+
+    return { success: true, questionId };
+  }
+
   private registerWorkspace(params: Record<string, unknown>): unknown {
     const { workspace } = params;
     if (!workspace || typeof workspace !== "string") {
@@ -2970,8 +3083,8 @@ export class BridgeServer {
   private listSessions(params: Record<string, unknown>): unknown {
     const { status, parentSessionId } = params;
 
-    if (status !== undefined && status !== "active" && status !== "all") {
-      throw new BridgeError(-32602, "'status' must be 'active' or 'all'");
+    if (status !== undefined && status !== "active" && status !== "all" && status !== "paused") {
+      throw new BridgeError(-32602, "'status' must be 'active', 'paused', or 'all'");
     }
 
     if (parentSessionId !== undefined && typeof parentSessionId !== "string") {
@@ -2979,7 +3092,7 @@ export class BridgeServer {
     }
 
     const sessions = this.sessionStore.list({
-      status: status as "active" | "all" | undefined,
+      status: status as "active" | "all" | "paused" | undefined,
       ...(typeof parentSessionId === "string" ? { parentSessionId } : {}),
     });
 
