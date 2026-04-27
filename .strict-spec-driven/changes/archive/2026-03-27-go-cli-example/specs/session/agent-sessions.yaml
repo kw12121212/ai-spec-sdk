@@ -1,0 +1,30 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: session-agent-sessions
+mapping:
+  implementation: []
+  tests: []
+operations:
+  ADDED:
+    Session Management in Go CLI Example:
+      strength: MUST
+      statement: >-
+        The Go CLI example MUST demonstrate the full session lifecycle: start, resume, stop, list,
+        and history retrieval, including the tool approval flow.
+      scenarios:
+        example-starts-and-resumes-sessions:
+          - GIVEN: the Go CLI is running
+          - WHEN: a user types a prompt
+          - THEN: >-
+              the CLI calls `session.start` (first prompt) or `session.resume` (subsequent prompts)
+              and streams the response
+        example-demonstrates-tool-approval:
+          - GIVEN: 'the Go CLI is running with `permissionMode: "approve"`'
+          - WHEN: Claude requests a tool use
+          - THEN: >-
+              the CLI presents a y/n prompt to the user and calls `session.approveTool` or
+              `session.rejectTool` based on the response
+  MODIFIED: {}
+  REMOVED: {}

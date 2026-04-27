@@ -1,0 +1,63 @@
+schema: strict-spec-driven/change-design/v1
+schema_version: 1
+artifact_type: change_design
+schema_file: templates/strict-spec-driven/schemas/change-design.yaml
+change: session-persistence
+approach:
+  - >-
+    Extend the existing `SessionStore` in-place rather than introducing a pluggable storage backend.
+    The store already handles file I/O — the changes add recovery logic to the constructor, expose
+    delete/export/cleanup operations, and extend the session status type.
+  - >-
+    **Interrupted recovery**: In `SessionStore._loadFromDisk()`, after loading each session, check
+    if `status === "active"`. If so, set it to `"interrupted"` and persist. This runs once at
+    startup before any client requests are served.
+  - >-
+    **session.export**: Return the full session object (id, workspace, sdkSessionId, status,
+    createdAt, updatedAt, history, result) from the in-memory map. No disk re-read needed.
+  - >-
+    **session.delete**: Remove from the in-memory map and delete the JSON file from disk. Reject if
+    the session is `active` (cannot delete a running session).
+  - >-
+    **session.cleanup**: Iterate all sessions, compute age from `updatedAt`, delete those older than
+    the requested threshold. Returns the count of removed sessions. Active sessions are excluded
+    from cleanup.
+  - >-
+    **Bridge dispatch**: Add three new cases to the switch statement in `dispatch()`, each
+    delegating to a new method on `BridgeServer`.
+  - >-
+    **Contract update**: Fix the "in-memory only" statement in `bridge-contract.yaml` and document
+    the three new methods and the `interrupted` status.
+decisions:
+  no-pluggable-storage-backend:
+    decision: YAGNI — there is one storage implementation (file-based) and no concrete need for another.
+    rationale: Introducing an interface now would be speculative.
+  no-debounced-writes:
+    decision: The current immediate-flush strategy is simple and correct.
+    rationale: The local SDK use case does not have I/O throughput concerns.
+  interrupted-sessions-cannot-be-auto-resumed:
+    decision: The SDK session context is likely lost after a crash.
+    rationale: >-
+      `interrupted` sessions can be listed and exported but must be explicitly resumed by the client
+      (which creates a new SDK session).
+  active-sessions-cannot-be-deleted-or-cleaned-up:
+    decision: Prevents accidental removal of in-progress sessions.
+    rationale: Prevents accidental removal of in-progress sessions.
+  cleanup-uses-updatedat-not-createdat:
+    decision: '**Cleanup uses `updatedAt`**, not `createdAt`'
+    rationale: Ensures recently-active sessions (even if created long ago) are not prematurely removed.
+alternatives:
+  - option: Debounced writes (500ms)
+    reason: >-
+      Would reduce I/O for high-frequency event appends but adds complexity (debounce timer,
+      flush-on-close). The local SDK rarely has enough concurrent sessions for this to matter.
+      Rejected.
+  - option: Pluggable storage interface
+    reason: >-
+      Would enable future SQLite or remote storage backends. Adds an abstraction layer with only one
+      implementation. Rejected per YAGNI.
+  - option: Auto-resume interrupted sessions
+    reason: >-
+      On startup, automatically resume sessions that were interrupted. Rejected because the SDK
+      session context is lost and auto-resuming without context would start fresh conversations,
+      which is surprising behavior.

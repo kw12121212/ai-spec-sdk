@@ -1,0 +1,58 @@
+schema: strict-spec-driven/roadmap-milestone/v2
+schema_version: 2
+artifact_type: roadmap_milestone
+schema_file: templates/strict-spec-driven/schemas/roadmap-milestone.yaml
+milestone:
+  0003-platform-reach:
+    title: Platform Reach
+goal: >-
+  Make the bridge distributable and production-safe: native binaries for all platforms, per-key HTTP
+  rate limiting, and workspace-scoped custom tool registration.
+scope:
+  in:
+    - >-
+      Multi-platform native binary builds via CI (linux-x64, linux-arm64, macos-x64, macos-arm64,
+      windows-x64)
+    - 'Local SDK packaging: `npm pack` for TypeScript client, `python -m build` for Python client'
+    - Per-API-key token bucket rate limiting for HTTP transport
+    - Workspace-scoped custom tool registration (shell-command tools)
+  out:
+    - WebSocket transport (see 04-advanced-runtime)
+    - OAuth2 / external identity providers
+    - Remote tool endpoints (HTTP callback tools)
+    - Tool sandboxing beyond process isolation
+done_criteria:
+  - Native binaries build successfully for all 5 target platforms with SHA-256 checksums
+  - '`bun run build:pack` produces `.tgz` and `.whl` artifacts ready for manual distribution'
+  - >-
+    HTTP requests return 429 with X-RateLimit-* headers when limit exceeded; admin scope bypasses
+    limits
+  - >-
+    tools.register and tools.unregister methods callable; custom tools appear in tools.list and work
+    in sessions
+planned_changes:
+  cross-platform-release:
+    status: complete
+    summary: native binaries for all platforms plus local SDK pack scripts
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+  rate-limiting:
+    status: complete
+    summary: per-key token bucket rate limiting for HTTP transport
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+  custom-tool-registration:
+    status: complete
+    summary: workspace-scoped shell-command custom tools
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+dependencies:
+  - >-
+    02-production-ready — rate-limiting requires auth-and-authorization; custom-tool-registration
+    requires session persistence
+risks:
+  - >-
+    Cross-platform bun compile requires platform-specific CI runners; Windows support may need extra
+    validation.
+status: complete
+notes: []

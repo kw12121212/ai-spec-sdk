@@ -1,0 +1,27 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: http-sse-transport
+  status: complete
+summary:
+  what:
+    - >-
+      Add HTTP + Server-Sent Events as a standalone alternative transport for the Bridge. Clients
+      can reach the bridge over HTTP without spawning a subprocess: `POST /rpc` for JSON-RPC calls
+      and `GET /events?sessionId=...` for streaming notifications via SSE.
+  why:
+    - >-
+      The existing stdio transport requires callers to manage a child process. Web clients, remote
+      dashboards, and polyglot tools benefit from a network-addressable bridge that reuses the same
+      `BridgeServer` core without duplicating business logic.
+scope:
+  in: []
+  out: []
+unchanged_behavior:
+  - >-
+    Stdio transport behaviour is entirely unchanged; the default launch mode continues to work as
+    before
+  - All JSON-RPC methods, error codes, and notification schemas remain identical across transports
+  - '`BridgeServer` internal logic is not modified; HTTP is a transport adapter only'

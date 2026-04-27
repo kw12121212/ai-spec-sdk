@@ -1,0 +1,180 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: llm-provider-provider-registry
+mapping:
+  implementation:
+    - src/llm-provider/provider-registry.ts
+    - src/bridge.ts
+  tests:
+    - test/provider-registry.test.ts
+    - test/provider-registry-bridge.test.ts
+operations:
+  ADDED:
+    Provider Registration:
+      strength: MUST
+      statement: The SDK MUST allow clients to register LLM provider configurations through the bridge.
+      scenarios:
+        register-a-valid-anthropic-provider:
+          - GIVEN: >-
+              a client provides a valid provider configuration with `id`, `type: "anthropic"`, and
+              `apiKey`
+          - WHEN: the client calls `provider.register` with that configuration
+          - THEN: >-
+              the bridge stores the configuration and returns `{ success: true, providerId: "<id>"
+              }`
+        register-a-provider-with-environment-variable-api-key:
+          - GIVEN: 'a client provides a configuration with `type: "anthropic"` but no `apiKey`'
+          - AND: the `ANTHROPIC_API_KEY` environment variable is set
+          - WHEN: the client calls `provider.register`
+          - THEN: the registration succeeds using the environment variable
+        reject-duplicate-provider-id:
+          - GIVEN: a provider with ID "my-anthropic" is already registered
+          - WHEN: the client attempts to register another provider with ID "my-anthropic"
+          - THEN: the bridge returns error `-32002` with message "Provider already exists"
+        reject-invalid-configuration:
+          - GIVEN: a client provides a configuration missing required fields (e.g., no `id` or `type`)
+          - WHEN: the client calls `provider.register`
+          - THEN: the bridge returns error `-32602` (Invalid params) with details about missing fields
+        reject-unsupported-provider-type:
+          - GIVEN: 'a client provides a configuration with `type: "unsupported-type"`'
+          - WHEN: the client calls `provider.register`
+          - THEN: the bridge returns error `-32003` with message "Unsupported provider type"
+    Provider Listing:
+      strength: MUST
+      statement: The SDK MUST allow clients to list all registered provider configurations.
+      scenarios:
+        list-all-providers:
+          - GIVEN: multiple providers are registered
+          - WHEN: the client calls `provider.list`
+          - THEN: >-
+              the bridge returns an array of provider configurations (excluding sensitive fields
+              like API keys)
+        list-empty-registry:
+          - GIVEN: no providers are registered
+          - WHEN: the client calls `provider.list`
+          - THEN: the bridge returns an empty array `[]`
+    Provider Retrieval:
+      strength: MUST
+      statement: The SDK MUST allow clients to retrieve a specific provider's configuration by ID.
+      scenarios:
+        get-existing-provider:
+          - GIVEN: a provider with ID "my-anthropic" is registered
+          - WHEN: 'the client calls `provider.get` with `{ providerId: "my-anthropic" }`'
+          - THEN: >-
+              the bridge returns the provider configuration (excluding sensitive fields like API
+              keys)
+        get-non-existent-provider:
+          - GIVEN: no provider with ID "unknown" exists
+          - WHEN: 'the client calls `provider.get` with `{ providerId: "unknown" }`'
+          - THEN: the bridge returns error `-32001` with message "Provider not found"
+    Provider Update:
+      strength: MUST
+      statement: The SDK MUST allow clients to update an existing provider's configuration.
+      scenarios:
+        update-existing-provider:
+          - GIVEN: a provider with ID "my-anthropic" is registered
+          - WHEN: >-
+              the client calls `provider.update` with `{ providerId: "my-anthropic", config: {
+              model: "claude-opus-4-20250514" } }`
+          - THEN: the bridge merges the new configuration and returns updated config
+        update-non-existent-provider:
+          - GIVEN: no provider with ID "unknown" exists
+          - WHEN: 'the client calls `provider.update` with `{ providerId: "unknown", config: {...} }`'
+          - THEN: the bridge returns error `-32001` with message "Provider not found"
+        update-invalidates-cached-instance:
+          - GIVEN: a provider has been initialized and its instance is cached
+          - WHEN: the client updates that provider's configuration
+          - THEN: the cached instance is destroyed and will be re-created on next use
+    Provider Removal:
+      strength: MUST
+      statement: The SDK MUST allow clients to remove a registered provider.
+      scenarios:
+        remove-existing-provider:
+          - GIVEN: a provider with ID "my-anthropic" is registered
+          - WHEN: 'the client calls `provider.remove` with `{ providerId: "my-anthropic" }`'
+          - THEN: >-
+              the bridge removes the provider and returns `{ success: true, providerId:
+              "my-anthropic" }`
+          - AND: if the provider was initialized, its instance is destroyed
+        remove-non-existent-provider:
+          - GIVEN: no provider with ID "unknown" exists
+          - WHEN: 'the client calls `provider.remove` with `{ providerId: "unknown" }`'
+          - THEN: the bridge returns error `-32001` with message "Provider not found"
+        remove-default-provider-clears-default:
+          - GIVEN: '"my-anthropic" is the default provider'
+          - WHEN: the client removes "my-anthropic"
+          - THEN: the default provider is cleared to null
+    Default Provider Management:
+      strength: MUST
+      statement: The SDK MUST support setting and retrieving a default provider.
+      scenarios:
+        set-default-provider:
+          - GIVEN: a provider with ID "my-anthropic" is registered
+          - WHEN: 'the client calls `provider.setDefault` with `{ providerId: "my-anthropic" }`'
+          - THEN: >-
+              the bridge sets "my-anthropic" as the default and returns `{ success: true,
+              providerId: "my-anthropic" }`
+        set-default-to-non-existent-provider-fails:
+          - GIVEN: no provider with ID "unknown" exists
+          - WHEN: 'the client calls `provider.setDefault` with `{ providerId: "unknown" }`'
+          - THEN: the bridge returns error `-32001` with message "Provider not found"
+        get-current-default-provider:
+          - GIVEN: '"my-anthropic" is set as the default provider'
+          - WHEN: the client calls `provider.getDefault`
+          - THEN: 'the bridge returns `{ providerId: "my-anthropic", ...config }`'
+        get-default-when-none-set:
+          - GIVEN: no default provider has been set
+          - WHEN: the client calls `provider.getDefault`
+          - THEN: 'the bridge returns `{ providerId: null }`'
+    Provider Health Check:
+      strength: MUST
+      statement: The SDK MUST allow clients to check the health of a registered provider.
+      scenarios:
+        health-check-on-healthy-provider:
+          - GIVEN: a provider with ID "my-anthropic" is registered and can be initialized
+          - WHEN: 'the client calls `provider.healthCheck` with `{ providerId: "my-anthropic" }`'
+          - THEN: >-
+              the bridge initializes the provider if needed, calls healthCheck(), and returns `{
+              healthy: true, providerId: "my-anthropic" }`
+        health-check-on-unhealthy-provider:
+          - GIVEN: a provider with ID "my-anthropic" is registered but initialization fails
+          - WHEN: 'the client calls `provider.healthCheck` with `{ providerId: "my-anthropic" }`'
+          - THEN: >-
+              the bridge returns `{ healthy: false, providerId: "my-anthropic", error: "<error
+              message>" }`
+        health-check-on-non-existent-provider:
+          - GIVEN: no provider with ID "unknown" exists
+          - WHEN: 'the client calls `provider.healthCheck` with `{ providerId: "unknown" }`'
+          - THEN: the bridge returns error `-32001` with message "Provider not found"
+    Provider Configuration Persistence:
+      strength: MUST
+      statement: The SDK MUST persist provider configurations to disk so they survive restarts.
+      scenarios:
+        persist-on-registration:
+          - GIVEN: a client registers a provider
+          - WHEN: the registration completes
+          - THEN: the provider configuration is saved to ConfigStore under key `llmProviders`
+        load-on-startup:
+          - GIVEN: the bridge is starting AND persisted provider configurations exist
+          - WHEN: the bridge initializes the registry
+          - THEN: all persisted providers are loaded into memory
+        persist-on-update-remove:
+          - GIVEN: a client updates or removes a provider
+          - WHEN: the operation completes
+          - THEN: the changes are persisted to ConfigStore
+    Sensitive Data Masking:
+      strength: MUST
+      statement: The SDK MUST NOT return sensitive information (API keys, tokens) in list or get responses.
+      scenarios:
+        api-key-masked-in-list-response:
+          - GIVEN: 'a provider is registered with `apiKey: "sk-ant-..."`'
+          - WHEN: the client calls `provider.list`
+          - THEN: the response does not include the `apiKey` field or shows it as masked
+        api-key-masked-in-get-response:
+          - GIVEN: 'a provider is registered with `apiKey: "sk-ant-..."`'
+          - WHEN: the client calls `provider.get`
+          - THEN: the response does not include the full `apiKey` value
+  MODIFIED: {}
+  REMOVED: {}

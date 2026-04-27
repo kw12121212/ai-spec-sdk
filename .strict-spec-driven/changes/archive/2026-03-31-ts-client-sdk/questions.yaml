@@ -1,0 +1,17 @@
+schema: strict-spec-driven/question-list/v1
+schema_version: 1
+artifact_type: question_list
+schema_file: templates/strict-spec-driven/schemas/question-list.yaml
+change: proposal-ts-client-sdk
+open: []
+resolved:
+  - id: >-
+      should-packages-client-be-part-of-the-root-bun-workspace-or-fully-standalone-with-its-own-bun-test-command
+    question: >-
+      Should `packages/client/` be part of the root `bun` workspace, or fully standalone with its
+      own `bun test` command?
+    context: >-
+      A standalone client keeps the client build decoupled from the bridge build, Integration tests
+      use `describe.skip`.
+    answer: Standalone (own `bun test`). Integration tests are skipped by default and use `describe.skip`.
+    status: resolved

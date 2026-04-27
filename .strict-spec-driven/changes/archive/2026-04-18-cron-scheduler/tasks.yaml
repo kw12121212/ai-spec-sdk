@@ -1,0 +1,51 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: cron-scheduler
+sections:
+  Implementation:
+    implementation-1:
+      text: Add `cron-parser` to dependencies in `package.json` and run `bun install`.
+      status: complete
+    implementation-2:
+      text: >-
+        Add `cronSchedule?: string` property to the `TaskTemplate` interface in
+        `src/task-template-types.ts`.
+      status: complete
+    implementation-3:
+      text: >-
+        Create `src/cron-scheduler.ts` with a `CronScheduler` class that periodically checks task
+        templates for due cron schedules.
+      status: complete
+    implementation-4:
+      text: Update `src/index.ts` or `src/cli.ts` to start the `CronScheduler` when the server starts.
+      status: complete
+  Testing:
+    testing-1:
+      text: >-
+        Write unit tests in `test/cron-scheduler.test.ts` to verify scheduling logic (mocking the
+        clock/store).
+      status: complete
+      command: test/cron-scheduler.test.ts
+    testing-2:
+      text: Add a unit test to verify that task templates with `cronSchedule` are parsed correctly.
+      status: complete
+      command: cronSchedule
+    testing-3:
+      text: Run `bun run test` to verify all unit tests pass.
+      status: complete
+      command: bun run test
+    testing-4:
+      text: Run `bun run lint` to ensure linting and type-checking pass.
+      status: complete
+      command: bun run lint
+  Verification:
+    verification-1:
+      text: >-
+        Ensure that a task template with a schedule of `* * * * *` starts an agent session every
+        minute while the server is running.
+      status: complete
+testing_gates:
+  validation_task: testing-1
+  unit_test_task: testing-2

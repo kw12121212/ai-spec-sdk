@@ -1,0 +1,54 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: task-template-registry
+sections:
+  Implementation:
+    implementation-1:
+      text: >-
+        Define the `TaskTemplate` interface and types in `src/types.ts` or a new file
+        `src/task-template-types.ts`.
+      status: complete
+    implementation-2:
+      text: >-
+        Create `TaskTemplateStore` in `src/task-template-store.ts` implementing create, get, update,
+        delete, and list operations using disk storage.
+      status: complete
+    implementation-3:
+      text: >-
+        Add JSON-RPC bridge methods for task template operations (e.g., `taskTemplate.create`,
+        `taskTemplate.get`) in `src/bridge.ts` or a new bridge handler.
+      status: complete
+    implementation-4:
+      text: Register the new bridge methods with the JSON-RPC server in `src/index.ts`.
+      status: complete
+  Testing:
+    testing-1:
+      text: Write unit tests for `TaskTemplateStore` in `test/task-template-store.test.ts`.
+      status: complete
+      command: TaskTemplateStore
+    testing-2:
+      text: >-
+        Write integration/bridge tests for the new JSON-RPC endpoints in
+        `test/task-template-bridge.test.ts`.
+      status: complete
+      command: test/task-template-bridge.test.ts
+    testing-3:
+      text: Run `bun run lint` to verify type checking and linting pass.
+      status: complete
+      command: bun run lint
+    testing-4:
+      text: Run `bun test` to ensure all tests pass.
+      status: complete
+      command: bun test
+  Verification:
+    verification-1:
+      text: Verify the task templates are successfully written to disk as JSON files.
+      status: complete
+    verification-2:
+      text: Verify that restarting the server reloads the saved task templates from disk.
+      status: complete
+testing_gates:
+  validation_task: testing-1
+  unit_test_task: testing-2

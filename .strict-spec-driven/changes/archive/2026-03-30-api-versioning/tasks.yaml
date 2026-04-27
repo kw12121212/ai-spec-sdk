@@ -1,0 +1,77 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: proposal-api-versioning
+sections:
+  Implementation:
+    implementation-1:
+      text: Add `API_VERSION` constant to `src/capabilities.ts` (equal to `BRIDGE_VERSION`)
+      status: complete
+    implementation-2:
+      text: Add `apiVersion` field to `Capabilities` interface and `getCapabilities()` return value
+      status: complete
+    implementation-3:
+      text: Implement `bridge.negotiateVersion` dispatch case in `src/bridge.ts`
+      status: complete
+    implementation-4:
+      text: >-
+        Add per-request version validation in `dispatch()` — check `params.apiVersion` before method
+        switch, throw `-32050` on mismatch
+      status: complete
+    implementation-5:
+      text: Add `bridge.negotiateVersion` to capabilities methods list
+      status: complete
+    implementation-6:
+      text: >-
+        Update `docs/bridge-contract.yaml` with new method, `apiVersion` field, and error code
+        `-32050`
+      status: complete
+  Testing:
+    testing-1:
+      text: Lint passes (`bun run lint`)
+      status: complete
+      command: bun run lint
+    testing-2:
+      text: 'Unit test: `bridge.capabilities` response includes `apiVersion`'
+      status: complete
+      command: bridge.capabilities
+    testing-3:
+      text: 'Unit test: `bridge.negotiateVersion` returns `{negotiatedVersion, capabilities}` on match'
+      status: complete
+      command: bridge.negotiateVersion
+    testing-4:
+      text: 'Unit test: `bridge.negotiateVersion` returns `-32050` when no version matches'
+      status: complete
+      command: bridge.negotiateVersion
+    testing-5:
+      text: >-
+        Unit test: `bridge.negotiateVersion` validates `supportedVersions` param (must be non-empty
+        string array)
+      status: complete
+      command: bridge.negotiateVersion
+    testing-6:
+      text: 'Unit test: request with matching `apiVersion` in params succeeds normally'
+      status: complete
+      command: apiVersion
+    testing-7:
+      text: 'Unit test: request with unsupported `apiVersion` in params returns `-32050`'
+      status: complete
+      command: apiVersion
+    testing-8:
+      text: 'Unit test: request without `apiVersion` in params succeeds (opt-in behavior)'
+      status: complete
+      command: apiVersion
+  Verification:
+    verification-1:
+      text: Verify `bridge.capabilities` response shape matches spec
+      status: complete
+    verification-2:
+      text: Verify error code `-32050` data includes `supportedVersions`
+      status: complete
+    verification-3:
+      text: Verify no regression in existing tests
+      status: complete
+testing_gates:
+  validation_task: testing-1
+  unit_test_task: testing-2

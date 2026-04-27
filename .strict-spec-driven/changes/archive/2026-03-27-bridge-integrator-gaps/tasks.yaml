@@ -1,0 +1,135 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: bridge-integrator-gaps
+sections:
+  Implementation:
+    implementation-1:
+      text: >-
+        Add `messageType` classification to `agent_message` notifications in
+        `BridgeServer._runQuery` (map SDK message shapes to `system_init` / `assistant_text` /
+        `tool_use` / `tool_result` / `result` / `other`)
+      status: complete
+    implementation-2:
+      text: Add `session.list` case to `BridgeServer.dispatch`
+      status: complete
+    implementation-3:
+      text: >-
+        Implement `SessionStore.list(filter?: "active" | "all")` returning up to 100 most recent
+        sessions sorted by `createdAt` descending
+      status: complete
+    implementation-4:
+      text: >-
+        Add and validate first-class agent control parameters (`model`, `allowedTools`,
+        `disallowedTools`, `permissionMode`, `maxTurns`, `systemPrompt`) in
+        `BridgeServer.startSession` and `BridgeServer.resumeSession`
+      status: complete
+    implementation-5:
+      text: Apply `permissionMode` default of `"bypassPermissions"` when not supplied by the caller
+      status: complete
+    implementation-6:
+      text: Merge validated control parameters into `sdkOptions` passed to `runClaudeQuery`
+      status: complete
+  Testing:
+    testing-1:
+      text: >-
+        Test: `agent_message` notifications carry correct `messageType` for each defined shape
+        (system_init, assistant_text, tool_use, tool_result, result, other)
+      status: complete
+      command: agent_message
+    testing-2:
+      text: >-
+        Test: `session.list` with no filter returns all sessions up to 100, sorted by `createdAt`
+        descending
+      status: complete
+      command: session.list
+    testing-3:
+      text: 'Test: `session.list` with `status: "active"` returns only active sessions'
+      status: complete
+      command: session.list
+    testing-4:
+      text: 'Test: `session.list` with `status: "all"` returns all sessions'
+      status: complete
+      command: session.list
+    testing-5:
+      text: 'Test: `session.list` with unknown `status` value returns `-32602`'
+      status: complete
+      command: session.list
+    testing-6:
+      text: 'Test: `session.list` caps response at 100 entries when more exist'
+      status: complete
+      command: session.list
+    testing-7:
+      text: 'Test: `session.start` with valid `model` passes it to the agent query'
+      status: complete
+      command: session.start
+    testing-8:
+      text: 'Test: `session.start` with valid `allowedTools` passes it to the agent query'
+      status: complete
+      command: session.start
+    testing-9:
+      text: 'Test: `session.start` with valid `disallowedTools` passes it to the agent query'
+      status: complete
+      command: session.start
+    testing-10:
+      text: 'Test: `session.start` with `permissionMode: "acceptEdits"` passes it to the agent query'
+      status: complete
+      command: session.start
+    testing-11:
+      text: 'Test: `session.start` without `permissionMode` defaults to `"bypassPermissions"`'
+      status: complete
+      command: session.start
+    testing-12:
+      text: 'Test: `session.start` with valid `maxTurns` passes it to the agent query'
+      status: complete
+      command: session.start
+    testing-13:
+      text: 'Test: `session.start` with valid `systemPrompt` passes it to the agent query'
+      status: complete
+      command: session.start
+    testing-14:
+      text: 'Test: `session.start` with `permissionMode: "superuser"` returns `-32602`'
+      status: complete
+      command: session.start
+    testing-15:
+      text: 'Test: `session.start` with `maxTurns: "five"` returns `-32602`'
+      status: complete
+      command: session.start
+    testing-16:
+      text: 'Test: `session.start` with `allowedTools: "Read"` (string not array) returns `-32602`'
+      status: complete
+      command: session.start
+    testing-17:
+      text: 'Test: control parameters apply on `session.resume` with the same validation rules'
+      status: complete
+      command: session.resume
+    testing-18:
+      text: Lint passes (`bun run lint` or equivalent)
+      status: complete
+      command: bun run lint
+    testing-19:
+      text: Unit tests pass (`bun test`)
+      status: complete
+      command: bun test
+  Verification:
+    verification-1:
+      text: All `bridge/session_event` notifications include `type` and `sessionId` fields
+      status: complete
+    verification-2:
+      text: '`agent_message` notifications include `messageType` field'
+      status: complete
+    verification-3:
+      text: '`session.list` method is present in `bridge.capabilities` response'
+      status: complete
+    verification-4:
+      text: >-
+        Agent control parameters are documented in capability metadata or are otherwise discoverable
+        via `bridge.capabilities`
+      status: complete
+    verification-5:
+      text: Verify implementation matches proposal scope — no out-of-scope features added
+      status: complete
+testing_gates:
+  validation_task: testing-1
+  unit_test_task: testing-2

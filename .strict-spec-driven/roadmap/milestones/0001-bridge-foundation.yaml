@@ -1,0 +1,57 @@
+schema: strict-spec-driven/roadmap-milestone/v2
+schema_version: 2
+artifact_type: roadmap_milestone
+schema_file: templates/strict-spec-driven/schemas/roadmap-milestone.yaml
+milestone:
+  0001-bridge-foundation:
+    title: Bridge Foundation
+goal: >-
+  Establish the polyglot JSON-RPC 2.0 bridge with full session management, Claude Agent SDK
+  integration, extensibility (MCP/config/hooks), and a Go CLI reference implementation.
+scope:
+  in:
+    - stdio transport with JSON-RPC 2.0 framing
+    - Claude Agent SDK session lifecycle (start, resume, stop, status)
+    - MCP server management, configuration management, and hooks system
+    - Session history, persistence, and listing
+    - Tool approval flow (permissionMode + approveTool/rejectTool)
+    - Go CLI REPL demonstrating all bridge methods
+  out:
+    - HTTP/SSE transport (see 02-production-ready)
+    - Authentication (see 02-production-ready)
+    - Client SDKs (see 02-production-ready)
+done_criteria:
+  - Bridge accepts JSON-RPC requests over stdio
+  - All core session lifecycle methods callable and tested
+  - MCP server management, config, and hooks methods operational
+  - Go CLI demo compiles and connects to bridge subprocess
+planned_changes:
+  add-polyglot-agent-spec-bridge:
+    status: complete
+    summary: polyglot stdio bridge with JSON-RPC 2.0
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+  agent-session-sdk-wiring:
+    status: complete
+    summary: Claude Agent SDK session wiring with proxy support
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+  bridge-extensibility:
+    status: complete
+    summary: MCP server management, config management, and hooks
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+  session-depth:
+    status: complete
+    summary: session history, persistence, and listing
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+  tool-approval-flow:
+    status: complete
+    summary: permissionMode approve and approveTool/rejectTool
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+dependencies: []
+risks: []
+status: complete
+notes: []

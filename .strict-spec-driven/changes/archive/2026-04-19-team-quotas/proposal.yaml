@@ -1,0 +1,23 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: proposal-team-quotas
+  status: complete
+summary:
+  what:
+    - >-
+      Add team-level quota enforcement for agent sessions, allowing organizations to restrict token
+      usage and resource consumption across all sessions associated with a specific team.
+  why:
+    - >-
+      Currently, quotas can only be enforced globally, per-provider, or per-session. In a
+      collaborative environment with team registries, organizations need to manage resource budgets
+      at the team level so that multiple agents working for the same team share a single token pool.
+scope:
+  in: []
+  out: []
+unchanged_behavior:
+  - Existing global, session, and provider quotas remain unchanged and continue to operate normally.
+  - Sessions without a `teamId` are not subject to team quotas.

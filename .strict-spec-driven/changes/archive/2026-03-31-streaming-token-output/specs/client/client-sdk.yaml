@@ -1,0 +1,36 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: client-client-sdk
+mapping:
+  implementation: []
+  tests: []
+operations:
+  ADDED:
+    Stream Chunk Event Type:
+      strength: MUST
+      statement: >-
+        The `BridgeClient` event listener MUST support `stream_chunk` as a `messageType` value
+        within `session_event` notifications. Clients using `client.on('session_event', handler)`
+        MUST receive `stream_chunk` events when the connected session has streaming enabled.
+      scenarios:
+        client-receives-streamchunk-events:
+          - GIVEN: a `BridgeClient` is connected to a bridge with a streaming session
+          - WHEN: the bridge emits a `stream_chunk` event
+          - THEN: >-
+              the client's `session_event` handler receives the event with `messageType:
+              "stream_chunk"`, `content`, and `index`
+    Stream Parameter in Session Methods:
+      strength: MUST
+      statement: >-
+        The `BridgeClient.session.start()` and `BridgeClient.session.resume()` methods MUST accept
+        an optional `stream: boolean` parameter. When set to `true`, the parameter MUST be passed to
+        the bridge in the JSON-RPC request.
+      scenarios:
+        start-session-with-streaming-via-client-sdk:
+          - GIVEN: 'a client calls `client.session.start({ ..., stream: true })`'
+          - WHEN: the request is sent to the bridge
+          - THEN: 'the JSON-RPC params include `stream: true`'
+  MODIFIED: {}
+  REMOVED: {}

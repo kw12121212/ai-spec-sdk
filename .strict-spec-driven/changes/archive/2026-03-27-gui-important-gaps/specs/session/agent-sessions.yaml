@@ -1,0 +1,21 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: session-agent-sessions
+mapping:
+  implementation: []
+  tests: []
+operations:
+  ADDED:
+    token usage in session completion:
+      strength: MUST
+      statement: >-
+        When a session completes, the `session_completed` notification MUST include a `usage` field:
+        `{inputTokens: number, outputTokens: number}` if usage data was available from the SDK, or
+        `null` if not. The `session.start` and `session.resume` response MUST include the same
+        `usage` field on completion. Usage data is NOT persisted to disk as part of the session
+        file.
+      scenarios: {}
+  MODIFIED: {}
+  REMOVED: {}

@@ -1,0 +1,77 @@
+schema: strict-spec-driven/roadmap-milestone/v2
+schema_version: 2
+artifact_type: roadmap_milestone
+schema_file: templates/strict-spec-driven/schemas/roadmap-milestone.yaml
+milestone:
+  0016-autonomous-loop:
+    title: Autonomous Loop Driver
+goal: >-
+  Implement a self-driving development loop that automatically executes roadmap changes through
+  recommend → auto workflow, with context lifecycle management and automatic question handling.
+scope:
+  in:
+    - Loop scheduler that reads roadmap state and selects next change
+    - Recommend → Auto execution pipeline (propose → implement → verify → review → archive)
+    - Context lifecycle management with automatic session restart on token limit
+    - Integration with Answer Agent for automatic question resolution
+    - Human escalation gate for unsolvable problems
+    - Progress persistence and crash recovery
+    - Loop control interface (start, pause, resume, stop)
+  out:
+    - Roadmap/milestone creation (prerequisite)
+    - Multi-loop coordination across distributed systems
+    - AI-driven roadmap planning
+done_criteria:
+  - Loop automatically executes changes based on roadmap recommendations
+  - Context window exhaustion triggers graceful session restart with state preservation
+  - Questions are automatically answered without human intervention when possible
+  - Unsolvable problems escalate to human with full context
+  - Progress is persisted and recoverable after crashes
+  - Loop can be controlled via API (start, pause, resume, stop)
+planned_changes:
+  loop-scheduler:
+    status: planned
+    summary: roadmap state reading and change selection
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+  recommend-auto-pipeline:
+    status: planned
+    summary: automated change execution
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+  context-lifecycle-manager:
+    status: planned
+    summary: token tracking and session restart
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+  answer-agent-integration:
+    status: planned
+    summary: automatic question handling
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+  escalation-gate:
+    status: planned
+    summary: human escalation for unsolvable issues
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+  loop-persistence:
+    status: planned
+    summary: progress tracking and crash recovery
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+  loop-control-api:
+    status: planned
+    summary: runtime control interface
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+dependencies:
+  - 07-agent-lifecycle — leverages agent state management
+  - 10-task-team-registry — uses task scheduling infrastructure
+  - 13-question-resolution — integrates with question handling
+  - 14-persistence-cache — requires state persistence
+risks:
+  - Automatic execution may produce unexpected changes; need safeguards
+  - Context restart must preserve exact execution state
+  - Answer Agent accuracy affects loop reliability
+status: proposed
+notes: []

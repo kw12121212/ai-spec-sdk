@@ -1,0 +1,35 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: session-depth
+  status: complete
+summary:
+  what:
+    - >-
+      Deepen the session layer of the SDK bridge to give GUI integrators full access to session
+      history and make sessions survive bridge process restarts. Concrete deliverables:
+    - Disk-backed `SessionStore` that writes each session as a JSON file and reloads them on startup
+    - >-
+      New RPC method `session.history` that returns stored session events with offset/limit
+      pagination
+    - >-
+      `session.list` response extended with a `prompt` field (first 200 characters of the initial
+      user prompt)
+  why:
+    - >-
+      Today the bridge stores all session state in memory. A GUI that crashes, is restarted, or
+      simply wants to show a session sidebar cannot recover any prior sessions or their conversation
+      history. `session.history` and disk persistence together close this gap without adding
+      external dependencies.
+scope:
+  in: []
+  out: []
+unchanged_behavior:
+  - >-
+    All existing RPC methods (`session.start`, `session.resume`, `session.stop`, `session.status`,
+    `session.list`) continue to work with the same request/response shapes, extended only by the new
+    `prompt` field on `session.list`
+  - In-memory session access patterns are unchanged; persistence is a write-through layer on top
+  - The `bridge/session_event` notification schema is unchanged

@@ -1,0 +1,34 @@
+schema: strict-spec-driven/question-list/v1
+schema_version: 1
+artifact_type: question_list
+schema_file: templates/strict-spec-driven/schemas/question-list.yaml
+change: policy-interface
+open: []
+resolved:
+  - id: should-policy-checks-be-sync-or-async
+    question: Should policy checks be sync or async?
+    context: Determines the PermissionPolicy interface method signature and affects bridge execution flow.
+    answer: >-
+      Async interface (`Promise<PolicyResult>`). Sync implementations simply return resolved
+      promises. Consistent with existing async hook model. Avoids breaking change when external
+      policy services are needed.
+    status: resolved
+  - id: how-should-multiple-policies-combine-decisions
+    question: How should multiple policies combine decisions?
+    context: >-
+      Determines PolicyResult type, chain execution logic, and future compatibility with
+      approval-chains and rbac-system.
+    answer: >-
+      Ordered chain with deny-short-circuit. Policies return `allow`, `deny`, or `pass`. `deny`
+      stops chain immediately. `allow` short-circuits in allow direction. All `pass` means default
+      allow. Consistent with existing hook sequential execution pattern.
+    status: resolved
+  - id: can-policies-be-dynamically-registered-deregistered-during-session-execution
+    question: Can policies be dynamically registered/deregistered during session execution?
+    context: >-
+      Determines whether runtime JSON-RPC methods for policy management are needed and whether
+      concurrency controls are required.
+    answer: >-
+      Static binding — policies are set at session creation only. Eliminates concurrency risks.
+      Dynamic capability can be added as a future extension without breaking the static interface.
+    status: resolved

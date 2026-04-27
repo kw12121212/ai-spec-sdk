@@ -1,0 +1,101 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: bridge-json-rpc-stdio
+mapping:
+  implementation: []
+  tests: []
+operations:
+  ADDED:
+    Context Management Methods:
+      strength: MUST
+      statement: >-
+        The bridge MUST expose the following methods for managing context files (CLAUDE.md files,
+        memory files, and `.claude/` directory contents): - `context.read` — Read a context file's
+        content - `context.write` — Write a context file's content - `context.list` — List available
+        context files Context operations operate in two scopes: `project` (workspace-relative) and
+        `user` (`~/.claude/`). For project scope, allowed paths are: `CLAUDE.md` at any directory
+        depth, and any file under `.claude/`. For user scope, allowed paths are any file under
+        `~/.claude/`. All paths MUST be resolved to absolute paths and validated against the allowed
+        base directory. Path traversal outside the allowed directory MUST be rejected with a
+        `-32602` error.
+      scenarios:
+        read-a-workspace-claude-md:
+          - GIVEN: a workspace has a `CLAUDE.md` file at its root
+          - WHEN: >-
+              a client calls `context.read` with `{ scope: "project", workspace, path: "CLAUDE.md"
+              }`
+          - THEN: the response includes `{ scope, path, content }` with the file's content
+        read-a-user-scope-context-file:
+          - GIVEN: the user's `~/.claude/` directory contains a `settings.json` file
+          - WHEN: 'a client calls `context.read` with `{ scope: "user", path: "settings.json" }`'
+          - THEN: the response includes the file content
+        read-a-non-existent-file:
+          - GIVEN: a context file does not exist at the specified path
+          - WHEN: a client calls `context.read`
+          - THEN: the bridge returns a `-32001` error indicating the file was not found
+        write-a-context-file:
+          - GIVEN: >-
+              a client calls `context.write` with `{ scope: "project", workspace, path: "CLAUDE.md",
+              content: "..." }`
+          - THEN: 'the file is written and the response includes `{ scope, path, written: true }`'
+        write-creates-parent-directories:
+          - GIVEN: >-
+              a client writes to `.claude/memory/my-notes.md` and the `.claude/memory/` directory
+              does not exist
+          - WHEN: the bridge processes the write
+          - THEN: parent directories are created automatically
+        write-rejects-path-traversal:
+          - GIVEN: >-
+              a client calls `context.write` with `{ scope: "project", workspace, path:
+              "../../etc/passwd", content: "..." }`
+          - WHEN: the bridge validates the path
+          - THEN: >-
+              the bridge returns a `-32602` error indicating the path is outside the allowed
+              directory
+        list-context-files:
+          - GIVEN: a workspace has `CLAUDE.md` and `.claude/settings.json`
+          - WHEN: a client calls `context.list` with `{ workspace }`
+          - THEN: >-
+              the response includes a `files` array with entries for both project and user scope
+              files, each containing `scope`, `path` (relative), `size`, and `modifiedAt`
+        list-with-user-only-scope:
+          - GIVEN: a client calls `context.list` without a workspace
+          - WHEN: the bridge processes the request
+          - THEN: the response includes only user-scope files from `~/.claude/`
+    Context Capability Advertisement:
+      strength: MUST
+      statement: >-
+        The `bridge.capabilities` response MUST include `context.read`, `context.write`, and
+        `context.list` in its supported methods list.
+      scenarios: {}
+    File Change Notification:
+      strength: MUST
+      statement: >-
+        The bridge MUST emit a `bridge/file_changed` notification when the agent uses a Write or
+        Edit tool during a session. For **Write** tool calls, the notification MUST include: -
+        `sessionId` (string) - `path` (string, relative to workspace) - `action` (`"created"` if the
+        file did not exist before, `"modified"` if it did) For **Edit** tool calls, the notification
+        MUST include: - `sessionId` (string) - `path` (string, relative to workspace) - `action`
+        (`"modified"`) The notification does NOT include file content or diff data to avoid leaking
+        potentially sensitive information.
+      scenarios:
+        write-tool-emits-filechanged-with-created-action:
+          - GIVEN: a session is running and the agent uses the Write tool to create a new file
+          - WHEN: the bridge detects the tool_use message
+          - THEN: >-
+              the bridge emits a `bridge/file_changed` notification with `action: "created"` and the
+              relative file path
+        edit-tool-emits-filechanged-with-modified-action:
+          - GIVEN: a session is running and the agent uses the Edit tool on an existing file
+          - WHEN: the bridge detects the tool_use message
+          - THEN: >-
+              the bridge emits a `bridge/file_changed` notification with `action: "modified"` and
+              the relative file path
+        non-file-tools-do-not-emit-filechanged:
+          - GIVEN: a session is running and the agent uses the Bash or Read tool
+          - WHEN: the bridge processes the tool_use message
+          - THEN: no `bridge/file_changed` notification is emitted
+  MODIFIED: {}
+  REMOVED: {}

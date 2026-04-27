@@ -1,0 +1,45 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: token-tracking-token-usage
+mapping:
+  implementation:
+    - src/token-tracking/types.ts
+    - src/token-tracking/store.ts
+    - src/claude-agent-runner.ts
+    - src/bridge.ts
+    - src/capabilities.ts
+  tests:
+    - test/token-tracking/store.test.ts
+    - test/token-tracking/bridge-methods.test.ts
+    - test/token-tracking/integration.test.ts
+operations:
+  ADDED:
+    Message-Level Token Attribution:
+      strength: MUST
+      statement: >-
+        The system MUST attribute token usage to specific message identifiers when available during
+        query execution.
+      scenarios:
+        query-includes-messageid-in-options:
+          - GIVEN: 'a query executed via the runner includes `options.messageId: "msg-123"`'
+          - WHEN: the query completes with token usage
+          - THEN: 'the TokenStore records the token usage with `messageId: "msg-123"`'
+        get-message-usage:
+          - GIVEN: the `token.getMessageUsage` bridge method is exposed
+          - AND: 'a session "session-456" has a record with `messageId: "msg-123"`'
+          - WHEN: the client calls `token.getMessageUsage("session-456", "msg-123")`
+          - THEN: the response returns the matching `TokenRecord` object.
+        get-message-usage-for-missing-message:
+          - GIVEN: 'a session "session-456" does not have a record with `messageId: "msg-missing"`'
+          - WHEN: the client calls `token.getMessageUsage("session-456", "msg-missing")`
+          - THEN: the bridge returns error `-32052` with message "Message not found".
+  MODIFIED:
+    Token Store Lifecycle Management:
+      strength: MUST
+      statement: >-
+        The system MUST manage token data lifecycle aligned with session lifecycle and preserve
+        `messageId` granularity on all stored records.
+      scenarios: {}
+  REMOVED: {}

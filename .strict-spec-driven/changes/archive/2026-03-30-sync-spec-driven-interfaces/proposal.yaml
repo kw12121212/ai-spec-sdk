@@ -1,0 +1,32 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: sync-spec-driven-interfaces
+  status: complete
+summary:
+  what:
+    - >-
+      Synchronize the bridge's spec-driven skill and workflow interfaces with the upgraded
+      auto-spec-driven framework (12 skills, new scripts: `migrate`, `run-maintenance`). Enrich
+      `skills.list` to return structured metadata per skill instead of a flat name array.
+  why:
+    - >-
+      The upstream `auto-spec-driven` repository has added a new skill (`spec-driven-maintenance`)
+      and two new script commands (`migrate`, `run-maintenance`). The bridge currently only lists 11
+      skills and 8 workflows, so callers cannot discover or invoke the new capabilities.
+      Additionally, `skills.list` returns only skill names — GUI clients need descriptions,
+      parameter info, and script availability to present actionable UI without hard-coding
+      knowledge.
+scope:
+  in: []
+  out: []
+unchanged_behavior:
+  - All existing 11 skills remain listed (no removals or renames)
+  - All existing 8 workflows remain supported (no changes to their invocation)
+  - '`workflow.run` error handling, notification, and result structure stay the same'
+  - >-
+    AI-only skills (brainstorm, auto, review, spec-content) remain in the skill list with
+    `hasScript: false`
+  - '`bridge.ping`, session methods, MCP methods, config, hooks, context methods are unchanged'

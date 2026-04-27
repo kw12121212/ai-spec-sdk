@@ -1,0 +1,21 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: proposal-task-queue
+  status: complete
+summary:
+  what:
+    - 实现一个带有优先级和重试逻辑的任务队列（Task Queue），用于管理代理执行任务，确保可靠的异步执行和从临时故障中恢复。
+  why:
+    - >-
+      任务模板（Task Templates）和 Cron 调度器（Cron Scheduler）现已完成。在实现跨会话任务依赖（Cross-session task
+      dependencies）或团队配额（Team quotas）之前，需要一个健壮的执行队列，将调度与立即执行解耦，以防止并发任务耗尽系统资源。
+scope:
+  in: []
+  out: []
+unchanged_behavior:
+  - 任务模板的定义和版本控制方式保持不变。
+  - 团队注册表和权限模型保持不变。
+  - 直接通过 API 同步启动代理会话的现有方式（非通过调度器）保持不变。

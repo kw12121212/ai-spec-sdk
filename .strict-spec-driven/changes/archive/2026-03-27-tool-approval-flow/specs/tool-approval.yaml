@@ -1,0 +1,58 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: tool-approval
+mapping:
+  implementation: []
+  tests: []
+operations:
+  ADDED:
+    Tool Approval Mode:
+      strength: MUST
+      statement: >-
+        When a session is started or resumed with `permissionMode: "approve"`, the bridge MUST
+        intercept every tool-use decision and route it to the caller before execution proceeds. The
+        bridge MUST emit a `bridge/tool_approval_requested` notification containing: - `sessionId`
+        (string) - `requestId` (string, unique per tool call) - `toolName` (string) - `input`
+        (object, the tool's input arguments) - `title` (string, optional — human-readable prompt
+        from the SDK) - `displayName` (string, optional — short label for the tool action) -
+        `description` (string, optional — additional context from the SDK) Agent execution MUST be
+        suspended until the caller responds via `session.approveTool` or `session.rejectTool`.
+      scenarios:
+        tool-call-is-approved:
+          - GIVEN: 'a session is running with `permissionMode: "approve"` and Claude wants to use a tool'
+          - WHEN: >-
+              the bridge emits `bridge/tool_approval_requested` and the caller calls
+              `session.approveTool`
+          - THEN: the tool executes and the session continues normally
+        tool-call-is-rejected:
+          - GIVEN: 'a session is running with `permissionMode: "approve"` and Claude wants to use a tool'
+          - WHEN: >-
+              the bridge emits `bridge/tool_approval_requested` and the caller calls
+              `session.rejectTool`
+          - THEN: the tool is not executed and Claude receives a denial message
+    session.approveTool:
+      strength: MUST
+      statement: >-
+        The bridge MUST expose a `session.approveTool` method. Parameters: `{ sessionId: string,
+        requestId: string }`. If `requestId` is not found, the bridge MUST return error code
+        `-32020`. If `sessionId` does not match the session that owns `requestId`, the bridge MUST
+        return error code `-32020`. On success the pending tool call is allowed to proceed.
+      scenarios: {}
+    session.rejectTool:
+      strength: MUST
+      statement: >-
+        The bridge MUST expose a `session.rejectTool` method. Parameters: `{ sessionId: string,
+        requestId: string, message?: string }`. Same validation as `session.approveTool`. On success
+        the pending tool call is denied; the optional `message` string is forwarded to the agent as
+        the denial reason.
+      scenarios: {}
+    Approval Cleanup on Stop:
+      strength: MUST
+      statement: >-
+        When `session.stop` is called while approvals are pending, the bridge MUST automatically
+        deny all pending approvals for that session so the agent is not left suspended indefinitely.
+      scenarios: {}
+  MODIFIED: {}
+  REMOVED: {}

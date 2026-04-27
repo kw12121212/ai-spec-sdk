@@ -1,0 +1,58 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: gui-discovery-apis
+sections:
+  Implementation:
+    implementation-1:
+      text: >-
+        Add `SUPPORTED_MODELS` and `BUILTIN_TOOLS` static arrays to `capabilities.ts`; add four new
+        method names to the `methods` list in `getCapabilities()`
+      status: complete
+    implementation-2:
+      text: >-
+        Create `src/workspace-store.ts` with `WorkspaceStore` class (`register`, `list`, persistence
+        to `workspaces.json`)
+      status: complete
+    implementation-3:
+      text: >-
+        Add `workspacesDir` option to `BridgeServerOptions`; wire `WorkspaceStore` into
+        `BridgeServer`
+      status: complete
+    implementation-4:
+      text: >-
+        Add dispatch cases in `bridge.ts`: `models.list`, `workspace.register`, `workspace.list`,
+        `tools.list`
+      status: complete
+    implementation-5:
+      text: 'Update `TODO.md`: mark items 7, 8, 9 as `[x]`'
+      status: complete
+  Testing:
+    testing-1:
+      text: >-
+        Add unit tests for `WorkspaceStore` in `test/session-store.test.ts` or a new
+        `test/workspace-store.test.ts`
+      status: complete
+      command: WorkspaceStore
+    testing-2:
+      text: >-
+        Add bridge integration tests for `models.list`, `workspace.register`, `workspace.list`,
+        `tools.list` in `test/bridge.test.ts`
+      status: complete
+      command: models.list
+    testing-3:
+      text: Lint passes (`bun run check` or equivalent)
+      status: complete
+      command: bun run check
+    testing-4:
+      text: Unit tests pass (`bun test`)
+      status: complete
+      command: bun test
+  Verification:
+    verification-1:
+      text: Verify implementation matches proposal
+      status: complete
+testing_gates:
+  validation_task: testing-1
+  unit_test_task: testing-2

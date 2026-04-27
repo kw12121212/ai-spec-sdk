@@ -1,0 +1,24 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: proposal-approval-chains
+  status: complete
+summary:
+  what:
+    - >-
+      Implement multi-level authorization workflows for sensitive operations, allowing tool
+      executions to be paused pending human or external approval.
+  why:
+    - >-
+      To achieve the "enhanced tool approval flow with multi-level authorization" goal of the
+      `09-permissions-hooks.md` milestone. This ensures sensitive tools can be governed by a
+      human-in-the-loop before execution, a critical requirement for enterprise-grade security.
+scope:
+  in: []
+  out: []
+unchanged_behavior:
+  - Basic allow/deny/pass policy semantics remain unchanged.
+  - Existing tool execution workflows for fully-allowed or fully-denied tools are unaffected.
+  - Session lifecycles are unchanged (except for the introduction of an approval paused state).

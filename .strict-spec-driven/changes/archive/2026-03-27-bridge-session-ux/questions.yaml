@@ -1,0 +1,23 @@
+schema: strict-spec-driven/question-list/v1
+schema_version: 1
+artifact_type: question_list
+schema_file: templates/strict-spec-driven/schemas/question-list.yaml
+change: bridge-session-ux
+open: []
+resolved:
+  - id: >-
+      should-context-read-also-allow-reading-claude-user-global-context-or-be-strictly-workspace-scoped
+    question: >-
+      Should context.read also allow reading `~/.claude/` (user global context), or be strictly
+      workspace-scoped?
+    context: Determines whether GUI clients can manage global context files or only per-workspace ones.
+    answer: Yes — allow both workspace and user scope for context operations.
+    status: resolved
+  - id: >-
+      should-session-branching-try-to-reuse-the-original-session-s-sdksessionid-for-sdk-level-resume-or-always-start-fresh
+    question: >-
+      Should session branching try to reuse the original session's `sdkSessionId` for SDK-level
+      resume, or always start fresh?
+    context: SDK resume preserves actual conversation state; fresh start only copies bridge-level history.
+    answer: Try SDK resume when `sdkSessionId` is available from the original session.
+    status: resolved

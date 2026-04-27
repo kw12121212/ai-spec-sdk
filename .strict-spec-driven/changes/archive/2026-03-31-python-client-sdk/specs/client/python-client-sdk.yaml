@@ -1,0 +1,183 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: client-python-client-sdk
+mapping:
+  implementation: []
+  tests: []
+operations:
+  ADDED:
+    Python BridgeClient Dual Transport:
+      strength: MUST
+      statement: >-
+        The `ai-spec-sdk` Python package MUST provide a `BridgeClient` that supports two transport
+        modes: `"stdio"` and `"http"`. When `transport="stdio"`, the client MUST use
+        `claude-agent-sdk` to spawn Claude Code CLI as a subprocess and communicate via its native
+        stdin/stdout JSON-lines protocol. When `transport="http"`, the client MUST connect to a
+        running ai-spec-sdk bridge via HTTP POST `/rpc` for JSON-RPC requests and GET `/events` for
+        SSE event streaming.
+      scenarios:
+        create-client-with-stdio-transport:
+          - GIVEN: a Python developer installs `ai-spec-sdk`
+          - WHEN: they create `BridgeClient(transport="stdio")`
+          - THEN: the client uses `claude-agent-sdk` to communicate with Claude CLI
+        create-client-with-http-transport:
+          - GIVEN: a bridge is running on `localhost:8765`
+          - WHEN: >-
+              a Python developer creates `BridgeClient(transport="http", host="localhost",
+              port=8765, api_key="...")`
+          - THEN: the client connects to the bridge via HTTP/SSE
+    Python Async-Only API:
+      strength: MUST
+      statement: >-
+        The `BridgeClient` MUST be async-only. All public methods MUST be coroutines (`async def`).
+        The client MUST support the `async with` context manager protocol for lifecycle management.
+      scenarios:
+        use-as-async-context-manager:
+          - GIVEN: a `BridgeClient` instance
+          - WHEN: used with `async with BridgeClient() as client:`
+          - THEN: the client connects on entry and disconnects on exit
+    Python Method Naming Convention:
+      strength: MUST
+      statement: >-
+        All `BridgeClient` public methods MUST use camelCase naming to match the TypeScript Client
+        SDK convention (e.g., `sessionStart`, `sessionList`, `bridgeCapabilities`).
+      scenarios:
+        method-names-match-ts-client-sdk:
+          - GIVEN: both the Python and TypeScript Client SDKs
+          - WHEN: comparing their method signatures
+          - THEN: >-
+              the Python method names match the TypeScript names exactly (e.g., `sessionStart` in
+              both)
+    Python Stdio Session Lifecycle:
+      strength: MUST
+      statement: >-
+        In stdio mode, `BridgeClient` MUST support `sessionStart`, `sessionResume`, and
+        `sessionStop` by mapping to `claude-agent-sdk`'s `ClaudeSDKClient` methods. -
+        `sessionStart(workspace, prompt, **options)` → `ClaudeSDKClient.connect(prompt)` with
+        `ClaudeAgentOptions` mapped from options - `sessionResume(sessionId, prompt, **options)` →
+        `ClaudeSDKClient.query(prompt, session_id=..., resume=True)` - `sessionStop(sessionId)` →
+        `ClaudeSDKClient.interrupt()` `sessionStart` and `sessionResume` MUST return immediately
+        with a result containing the session ID. Agent output MUST be delivered asynchronously via
+        `on("session_event", handler)` callbacks, not by blocking until completion. Agent control
+        parameters MUST map as follows: | BridgeClient param | ClaudeAgentOptions field | |---|---|
+        | `model` | `model` | | `allowedTools` | `allowed_tools` | | `disallowedTools` |
+        `disallowed_tools` | | `permissionMode` | `permission_mode` | | `maxTurns` | `max_turns` | |
+        `systemPrompt` | `system_prompt` | | `stream` | `stream` |
+      scenarios:
+        start-session-with-model-and-tools-in-stdio-mode:
+          - GIVEN: a `BridgeClient` with stdio transport
+          - WHEN: >-
+              `await client.sessionStart(workspace="/project", prompt="Fix the bug",
+              model="claude-sonnet-4-6", allowedTools=["Read", "Edit"])`
+          - THEN: '`claude-agent-sdk` spawns Claude CLI with the specified model and tool allowlist'
+        start-session-returns-immediately:
+          - GIVEN: a `BridgeClient` with stdio transport
+          - WHEN: '`result = await client.sessionStart(workspace="/project", prompt="Hello")`'
+          - THEN: >-
+              `result` is returned immediately and subsequent agent output arrives via
+              `on("session_event", handler)` callbacks
+        resume-session-in-stdio-mode:
+          - GIVEN: a `BridgeClient` with stdio transport and a previous session ID
+          - WHEN: '`await client.sessionResume(sessionId="abc-123", prompt="Continue")`'
+          - THEN: '`claude-agent-sdk` resumes the session with the given ID'
+    Python HTTP Full Method Surface:
+      strength: MUST
+      statement: >-
+        In HTTP mode, `BridgeClient` MUST support all bridge JSON-RPC methods by sending requests to
+        `POST /rpc` and returning the parsed response. Methods MUST use camelCase naming matching
+        the TS Client SDK (e.g., `sessionList` maps to `session.list` JSON-RPC method).
+      scenarios:
+        list-sessions-via-http:
+          - GIVEN: a `BridgeClient` with HTTP transport connected to a bridge
+          - WHEN: '`await client.sessionList()`'
+          - THEN: the client sends a JSON-RPC request for `session.list` and returns the sessions array
+        get-config-via-http:
+          - GIVEN: a `BridgeClient` with HTTP transport
+          - WHEN: '`await client.configGet(key="logLevel")`'
+          - THEN: the client sends a JSON-RPC request for `config.get` with the key parameter
+    Python Stdio Unsupported Method Guard:
+      strength: MUST
+      statement: >-
+        When a bridge-only method is called in stdio mode, the `BridgeClient` MUST raise
+        `UnsupportedInStdioError` with a message indicating which methods are available in stdio
+        mode and suggesting HTTP transport for full functionality. Bridge-only methods include:
+        `sessionStatus`, `sessionList`, `sessionHistory`, `sessionSearch`, `sessionBranch`,
+        `sessionExport`, `sessionDelete`, `sessionCleanup`, `sessionEvents`, `sessionApproveTool`,
+        `sessionRejectTool`, `configGet`, `configSet`, `configList`, `toolsList`, `modelsList`,
+        `workspaceRegister`, `workspaceList`, `bridgeCapabilities`, `bridgePing`, `bridgeInfo`,
+        `bridgeSetLogLevel`, `bridgeNegotiateVersion`, `mcpAdd`, `mcpRemove`, `mcpStart`, `mcpStop`,
+        `mcpList`, `hooksAdd`, `hooksRemove`, `hooksList`, `contextRead`, `contextWrite`,
+        `contextList`, `workflowRun`, `skillsList`.
+      scenarios:
+        call-bridge-only-method-in-stdio-mode:
+          - GIVEN: a `BridgeClient` with stdio transport
+          - WHEN: '`await client.sessionList()`'
+          - THEN: the client raises `UnsupportedInStdioError` suggesting HTTP transport
+    Python Event Listener:
+      strength: MUST
+      statement: >-
+        The `BridgeClient` MUST provide an `on(event_name, callback)` method for subscribing to
+        session events. In stdio mode, events from `claude-agent-sdk`'s `receive_messages()` MUST be
+        mapped to `session_event` notifications matching the bridge's event schema. In HTTP mode,
+        SSE events MUST be parsed and delivered to registered callbacks.
+      scenarios:
+        listen-for-session-events-in-stdio-mode:
+          - GIVEN: a `BridgeClient` with stdio transport and a registered event handler
+          - WHEN: the agent produces messages during a session
+          - THEN: >-
+              the handler receives mapped `session_event` notifications with `type` and
+              `messageType` fields
+        listen-for-session-events-in-http-mode:
+          - GIVEN: a `BridgeClient` with HTTP transport subscribed to a session's events
+          - WHEN: the bridge emits an SSE event
+          - THEN: the registered handler receives the parsed event
+    Python HTTP Authentication:
+      strength: MUST
+      statement: >-
+        When `api_key` is provided to `BridgeClient` in HTTP mode, the client MUST include
+        `Authorization: Bearer <key>` header on all HTTP requests.
+      scenarios:
+        api-key-is-sent-with-requests:
+          - GIVEN: a `BridgeClient` with HTTP transport and `api_key="my-key"`
+          - WHEN: any method is called
+          - THEN: 'the HTTP request includes `Authorization: Bearer my-key` header'
+    Python HTTP SSE Reconnection:
+      strength: MUST
+      statement: >-
+        The `HttpTransport` MUST automatically reconnect to the SSE event stream if the connection
+        is lost, using exponential backoff starting at 1 second, capped at 30 seconds.
+      scenarios:
+        sse-reconnects-after-disconnect:
+          - GIVEN: a `BridgeClient` with HTTP transport is receiving SSE events
+          - WHEN: the connection is lost
+          - THEN: >-
+              the client retries with exponential backoff and resumes event delivery upon
+              reconnection
+    Python Custom Tools in Stdio Mode:
+      strength: MUST
+      statement: >-
+        In stdio mode, the `BridgeClient` MUST allow registering custom tools that are passed to
+        `claude-agent-sdk`'s `ClaudeAgentOptions(tools=...)`.
+      scenarios:
+        register-custom-tool-for-stdio-session:
+          - GIVEN: a `BridgeClient` with stdio transport
+          - WHEN: a custom tool is registered and `sessionStart` is called
+          - THEN: the tool is available to the agent during the session
+    Python Dependency Declaration:
+      strength: MUST
+      statement: >-
+        The package MUST declare `claude-agent-sdk` as a required dependency. The package MUST NOT
+        declare any HTTP-specific external dependencies (httpx, aiohttp, requests, etc.).
+      scenarios:
+        package-installs-with-claude-agent-sdk:
+          - GIVEN: a Python environment with `pip`
+          - WHEN: '`pip install ai-spec-sdk` is run'
+          - THEN: '`claude-agent-sdk` is installed as a dependency'
+        http-transport-works-without-extra-dependencies:
+          - GIVEN: only `ai-spec-sdk` and its declared dependencies are installed
+          - WHEN: a `BridgeClient` is created with `transport="http"`
+          - THEN: the client connects and communicates successfully using only Python stdlib
+  MODIFIED: {}
+  REMOVED: {}

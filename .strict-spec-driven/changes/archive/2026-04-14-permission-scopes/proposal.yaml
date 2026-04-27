@@ -1,0 +1,39 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: permission-scopes
+  status: complete
+summary:
+  what:
+    - >-
+      Define a fine-grained tool execution scope model that categorizes each built-in tool by
+      capability domain (file:read, file:write, network, system, task, notebook). Sessions can be
+      created with scope restrictions (`allowedScopes` / `blockedScopes`) that gate tool execution
+      before the agent invokes the tool, independently of the existing `allowedTools` /
+      `disallowedTools` name-based filtering.
+  why:
+    - >-
+      The current permission model is limited to allowlisting/denylisting individual tool names
+      (`allowedTools`, `disallowedTools`) and a coarse `permissionMode` setting. This forces
+      integrators to enumerate every tool name when they want to restrict broad capability
+      categories (e.g., "no network access" or "read-only file access"). A scope-based abstraction
+      provides a higher-level permission primitive that: 1. Reduces configuration surface — restrict
+      an entire capability domain with one scope name 2. Complements existing tool-name filtering —
+      scopes are checked first, then tool-level filtering applies 3. Serves as the foundation for
+      future policy-interface and RBAC changes in milestone 09 4. Aligns with the existing API key
+      scope model in `authentication.md` (consistent scope patterns)
+scope:
+  in: []
+  out: []
+unchanged_behavior:
+  - Existing `allowedTools` / `disallowedTools` parameters continue to work exactly as before
+  - >-
+    Existing `permissionMode` values (`default`, `acceptEdits`, `bypassPermissions`, `approve`) are
+    unaffected
+  - Existing `pre_tool_use` hook execution flow is unaffected — hooks fire after scope checks pass
+  - >-
+    Sessions created without `allowedScopes` / `blockedScopes` have no scope restrictions (backward
+    compatible)
+  - Custom tools (`custom.*`) continue to work; they map to `system` scope by default

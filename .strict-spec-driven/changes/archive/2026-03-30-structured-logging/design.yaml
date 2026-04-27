@@ -1,0 +1,53 @@
+schema: strict-spec-driven/change-design/v1
+schema_version: 1
+artifact_type: change_design
+schema_file: templates/strict-spec-driven/schemas/change-design.yaml
+change: proposal-structured-logging
+approach:
+  - 'Create a singleton `Logger` in `src/logger.ts` that:'
+  - Reads the initial level from `AI_SPEC_SDK_LOG_LEVEL` (case-insensitive, defaults to `info`)
+  - 'Formats each entry as a single JSON line: `{ timestamp, level, message, ...context }`'
+  - Writes to `process.stderr` via `stderr.write()` — synchronous, no buffering
+  - >-
+    Exposes level-specific methods (`logger.trace()`, `logger.debug()`, etc.) that skip formatting
+    when the level is filtered out
+  - >-
+    Supports a `.child(bindings)` method to create scoped loggers that automatically attach context
+    (e.g., `{ sessionId }` for all calls within a session handler) The `BridgeServer` constructor
+    accepts an optional `logger` option. When omitted, the default singleton is used. This allows
+    tests to inject a silent or capturing logger. ### Integration points **bridge.ts dispatch**: log
+    method name, duration (ms), and any error at the end of each `handleMessage` call
+    **session-store.ts**: log session create, complete, stop, interrupt events
+    **claude-agent-runner.ts**: log SDK query start, stop, error **mcp-store.ts**: log MCP server
+    start, stop, error lifecycle **workflow.ts**: log workflow execution start, result, error
+    **config-store.ts**, **context-store.ts**, **hooks-store.ts**, **workspace-store.ts**: log write
+    operations and errors ### bridge.setLogLevel New JSON-RPC method with parameter `{ level: string
+    }`. Validates the level against the five known levels; returns `-32602` on invalid input.
+    Responds with `{ level: "<new-level>" }`.
+decisions:
+  no-external-dependency:
+    decision: '**No external dependency**'
+    rationale: hand-rolled logger keeps bundle small and avoids supply-chain risk
+  json-lines-to-stderr:
+    decision: '**JSON lines to stderr**'
+    rationale: stdout reserved for JSON-RPC; stderr is the standard log channel for CLI tools
+  synchronous-writes:
+    decision: '**Synchronous writes**'
+    rationale: >-
+      `stderr.write()` is synchronous in practice for pipe/terminal destinations; avoids event-loop
+      complexity
+  child-loggers:
+    decision: '**Child loggers**'
+    rationale: '`.child({ sessionId })` pattern avoids manually threading sessionId through every call site'
+  singleton-injectable:
+    decision: '**Singleton + injectable**'
+    rationale: default singleton for production; injectable for testing
+alternatives:
+  - option: '**Winston / pino / bunyan**'
+    reason: >-
+      rejected to avoid external dependencies; the logging needs are simple enough for a hand-rolled
+      solution
+  - option: '**Log to file**'
+    reason: rejected; use external tooling (`2>bridge.log` or `systemd`) to capture stderr
+  - option: '**Async/queued writes**'
+    reason: rejected; adds complexity with no benefit for stderr output

@@ -1,0 +1,73 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: proposal-approval-chains
+sections:
+  Implementation:
+    implementation-1:
+      text: >-
+        Update `PolicyResult` and `ChainRunResult` types in `src/permission-policy.ts` to include
+        `approval_required`.
+      status: complete
+    implementation-2:
+      text: >-
+        Create `src/approval-store.ts` with an `ApprovalStore` class to manage pending approvals
+        (in-memory map of `approvalId` to `PendingApproval` objects containing promise resolvers).
+      status: complete
+    implementation-3:
+      text: Update `PolicyChain.run` in `src/permission-policy.ts` to return `approval_required` early.
+      status: complete
+    implementation-4:
+      text: >-
+        Add `approveTool(approvalId)` and `denyTool(approvalId)` JSON-RPC methods to
+        `src/bridge.ts`.
+      status: complete
+    implementation-5:
+      text: >-
+        Update `executeTool` in `src/bridge.ts` (or the agent runner) to handle `approval_required`
+        from the policy chain: generate an ID, store the pending execution in `ApprovalStore`, and
+        return `{ status: "pending_approval", approvalId }` to the client.
+      status: complete
+    implementation-6:
+      text: >-
+        Ensure `approveTool` resolves the stored promise and `denyTool` rejects it (or resolves it
+        with a specific denial result) to resume execution.
+      status: complete
+  Testing:
+    testing-1:
+      text: >-
+        Run `npm run lint` or equivalent (e.g., `bun run lint` if configured) to ensure no style
+        regressions.
+      status: complete
+      command: npm run lint
+    testing-2:
+      text: Add unit tests in `test/permission-policy.test.ts` for the `approval_required` chain logic.
+      status: complete
+      command: test/permission-policy.test.ts
+    testing-3:
+      text: >-
+        Create `test/approval-store.test.ts` to verify the basic storage and retrieval of pending
+        approvals.
+      status: complete
+      command: test/approval-store.test.ts
+    testing-4:
+      text: >-
+        Update `test/bridge.test.ts` (or create a new integration test) to verify the full flow:
+        request tool -> get pending -> call approve -> tool executes.
+      status: complete
+      command: test/bridge.test.ts
+    testing-5:
+      text: Run `bun test` to verify all tests pass.
+      status: complete
+      command: bun test
+  Verification:
+    verification-1:
+      text: Verify that a tool execution can be paused and successfully resumed via the bridge API.
+      status: complete
+    verification-2:
+      text: Verify that an unapproved tool execution (denied or timed out if implemented) does not run.
+      status: complete
+testing_gates:
+  validation_task: testing-1
+  unit_test_task: testing-2

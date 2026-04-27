@@ -1,0 +1,50 @@
+schema: strict-spec-driven/change-design/v1
+schema_version: 1
+artifact_type: change_design
+schema_file: templates/strict-spec-driven/schemas/change-design.yaml
+change: proposal-rbac-system
+approach:
+  - >-
+    **Configuration:** Introduce a `roles.yaml` file that maps role names to arrays of scope
+    strings. This will be loaded into memory on startup by the `ConfigStore` or a new `RoleStore`.
+  - >-
+    **API Keys:** Update `keys.json` schema and `KeyStore` to support an optional `roles` array
+    alongside the existing `scopes` array.
+  - >-
+    **Authentication:** Modify the authorization logic (in `auth.ts` or `bridge.ts`) to compute the
+    effective scopes of an authenticated key. Effective scopes = direct scopes ∪ scopes from
+    assigned roles.
+  - >-
+    **Session Start:** Update `session.start`, `session.spawn`, and `session.resume` to accept an
+    optional `roles` array in addition to `allowedScopes` and `blockedScopes`. The effective allowed
+    scopes for a session will be the union of `allowedScopes` and the scopes from its assigned
+    `roles`.
+decisions:
+  static-configuration-roles-will-be-defined-in-a-static:
+    decision: >-
+      **Static Configuration:** Roles will be defined in a static configuration file (`roles.yaml`)
+      loaded at startup.
+    rationale: >-
+      This simplifies implementation and avoids the need for new dynamic role management JSON-RPC
+      APIs immediately.
+  additive-roles-roles-will-only-add-scopes:
+    decision: '**Additive Roles:** Roles will only *add* scopes.'
+    rationale: >-
+      Blocking scopes will still be handled via the existing `blockedScopes` mechanism, keeping the
+      mental model simple.
+  hybrid-keys-api-keys-will-support-both-direct-scopes-and:
+    decision: '**Hybrid Keys:** API keys will support both direct `scopes` and `roles`.'
+    rationale: This provides maximum flexibility and backwards compatibility with existing keys.
+alternatives:
+  - option: >-
+      **Dynamic Role APIs:** We considered adding JSON-RPC methods to create, update, and delete
+      roles dynamically.
+    reason: >-
+      This was deferred to keep the initial RBAC implementation simple. Static configuration is
+      sufficient for many enterprise use cases.
+  - option: >-
+      **Role-Only Keys:** We considered forcing API keys to use *only* roles, deprecating direct
+      scopes.
+    reason: >-
+      This was rejected because it would break existing keys and make simple, one-off key creation
+      more complex.

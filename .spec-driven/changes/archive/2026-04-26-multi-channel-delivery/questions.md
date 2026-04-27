@@ -1,2 +1,0 @@
-## Open
-<!-- No open questions -->

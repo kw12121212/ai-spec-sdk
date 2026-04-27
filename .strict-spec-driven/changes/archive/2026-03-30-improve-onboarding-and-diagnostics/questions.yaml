@@ -1,0 +1,17 @@
+schema: strict-spec-driven/question-list/v1
+schema_version: 1
+artifact_type: question_list
+schema_file: templates/strict-spec-driven/schemas/question-list.yaml
+change: proposal-improve-onboarding-and-diagnostics
+open: []
+resolved:
+  - id: how-should-the-current-version-mismatch-be-resolved
+    question: How should the current version mismatch be resolved?
+    context: '`package.json` still reports `0.1.0`, while the runtime bridge already reports `0.2.0`.'
+    answer: Bump the package version up so published metadata matches the runtime bridge and API version.
+    status: resolved
+  - id: what-output-mode-should-ai-spec-bridge-doctor-use
+    question: What output mode should `ai-spec-bridge doctor` use?
+    context: Humans need a readable diagnostic summary, but scripts also need machine-readable output.
+    answer: Default to human-readable output and also support `--json`.
+    status: resolved

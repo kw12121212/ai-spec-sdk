@@ -1,0 +1,29 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: load-balancer
+  status: complete
+summary:
+  what:
+    - >-
+      Add a load balancer layer to the LLM provider subsystem that distributes requests across
+      multiple registered provider instances using configurable routing strategies. Exposes
+      `balancer.create`, `balancer.remove`, `balancer.list`, and `balancer.status` JSON-RPC methods
+      on the bridge.
+  why:
+    - >-
+      Milestone 08 is 6/7 complete. The load balancer is the only remaining planned change.
+      Completing it closes the milestone and unblocks Milestone 12 (Streaming and Token Management),
+      which has an explicit dependency on M08. It also gives SDK consumers a high-availability
+      routing primitive that complements the already-shipped fallback chain.
+scope:
+  in: []
+  out: []
+unchanged_behavior:
+  - 'Behaviors that must not change as a result of this change:'
+  - Existing `provider.*` JSON-RPC methods are not modified
+  - The fallback chain behavior implemented in `provider-fallback` is not changed
+  - Sessions using `providerId` (not `balancerId`) continue to work as before
+  - Token tracking and quota enforcement operate per the provider actually used

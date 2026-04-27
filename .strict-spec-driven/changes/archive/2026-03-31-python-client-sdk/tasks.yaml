@@ -1,0 +1,105 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: python-client-sdk
+sections:
+  Implementation:
+    implementation-1:
+      text: >-
+        Create `clients/python/` with `pyproject.toml` (Python 3.10+, dependency on
+        `claude-agent-sdk`, dev deps: pytest, pytest-asyncio)
+      status: complete
+    implementation-2:
+      text: >-
+        Create `src/ai_spec_sdk/errors.py` with `UnsupportedInStdioError`, `BridgeClientError`,
+        `TransportError` exception classes
+      status: complete
+    implementation-3:
+      text: >-
+        Create `src/ai_spec_sdk/types.py` with typed dataclasses for request/response params
+        (SessionStartParams, SessionResult, EventPayload, etc.)
+      status: complete
+    implementation-4:
+      text: >-
+        Create `src/ai_spec_sdk/events.py` with event listener registry (`EventEmitter` class
+        supporting `on`, `off`, `emit`)
+      status: complete
+    implementation-5:
+      text: >-
+        Create `src/ai_spec_sdk/transports/base.py` with abstract `Transport` base class (connect,
+        disconnect, request, on_event)
+      status: complete
+    implementation-6:
+      text: >-
+        Implement `src/ai_spec_sdk/transports/stdio.py` — `StdioTransport` wrapping
+        `claude-agent-sdk`'s `ClaudeSDKClient` for session start/resume/stop, streaming event
+        mapping, agent control param mapping
+      status: complete
+    implementation-7:
+      text: >-
+        Implement `src/ai_spec_sdk/transports/http.py` — `HttpTransport` with JSON-RPC 2.0 over
+        `POST /rpc`, SSE parsing for `GET /events`, Bearer token auth, reconnection with exponential
+        backoff
+      status: complete
+    implementation-8:
+      text: >-
+        Implement `src/ai_spec_sdk/client.py` — `BridgeClient` with unified API, transport
+        selection, camelCase method names matching TS Client SDK, `UnsupportedInStdioError` guard
+        for stdio mode, async context manager, non-blocking sessionStart/sessionResume with event
+        streaming via `on()`
+      status: complete
+    implementation-9:
+      text: >-
+        Create `src/ai_spec_sdk/__init__.py` with public API exports (`BridgeClient`,
+        `StdioTransport`, `HttpTransport`, error classes, type classes)
+      status: complete
+  Testing:
+    testing-1:
+      text: >-
+        Unit tests for `StdioTransport`: mock `ClaudeSDKClient`, verify session start/resume/stop
+        param mapping, streaming event translation, `UnsupportedInStdioError` for bridge-only
+        methods
+      status: complete
+      command: StdioTransport
+    testing-2:
+      text: >-
+        Unit tests for `HttpTransport`: mock HTTP responses, verify JSON-RPC request format, SSE
+        parsing, auth header, reconnection logic, error code handling
+      status: complete
+      command: HttpTransport
+    testing-3:
+      text: >-
+        Unit tests for `BridgeClient`: verify transport selection, method routing, event listener
+        registration, context manager lifecycle
+      status: complete
+      command: BridgeClient
+    testing-4:
+      text: 'Unit tests for `types.py`: verify dataclass construction and field validation'
+      status: complete
+      command: types.py
+    testing-5:
+      text: All tests pass with `pytest`
+      status: complete
+      command: pytest
+  Verification:
+    verification-1:
+      text: >-
+        Verify package installs cleanly (`pip install -e .`) — requires `claude-agent-sdk` install,
+        manual
+      status: pending
+    verification-2:
+      text: Verify stdio mode can start a session with a real Claude CLI (manual smoke test)
+      status: pending
+    verification-3:
+      text: Verify HTTP mode can connect to a running bridge and call methods (manual smoke test)
+      status: pending
+    verification-4:
+      text: Verify `UnsupportedInStdioError` is raised for bridge-only methods in stdio mode
+      status: complete
+    verification-5:
+      text: Verify no external HTTP dependencies — only `claude-agent-sdk` as required dependency
+      status: complete
+testing_gates:
+  validation_task: testing-1
+  unit_test_task: testing-2

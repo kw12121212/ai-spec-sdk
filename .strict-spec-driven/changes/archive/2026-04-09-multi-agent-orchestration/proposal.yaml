@@ -1,0 +1,31 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: multi-agent-orchestration-proposal
+  status: complete
+summary:
+  what:
+    - >-
+      Introduce parent-child agent session relationships to enable multi-agent orchestration. This
+      allows a parent session to spawn a child session and receive lifecycle events (e.g.,
+      completion) regarding the child session. If a parent session is stopped, all of its active
+      child sessions are recursively stopped to prevent orphaned processes.
+  why:
+    - >-
+      This implements the "multi-agent-orchestration" planned change under the Advanced Runtime
+      milestone (04-advanced-runtime.md). Adding native support for `session.spawn` provides a
+      standardized mechanism for multi-agent workflows across the bridge SDK ecosystem, fulfilling a
+      core objective of the platform.
+scope:
+  in: []
+  out: []
+unchanged_behavior:
+  - >-
+    Existing single-agent `session.start` and `session.stop` behavior remains unchanged when not
+    part of a hierarchy.
+  - >-
+    WebSocket and HTTP SSE transports do not change their fundamental notification fan-out
+    mechanisms.
+  - Authentication, logging, and existing tool configurations are preserved without changes.

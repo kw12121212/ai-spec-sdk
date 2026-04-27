@@ -1,0 +1,35 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: skills-builtin-spec-skills
+mapping:
+  implementation: []
+  tests: []
+operations:
+  ADDED:
+    Built-in Skill Discovery:
+      strength: MUST
+      statement: >-
+        The SDK MUST let clients discover which spec-driven skills are bundled and available through
+        the current SDK distribution.
+      scenarios:
+        list-bundled-skills:
+          - GIVEN: a client wants to understand the spec-driven capabilities packaged with the SDK
+          - WHEN: the client requests bundled skill information
+          - THEN: the bridge returns machine-readable metadata describing the bundled spec-driven skills
+    Workflow and Skill Alignment:
+      strength: SHOULD
+      statement: >-
+        The SDK SHOULD report which bundled skills back the supported high-level workflow operations
+        so host tools can present understandable capability descriptions without depending on
+        internal file layouts.
+      scenarios:
+        describe-workflow-support:
+          - GIVEN: a client inspects the bridge capability metadata
+          - WHEN: the bridge reports supported workflow operations
+          - THEN: >-
+              the response identifies the related bundled spec-driven capabilities in a
+              machine-readable form
+  MODIFIED: {}
+  REMOVED: {}

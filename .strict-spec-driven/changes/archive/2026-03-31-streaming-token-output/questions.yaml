@@ -1,0 +1,29 @@
+schema: strict-spec-driven/question-list/v1
+schema_version: 1
+artifact_type: question_list
+schema_file: templates/strict-spec-driven/schemas/question-list.yaml
+change: streaming-token-output
+open: []
+resolved:
+  - id: what-is-the-exact-typescript-sdk-api-for-enabling-partial-message-delivery
+    question: What is the exact TypeScript SDK API for enabling partial message delivery?
+    context: Determines how `claude-agent-runner.ts` options are structured.
+    answer: >-
+      The SDK option is `includePartialMessages: boolean` in the query options. When `true`, the
+      iterator yields `SDKPartialAssistantMessage` objects with `type: 'stream_event'` and an
+      `event: BetaRawMessageStreamEvent` field. Filter for `event.type === 'content_block_delta'`
+      and `event.delta.type === 'text_delta'` to get text chunks. The delta text is in
+      `event.delta.text`.
+    status: resolved
+  - id: should-streamchunk-be-a-separate-notification-or-a-new-messagetype-within-bridge-sessionevent
+    question: >-
+      Should `stream_chunk` be a separate notification or a new `messageType` within
+      `bridge/session_event`?
+    context: Affects event model consistency and client-side handling.
+    answer: New `messageType` within `bridge/session_event` — keeps the event model unified.
+    status: resolved
+  - id: should-web-ui-streaming-rendering-be-included-in-this-change-or-handled-separately
+    question: Should Web UI streaming rendering be included in this change or handled separately?
+    context: Affects scope and task count.
+    answer: Included together in this change.
+    status: resolved

@@ -1,0 +1,36 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: build-sdk-packaging
+mapping:
+  implementation: []
+  tests: []
+operations:
+  ADDED:
+    build:pack script exists:
+      strength: MUST
+      statement: The project MUST expose a `build:pack` script in the root `package.json`.
+      scenarios: {}
+    build:pack produces a TypeScript client tgz:
+      strength: MUST
+      statement: >-
+        Running `build:pack` MUST produce an npm-installable `.tgz` artifact for the
+        `@ai-spec-sdk/client` package (via `npm pack` in `packages/client/`).
+      scenarios: {}
+    build:pack produces a Python client wheel:
+      strength: MUST
+      statement: >-
+        Running `build:pack` MUST produce a Python-installable `.whl` artifact for the `ai-spec-sdk`
+        package (via `python -m build --wheel` in `clients/python/`), output to
+        `clients/python/dist/`.
+      scenarios: {}
+    artifacts are installable locally without a registry:
+      strength: MUST
+      statement: >-
+        The `.tgz` artifact MUST be installable with `npm install ./path/to/artifact.tgz`. The
+        `.whl` artifact MUST be installable with `pip install ./path/to/artifact.whl`. No registry
+        access is required.
+      scenarios: {}
+  MODIFIED: {}
+  REMOVED: {}

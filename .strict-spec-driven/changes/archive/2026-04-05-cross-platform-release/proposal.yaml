@@ -1,0 +1,34 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: cross-platform-release
+  status: complete
+summary:
+  what:
+    - >-
+      Extend the bridge CLI build to produce native self-contained binaries for five target
+      platforms (linux-x64, linux-arm64, macos-x64, macos-arm64, windows-x64) via `bun compile`. Add
+      a `build:pack` script to the root `package.json` that packages the TypeScript client (`npm
+      pack`) and Python client (`python -m build`) into installable local artifacts. Each native
+      binary gets a SHA-256 checksum file alongside it.
+  why:
+    - >-
+      Milestones 01 and 02 delivered a working bridge, but distribution is currently platform-locked
+      — consumers must have Bun installed and build from source. This change makes the bridge
+      distributable as single-file binaries and both client SDKs distributable as local packages,
+      enabling manual hand-off without any registry dependency.
+scope:
+  in: []
+  out:
+    - Publishing to npm or PyPI
+    - GitHub Actions / CI workflow changes (binaries are built locally)
+    - Changes to bridge source code, JSON-RPC surface, or client SDK source
+unchanged_behavior:
+  - >-
+    The existing `build:native` script (no target flag) is kept unchanged and continues to produce
+    `dist/ai-spec-bridge-native`
+  - '`build` (tsc), `test`, `lint`, and `start` scripts are unaffected'
+  - No bridge runtime behavior changes; no JSON-RPC surface changes
+  - No changes to `packages/client/` or `clients/python/` source code

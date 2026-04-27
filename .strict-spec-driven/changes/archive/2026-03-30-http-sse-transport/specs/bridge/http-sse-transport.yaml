@@ -1,0 +1,116 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: bridge-http-sse-transport
+mapping:
+  implementation: []
+  tests: []
+operations:
+  ADDED:
+    HTTP Transport Entrypoint:
+      strength: MUST
+      statement: >-
+        When started with `--transport http` (or `AI_SPEC_SDK_TRANSPORT=http`), the bridge MUST
+        listen for HTTP connections on the configured port instead of reading from stdin/stdout. The
+        default port is `8765` and MUST be overridable via `--port <n>` or `AI_SPEC_SDK_PORT`.
+      scenarios:
+        bridge-starts-in-http-mode:
+          - GIVEN: the bridge is launched with `--transport http --port 8765`
+          - WHEN: the process starts
+          - THEN: it accepts HTTP connections on port 8765 and does not read from stdin
+    POST /rpc Endpoint:
+      strength: MUST
+      statement: >-
+        The bridge MUST expose a `POST /rpc` endpoint that accepts a JSON-RPC 2.0 request body and
+        returns a JSON-RPC 2.0 response. The endpoint MUST require `Content-Type: application/json`.
+        Requests with a body exceeding 10 MB MUST be rejected with HTTP 413. Malformed JSON MUST be
+        rejected with a JSON-RPC `-32700` parse error response.
+      scenarios:
+        valid-json-rpc-request-over-http:
+          - GIVEN: the bridge is running in HTTP mode
+          - WHEN: a client sends `POST /rpc` with a valid JSON-RPC 2.0 body
+          - THEN: the bridge returns a JSON-RPC 2.0 response with HTTP 200
+        body-too-large:
+          - GIVEN: a client sends `POST /rpc` with a body exceeding 10 MB
+          - WHEN: the bridge reads the request
+          - THEN: the bridge responds with HTTP 413
+        wrong-content-type:
+          - GIVEN: 'a client sends `POST /rpc` without `Content-Type: application/json`'
+          - WHEN: the bridge validates the request
+          - THEN: the bridge responds with HTTP 415
+    GET /events SSE Endpoint:
+      strength: MUST
+      statement: >-
+        The bridge MUST expose a `GET /events?sessionId=<id>` endpoint that streams
+        `bridge/session_event` and other session-scoped notifications as Server-Sent Events. The
+        `sessionId` query parameter is required; its absence MUST result in HTTP 400. Multiple
+        clients MAY subscribe to the same `sessionId` (fan-out). Notifications that do not carry a
+        `sessionId` MUST NOT be sent to any SSE connection.
+      scenarios:
+        sse-stream-delivers-session-scoped-notifications:
+          - GIVEN: a client is subscribed to `GET /events?sessionId=abc`
+          - WHEN: 'the bridge emits a `bridge/session_event` notification with `sessionId: "abc"`'
+          - THEN: >-
+              the notification is written to the SSE stream as an `event: session_event` / `data:
+              <json>` pair
+        multiple-subscribers-receive-the-same-notification:
+          - GIVEN: two clients are both subscribed to `GET /events?sessionId=abc`
+          - WHEN: the bridge emits a session-scoped notification for session `abc`
+          - THEN: both clients receive the notification
+        missing-sessionid-query-param-returns-400:
+          - GIVEN: a client calls `GET /events` without a `sessionId` query param
+          - WHEN: the bridge validates the request
+          - THEN: the bridge responds with HTTP 400
+        notification-without-sessionid-is-dropped:
+          - GIVEN: a notification is emitted that does not include a `sessionId` field
+          - WHEN: the bridge processes the notification
+          - THEN: no SSE connection receives the notification
+    GET /health Endpoint:
+      strength: MUST
+      statement: >-
+        The bridge MUST expose a `GET /health` endpoint that returns `{ status: "ok", apiVersion }`
+        with HTTP 200 and `Content-Type: application/json`. This endpoint requires no
+        authentication.
+      scenarios:
+        health-check-responds:
+          - GIVEN: the bridge is running in HTTP mode
+          - WHEN: a client calls `GET /health`
+          - THEN: 'the bridge returns HTTP 200 with `{ status: "ok", apiVersion: "<semver>" }`'
+    CORS Support:
+      strength: MUST
+      statement: >-
+        The bridge MUST include CORS response headers on all HTTP responses. The allowed origins
+        MUST be configurable via the `AI_SPEC_SDK_CORS_ORIGINS` environment variable. When the env
+        var is unset the bridge MUST default to `Access-Control-Allow-Origin: *`. Preflight
+        `OPTIONS` requests MUST receive HTTP 204 with the appropriate CORS headers.
+      scenarios:
+        cors-headers-present-on-rpc-response:
+          - GIVEN: the bridge is running in HTTP mode
+          - WHEN: a client sends `POST /rpc`
+          - THEN: >-
+              the response includes `Access-Control-Allow-Origin` and `Access-Control-Allow-Methods`
+              headers
+    Graceful Shutdown:
+      strength: MUST
+      statement: >-
+        When the bridge process receives `SIGTERM` in HTTP mode, it MUST stop accepting new
+        connections, wait for all in-flight `POST /rpc` requests to complete, then close all open
+        SSE connections before exiting.
+      scenarios:
+        in-flight-request-completes-before-shutdown:
+          - GIVEN: a `POST /rpc` request is being processed when `SIGTERM` is received
+          - WHEN: the bridge handles the signal
+          - THEN: the response is sent before the process exits
+    Transport Field in Capabilities:
+      strength: MUST
+      statement: >-
+        The `bridge.capabilities` response MUST include a `transport` field whose value is `"stdio"`
+        when running in stdio mode and `"http"` when running in HTTP mode.
+      scenarios:
+        http-mode-reports-transport-in-capabilities:
+          - GIVEN: the bridge is running in HTTP mode
+          - WHEN: a client calls `bridge.capabilities` via `POST /rpc`
+          - THEN: 'the response includes `transport: "http"`'
+  MODIFIED: {}
+  REMOVED: {}

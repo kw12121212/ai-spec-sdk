@@ -1,0 +1,30 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: session-stream-control
+mapping:
+  implementation:
+    - src/bridge.ts
+    - src/session-store.ts
+    - src/llm-provider/adapters/anthropic.ts
+  tests:
+    - test/session.test.ts
+    - test/anthropic-adapter.test.ts
+operations:
+  ADDED:
+    reasoning-stream:
+      strength: MUST
+      statement: >-
+        The system MUST stream reasoning/thinking process output separately from final response
+        output.
+      scenarios:
+        reasoning-tokens-received:
+          - GIVEN: an active streaming session where the LLM provider supports reasoning output
+          - WHEN: the LLM provider emits a reasoning token chunk
+          - THEN: >-
+              the system MUST emit a distinct JSON-RPC notification (e.g., `agent.reasoning`) to the
+              client
+          - AND: the system MUST NOT include the reasoning text in the standard text token stream
+  MODIFIED: {}
+  REMOVED: {}

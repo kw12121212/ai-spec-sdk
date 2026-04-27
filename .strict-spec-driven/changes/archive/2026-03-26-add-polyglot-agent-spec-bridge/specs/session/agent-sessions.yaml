@@ -1,0 +1,60 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: session-agent-sessions
+mapping:
+  implementation: []
+  tests: []
+operations:
+  ADDED:
+    Start Agent Session:
+      strength: MUST
+      statement: >-
+        The SDK MUST let a client start a Claude-backed agent session for an explicit workspace and
+        prompt through the bridge.
+      scenarios:
+        start-a-new-session:
+          - GIVEN: a client provides a workspace path and an initial prompt
+          - WHEN: the client requests a new agent session
+          - THEN: >-
+              the bridge starts agent execution and returns a session identifier that the client can
+              use for subsequent operations
+    Resume Agent Session:
+      strength: MUST
+      statement: >-
+        The SDK MUST let a client resume a previously created session when the session identifier is
+        still available to the bridge.
+      scenarios:
+        resume-existing-context:
+          - GIVEN: a client previously received a session identifier from the bridge
+          - WHEN: the client requests session resumption using that identifier
+          - THEN: >-
+              the bridge continues the session with preserved context instead of starting from an
+              empty conversation
+    Observe Session Progress:
+      strength: MUST
+      statement: >-
+        The SDK MUST provide machine-readable session events that let clients follow progress and
+        receive final results through the bridge.
+      scenarios:
+        receive-session-events:
+          - GIVEN: a client has started or resumed a session
+          - WHEN: the agent emits progress or completion output
+          - THEN: >-
+              the bridge forwards machine-readable events that the client can associate with that
+              session
+    Stop Active Session:
+      strength: SHOULD
+      statement: >-
+        The SDK SHOULD let a client request termination of an active session and return a clear
+        terminal state for that session.
+      scenarios:
+        stop-a-running-session:
+          - GIVEN: a client has an active session in progress
+          - WHEN: the client requests session termination
+          - THEN: >-
+              the bridge reports whether the session stopped successfully and what terminal state
+              was recorded
+  MODIFIED: {}
+  REMOVED: {}

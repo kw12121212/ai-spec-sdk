@@ -1,0 +1,40 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: execution-hooks
+  status: complete
+summary:
+  what:
+    - >-
+      Execute registered hook commands when hook events fire, and support blocking behavior for
+      `pre_tool_use` hooks so they can intercept, modify, or prevent tool execution before the agent
+      proceeds. Currently, `_fireHooks` only emits a `bridge/hook_triggered` notification. After
+      this change, the bridge will `spawn` the hook command, capture its stdout/stderr/exit code,
+      and — for `pre_tool_use` hooks — wait for the command to complete before allowing the tool use
+      to proceed. If a blocking hook exits non-zero, the tool use MUST be aborted.
+  why:
+    - >-
+      The hooks infrastructure already exists (`HooksStore`, `HookEntry.command`, `_fireHooks`,
+      `hooks.add`/`hooks.remove`/`hooks.list` RPC methods) but hook commands are never executed.
+      This makes the hook system notification-only rather than functional. Execution hooks are
+      needed to:
+    - Allow external programs to observe and react to tool execution
+    - Enable blocking pre-flight checks (e.g., safety gates, policy enforcement)
+    - >-
+      Provide the execution-event capture foundation that audit-logging, pause-resume, and
+      timeout-cancellation changes depend on
+scope:
+  in: []
+  out: []
+unchanged_behavior:
+  - Hook registration, removal, and listing behavior MUST NOT change
+  - Hook file persistence (`.claude/hooks.json`) MUST NOT change
+  - >-
+    Non-blocking hook events (`post_tool_use`, `notification`, `stop`, `subagent_stop`) MUST NOT
+    alter the agent execution flow — they remain fire-and-forget
+  - >-
+    The `_fireHooks` method MUST still emit `bridge/hook_triggered` notifications for all matching
+    hooks
+  - When no hooks are registered, behavior MUST be identical to current (no hooks to fire)

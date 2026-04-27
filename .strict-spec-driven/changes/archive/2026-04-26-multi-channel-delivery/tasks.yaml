@@ -1,0 +1,40 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: proposal-multi-channel-delivery
+sections:
+  Implementation:
+    implementation-1:
+      text: Update webhook delivery system to subscribe to `session.question` events emitted by agents
+      status: complete
+    implementation-2:
+      text: Add `session_question` to the list of webhook event types
+      status: complete
+    implementation-3:
+      text: Construct the structured payload for question webhooks
+      status: complete
+    implementation-4:
+      text: Ensure question webhooks use the existing retry and HMAC signing logic
+      status: complete
+    implementation-5:
+      text: Implement WebPush or generic push notification HTTP dispatch functionality
+      status: complete
+  Testing:
+    testing-1:
+      text: Run `npm run lint` — validation task to check for TypeScript errors
+      status: complete
+      command: npm run lint
+    testing-2:
+      text: Run `bun test` — unit tests to verify webhook question delivery
+      status: complete
+      command: bun test
+  Verification:
+    verification-1:
+      text: >-
+        Verify implementation matches proposal scope by ensuring `session_question` webhooks are
+        delivered correctly.
+      status: complete
+testing_gates:
+  validation_task: testing-1
+  unit_test_task: testing-2

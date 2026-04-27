@@ -1,0 +1,35 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: session-agent-sessions
+mapping:
+  implementation:
+    - src/session-store.ts
+    - src/bridge.ts
+  tests:
+    - test/provider-switching.test.ts
+    - test/provider-switching-bridge.test.ts
+operations:
+  ADDED:
+    Active Provider Field in Session Record:
+      strength: MUST
+      statement: >-
+        Session records MUST include an optional `activeProviderId` field (string | undefined) that
+        tracks which LLM provider the session is configured to use. This field MUST be persisted to
+        disk alongside other session fields and restored on bridge restart.
+      scenarios:
+        active-provider-is-persisted:
+          - GIVEN: 'a session has `activeProviderId: "my-openai"`'
+          - WHEN: the session is saved to disk
+          - THEN: the JSON file includes the `activeProviderId` field
+        active-provider-is-restored-on-restart:
+          - GIVEN: 'a session file on disk contains `activeProviderId: "my-openai"`'
+          - WHEN: the bridge restarts and loads the session
+          - THEN: the session's `activeProviderId` is correctly restored to `"my-openai"`
+        absent-activeproviderid-defaults-to-undefined:
+          - GIVEN: a session file on disk does NOT contain `activeProviderId`
+          - WHEN: the bridge loads the session
+          - THEN: the session's `activeProviderId` is `undefined`
+  MODIFIED: {}
+  REMOVED: {}

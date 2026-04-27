@@ -1,0 +1,32 @@
+schema: strict-spec-driven/question-list/v1
+schema_version: 1
+artifact_type: question_list
+schema_file: templates/strict-spec-driven/schemas/question-list.yaml
+change: go-cli-example
+open: []
+resolved:
+  - id: should-the-go-cli-support-the-tool-approval-flow
+    question: Should the Go CLI support the tool approval flow?
+    context: Tool approval is a key SDK feature; the example should demonstrate it.
+    answer: 'Yes, support it. Use `permissionMode: "approve"` as the default mode.'
+    status: resolved
+  - id: what-is-the-scope-of-the-example
+    question: What is the scope of the example?
+    context: Determines how many bridge methods and commands to implement.
+    answer: Full version — cover all bridge methods including workflow.run.
+    status: resolved
+  - id: should-the-code-include-detailed-comments-in-what-language
+    question: Should the code include detailed comments? In what language?
+    context: Affects readability for the target audience.
+    answer: English comments explaining each JSON-RPC interaction.
+    status: resolved
+  - id: should-the-cli-support-multi-line-input
+    question: Should the CLI support multi-line input?
+    context: Users may want to paste multi-line code or prompts.
+    answer: Yes, support multi-line input via backslash continuation.
+    status: resolved
+  - id: should-there-be-a-workflow-command
+    question: Should there be a `/workflow` command?
+    context: workflow.run is a core bridge method that should be demonstrated.
+    answer: Yes, include `/workflow <name>` command.
+    status: resolved

@@ -1,0 +1,29 @@
+schema: strict-spec-driven/question-list/v1
+schema_version: 1
+artifact_type: question_list
+schema_file: templates/strict-spec-driven/schemas/question-list.yaml
+change: add-polyglot-agent-spec-bridge
+open: []
+resolved:
+  - id: what-is-the-primary-integration-shape-for-the-first-release
+    question: What is the primary integration shape for the first release?
+    context: >-
+      This determines whether the proposal centers on a language-specific SDK, CLI wrapper, or
+      language-neutral bridge.
+    answer: The first release targets a polyglot bridge for external tool integration.
+    status: resolved
+  - id: which-transport-should-the-bridge-support-first
+    question: Which transport should the bridge support first?
+    context: This affects the external contract, lifecycle handling, and deployment assumptions.
+    answer: The first release uses JSON-RPC 2.0 over stdio.
+    status: resolved
+  - id: which-capabilities-are-in-scope-for-the-first-release
+    question: Which capabilities are in scope for the first release?
+    context: >-
+      This determines proposal size and prevents the first change from expanding into a full
+      platform.
+    answer: >-
+      The first release includes spec-driven workflow operations plus Claude agent session
+      orchestration, but not HTTP deployment, plugin marketplace features, or multi-tenant platform
+      concerns.
+    status: resolved

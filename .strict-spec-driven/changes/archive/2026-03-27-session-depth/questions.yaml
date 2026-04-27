@@ -1,0 +1,24 @@
+schema: strict-spec-driven/question-list/v1
+schema_version: 1
+artifact_type: question_list
+schema_file: templates/strict-spec-driven/schemas/question-list.yaml
+change: session-depth
+open: []
+resolved:
+  - id: should-tool-approval-flow-be-in-scope-for-this-change
+    question: Should tool approval flow be in scope for this change?
+    context: GUI might want to show approve/deny dialogs for tool calls.
+    answer: No — tool approval is low priority and out of scope for this change.
+    status: resolved
+  - id: should-persistence-be-optional-or-always-on
+    question: Should persistence be optional or always-on?
+    context: In-memory-only mode is simpler for testing and embedded use cases.
+    answer: >-
+      Persistence is opt-in via `sessionsDir` constructor option; when absent, behavior is unchanged
+      (in-memory only). The CLI always provides the default path.
+    status: resolved
+  - id: single-store-file-vs-one-file-per-session
+    question: Single store file vs one file per session?
+    context: Affects read/write patterns and recoverability.
+    answer: One file per session — simpler, independently readable and deletable, no migration needed.
+    status: resolved

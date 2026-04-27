@@ -1,0 +1,50 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: proposal-lsp-diagnostics
+sections:
+  Implementation:
+    implementation-1:
+      text: >-
+        Define LSP diagnostic interfaces (`Diagnostic`, `DiagnosticSeverity`,
+        `PublishDiagnosticsParams`) in `src/lsp-types.ts`
+      status: complete
+    implementation-2:
+      text: >-
+        Update `LspClient` to listen for `textDocument/publishDiagnostics` and store the result
+        internally
+      status: complete
+    implementation-3:
+      text: 'Add `getDiagnostics(uri: string)` method to `LspClient`'
+      status: complete
+    implementation-4:
+      text: Implement the `lsp_diagnostics` tool in `src/lsp-tools.ts`
+      status: complete
+    implementation-5:
+      text: Export the new tool in `src/index.ts`
+      status: complete
+  Testing:
+    testing-1:
+      text: Write unit tests for `LspClient` diagnostic handling in `test/lsp-client.test.ts`
+      status: complete
+      command: LspClient
+    testing-2:
+      text: Write unit tests for the `lsp_diagnostics` tool in `test/lsp-tools.test.ts`
+      status: complete
+      command: lsp_diagnostics
+    testing-3:
+      text: Run `npm run lint` — validate TypeScript definitions and formatting
+      status: complete
+      command: npm run lint
+    testing-4:
+      text: Run `npm run test` — verify the unit tests pass
+      status: complete
+      command: npm run test
+  Verification:
+    verification-1:
+      text: Verify implementation matches proposal scope and correctly exposes diagnostics to the agent
+      status: complete
+testing_gates:
+  validation_task: testing-1
+  unit_test_task: testing-2

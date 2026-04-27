@@ -1,0 +1,30 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: team-registry
+  status: complete
+summary:
+  what:
+    - >-
+      Add a team registry to the bridge that supports creating, reading, updating, deleting, and
+      listing teams with members and shared workspace associations. Teams serve as organizational
+      units for collaborative agent workflows and provide a scope for team-level permissions and
+      (future) resource quotas.
+  why:
+    - >-
+      Milestone 10 (Task and Team Registry) requires team management as a foundational capability.
+      The `task-template-registry` change established reusable task configurations; teams complement
+      this by providing shared workspaces where members can collaborate on agent sessions. The RBAC
+      system (milestone 09) already defines roles and scopes; teams extend this to group-level
+      permission scoping. Team registry is also a prerequisite for the planned `team-quotas` change.
+scope:
+  in: []
+  out: []
+unchanged_behavior:
+  - Existing task template operations remain unchanged
+  - Session management (start, resume, stop, etc.) remains unchanged
+  - RBAC scope checking and role resolution remain unchanged
+  - Existing bridge methods and capabilities remain unchanged
+  - Workspace registration and configuration management remain unchanged

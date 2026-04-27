@@ -1,0 +1,41 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: proposal-team-quotas
+sections:
+  Implementation:
+    implementation-1:
+      text: Add `"team"` to `QuotaScope` and update validation in `src/quota/types.ts`.
+      status: complete
+    implementation-2:
+      text: >-
+        Add optional `teamId` to `Session` interface and `SessionStore.create` method in
+        `src/session-store.ts`.
+      status: complete
+    implementation-3:
+      text: >-
+        Update `src/quota/enforcer.ts` to accumulate and enforce usage for `scope: "team"` when
+        `session.teamId` is present.
+      status: complete
+    implementation-4:
+      text: Ensure `teamId` is persisted to disk and exported in session data.
+      status: complete
+  Testing:
+    testing-1:
+      text: Run `bun run typecheck` — lint and typecheck validation.
+      status: complete
+      command: bun run typecheck
+    testing-2:
+      text: Run `bun test` — unit test task for quota enforcement and session creation.
+      status: complete
+      command: bun test
+  Verification:
+    verification-1:
+      text: >-
+        Verify implementation matches proposal scope and correctly blocks queries when a team limit
+        is exceeded.
+      status: complete
+testing_gates:
+  validation_task: testing-1
+  unit_test_task: testing-2

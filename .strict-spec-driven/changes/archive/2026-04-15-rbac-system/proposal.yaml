@@ -1,0 +1,27 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: proposal-rbac-system
+  status: complete
+summary:
+  what:
+    - >-
+      Implement a Role-Based Access Control (RBAC) system for tools and sessions. This system will
+      allow operators to define reusable "Roles" that aggregate existing permission scopes (e.g.,
+      `file:read`, `system`). These roles can then be assigned to API keys and sessions to simplify
+      permission management.
+  why:
+    - >-
+      As the platform expands and more tools are integrated, managing raw scopes on individual API
+      keys and sessions becomes error-prone and tedious. RBAC provides a manageable,
+      enterprise-grade permissions grouping mechanism. It is a logical prerequisite for more
+      advanced security features like permission inheritance and auditing.
+scope:
+  in: []
+  out: []
+unchanged_behavior:
+  - Existing APIs and keys that only use `scopes` will continue to function without modification.
+  - The underlying scope-based tool execution gating (`isScopeDenied`) will remain unchanged.
+  - The policy interface will remain unaffected by this change.

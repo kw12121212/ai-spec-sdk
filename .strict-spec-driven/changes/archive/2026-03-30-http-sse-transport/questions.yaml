@@ -1,0 +1,29 @@
+schema: strict-spec-driven/question-list/v1
+schema_version: 1
+artifact_type: question_list
+schema_file: templates/strict-spec-driven/schemas/question-list.yaml
+change: http-sse-transport
+open: []
+resolved:
+  - id: should-stdio-and-http-transports-run-simultaneously-in-one-process
+    question: Should stdio and HTTP transports run simultaneously in one process?
+    context: Affects CLI design and whether `BridgeServer` needs to support multiple notification sinks.
+    answer: No — they are separate launch modes. Use `--transport http` for HTTP, default is stdio.
+    status: resolved
+  - id: which-notifications-should-sse-connections-receive
+    question: Which notifications should SSE connections receive?
+    context: Some notifications (e.g. `mcp/server_started`) do not carry a `sessionId`.
+    answer: >-
+      All notifications that carry a `sessionId` are routed to matching SSE subscribers.
+      Notifications without a `sessionId` are dropped (not sent to any SSE connection).
+    status: resolved
+  - id: can-multiple-http-clients-subscribe-to-the-same-sessionid-via-get-events
+    question: Can multiple HTTP clients subscribe to the same sessionId via `GET /events`?
+    context: Determines whether fan-out is needed in the SSE manager.
+    answer: Yes — multiple subscribers per sessionId are supported (fan-out).
+    status: resolved
+  - id: should-graceful-shutdown-drain-in-flight-requests-or-close-immediately
+    question: Should graceful shutdown drain in-flight requests or close immediately?
+    context: Affects perceived reliability for clients mid-request during restarts.
+    answer: Yes — drain in-flight `POST /rpc` requests before closing SSE connections.
+    status: resolved

@@ -1,0 +1,49 @@
+schema: strict-spec-driven/roadmap-milestone/v2
+schema_version: 2
+artifact_type: roadmap_milestone
+schema_file: templates/strict-spec-driven/schemas/roadmap-milestone.yaml
+milestone:
+  0005-developer-ecosystem:
+    title: Developer Ecosystem
+goal: >-
+  Complete the production observability story, enable external integrations via webhooks, add
+  session configuration reuse, and deliver a JVM reference implementation.
+scope:
+  in:
+    - Prometheus metrics at GET /metrics (bridge_requests_total, bridge_tokens_consumed, etc.)
+    - HMAC-signed HTTP webhook delivery for session lifecycle events with retry
+    - Save and reuse named session configurations (templates)
+  out:
+    - Log shipping to OpenTelemetry collector
+    - Distributed tracing across multiple bridges
+    - Webhook filtering by session or workspace
+done_criteria:
+  - GET /metrics returns valid Prometheus text format; counters increment correctly per request
+  - Webhook delivers HMAC-signed POST within 3 retry attempts; unsubscribe stops delivery
+  - session.start accepts template param; explicit params override template defaults
+planned_changes:
+  opentelemetry-metrics:
+    status: complete
+    summary: Prometheus metrics at GET /metrics
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+  event-webhooks:
+    status: complete
+    summary: HMAC-signed HTTP webhook delivery with retry
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+  session-templates:
+    status: complete
+    summary: save and reuse session configurations
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+dependencies:
+  - >-
+    02-production-ready — metrics and webhooks require HTTP transport and auth; session-templates
+    requires session persistence
+risks:
+  - >-
+    Prometheus format is hand-rolled (no external dep); correctness must be validated against a real
+    scraper.
+status: complete
+notes: []

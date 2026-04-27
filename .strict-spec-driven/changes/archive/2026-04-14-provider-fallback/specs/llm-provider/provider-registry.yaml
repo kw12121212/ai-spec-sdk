@@ -1,0 +1,131 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: llm-provider-provider-registry
+mapping:
+  implementation:
+    - src/llm-provider/types.ts
+    - src/llm-provider/provider-registry.ts
+    - src/bridge.ts
+  tests:
+    - test/provider-fallback.test.ts
+    - test/provider-registry.test.ts
+    - test/provider-registry-bridge.test.ts
+operations:
+  ADDED:
+    Fallback Chain Configuration:
+      strength: MUST
+      statement: >-
+        The SDK MUST allow clients to configure an ordered fallback chain on a provider by including
+        `fallbackProviderIds` (an array of registered provider IDs) in the provider configuration.
+      scenarios:
+        register-provider-with-fallback-chain:
+          - GIVEN: >-
+              a client provides a valid provider configuration with `fallbackProviderIds:
+              ["backup-1", "backup-2"]`
+          - WHEN: the client calls `provider.register` with that configuration
+          - THEN: the bridge stores the configuration including `fallbackProviderIds`
+          - AND: 'returns `{ success: true, providerId: "<id>" }`'
+        register-provider-without-fallback-chain:
+          - GIVEN: a client provides a valid provider configuration without `fallbackProviderIds`
+          - WHEN: the client calls `provider.register`
+          - THEN: the registration succeeds and behaves identically to the existing behavior
+        reject-non-array-fallbackproviderids:
+          - GIVEN: >-
+              a client provides a configuration with `fallbackProviderIds: "backup-1"` (a string,
+              not an array)
+          - WHEN: the client calls `provider.register`
+          - THEN: >-
+              the bridge returns error `-32602` (Invalid params) with details about the invalid
+              field
+        fallback-chain-persists-across-restarts:
+          - GIVEN: a provider with `fallbackProviderIds` is registered
+          - WHEN: the bridge restarts and loads from ConfigStore
+          - THEN: the reloaded provider config includes the original `fallbackProviderIds`
+    Reactive Fallback on Request Error:
+      strength: MUST
+      statement: >-
+        The SDK MUST automatically retry a failed request on the next provider in the fallback chain
+        when the active provider throws an error during a live request.
+      scenarios:
+        fallback-activates-on-primary-provider-error:
+          - GIVEN: provider "primary" is active for a session
+          - AND: '"primary" has `fallbackProviderIds: ["backup"]`'
+          - AND: '"primary" throws an error on query'
+          - WHEN: the session executes a request
+          - THEN: the SDK retries the request on "backup"
+          - AND: returns the result from "backup"
+        fallback-walks-the-full-chain-in-order:
+          - GIVEN: 'provider "primary" has `fallbackProviderIds: ["b1", "b2"]`'
+          - AND: '"primary" and "b1" both throw on query'
+          - WHEN: the session executes a request
+          - THEN: the SDK tries "primary", then "b1", then "b2" in that order
+          - AND: returns the result from "b2"
+        all-chain-members-fail:
+          - GIVEN: 'provider "primary" has `fallbackProviderIds: ["backup"]`'
+          - AND: both "primary" and "backup" throw on query
+          - WHEN: the session executes a request
+          - THEN: the SDK returns an error indicating all providers in the chain failed
+        fallback-does-not-activate-on-successful-request:
+          - GIVEN: 'provider "primary" has `fallbackProviderIds: ["backup"]`'
+          - AND: '"primary" succeeds on query'
+          - WHEN: the session executes a request
+          - THEN: only "primary" is used; "backup" is not called
+        no-fallback-when-chain-is-absent:
+          - GIVEN: provider "primary" has no `fallbackProviderIds`
+          - AND: '"primary" throws on query'
+          - WHEN: the session executes a request
+          - THEN: the SDK falls through to the default provider (existing behavior)
+    Fallback Activation Event:
+      strength: MUST
+      statement: >-
+        The SDK MUST emit a `provider.fallback.activated` event on the bridge event stream whenever
+        the fallback chain advances due to a provider error.
+      scenarios:
+        event-emitted-on-fallback:
+          - GIVEN: 'provider "primary" has `fallbackProviderIds: ["backup"]`'
+          - AND: '"primary" throws on query'
+          - WHEN: the SDK falls back to "backup"
+          - THEN: >-
+              a `provider.fallback.activated` event is emitted with `{ fromProviderId: "primary",
+              toProviderId: "backup", reason: "<error message>", sessionId: "<id>" }`
+        one-event-per-chain-step:
+          - GIVEN: 'provider "primary" has `fallbackProviderIds: ["b1", "b2"]`'
+          - AND: '"primary" and "b1" both fail'
+          - WHEN: the SDK walks to "b2"
+          - THEN: 'two `provider.fallback.activated` events are emitted: primary→b1 and b1→b2'
+    Fallback Chain Inspection:
+      strength: MUST
+      statement: >-
+        The SDK MUST allow clients to retrieve the configured fallback chain for a provider via
+        `provider.getFallbackChain`.
+      scenarios:
+        get-fallback-chain-for-provider-with-chain-configured:
+          - GIVEN: 'provider "primary" is registered with `fallbackProviderIds: ["b1", "b2"]`'
+          - WHEN: 'the client calls `provider.getFallbackChain` with `{ providerId: "primary" }`'
+          - THEN: 'the bridge returns `{ providerId: "primary", fallbackProviderIds: ["b1", "b2"] }`'
+        get-fallback-chain-for-provider-without-chain:
+          - GIVEN: provider "primary" is registered without `fallbackProviderIds`
+          - WHEN: 'the client calls `provider.getFallbackChain` with `{ providerId: "primary" }`'
+          - THEN: 'the bridge returns `{ providerId: "primary", fallbackProviderIds: [] }`'
+        get-fallback-chain-for-non-existent-provider:
+          - GIVEN: no provider with ID "unknown" exists
+          - WHEN: 'the client calls `provider.getFallbackChain` with `{ providerId: "unknown" }`'
+          - THEN: the bridge returns error `-32001` with message "Provider not found"
+    Fallback Chain Update:
+      strength: MUST
+      statement: >-
+        The SDK MUST allow clients to update the fallback chain on an existing provider via
+        `provider.update`.
+      scenarios:
+        update-fallback-chain:
+          - GIVEN: provider "primary" is registered with no fallback chain
+          - WHEN: >-
+              the client calls `provider.update` with `{ providerId: "primary", config: {
+              fallbackProviderIds: ["backup"] } }`
+          - THEN: >-
+              the bridge updates the stored config and returns the updated provider config including
+              `fallbackProviderIds: ["backup"]`
+  MODIFIED: {}
+  REMOVED: {}

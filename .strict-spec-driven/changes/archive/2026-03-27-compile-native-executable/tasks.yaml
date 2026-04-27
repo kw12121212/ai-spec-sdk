@@ -1,0 +1,44 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: compile-native-executable
+sections:
+  Implementation:
+    implementation-1:
+      text: >-
+        Add `build:native` script to `package.json` using `bun build --compile src/cli.ts --outfile
+        dist/ai-spec-bridge-native`
+      status: complete
+    implementation-2:
+      text: >-
+        Update `.gitignore` to exclude `dist/ai-spec-bridge-native` and
+        `dist/ai-spec-bridge-native.exe` (no-op: `dist/` already excluded)
+      status: complete
+    implementation-3:
+      text: >-
+        Write `test/native-build.test.ts` — smoke test that builds the native binary and verifies it
+        responds to a JSON-RPC `capabilities/list` call (gated on `NATIVE_BUILD_TEST=1`)
+      status: complete
+  Testing:
+    testing-1:
+      text: Run `bun run lint` — typecheck passes with no errors
+      status: complete
+      command: bun run lint
+    testing-2:
+      text: Run `bun test` — all existing tests pass (native smoke test skipped without env var)
+      status: complete
+      command: bun test
+    testing-3:
+      text: >-
+        Run `NATIVE_BUILD_TEST=1 bun test test/native-build.test.ts` — native smoke test builds
+        binary and passes
+      status: complete
+      command: NATIVE_BUILD_TEST=1 bun test test/native-build.test.ts
+  Verification:
+    verification-1:
+      text: Verify implementation matches proposal
+      status: complete
+testing_gates:
+  validation_task: testing-1
+  unit_test_task: testing-2

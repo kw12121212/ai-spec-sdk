@@ -1,0 +1,22 @@
+schema: strict-spec-driven/question-list/v1
+schema_version: 1
+artifact_type: question_list
+schema_file: templates/strict-spec-driven/schemas/question-list.yaml
+change: bridge-extensibility
+open: []
+resolved:
+  - id: should-mcp-servers-be-scoped-per-workspace-or-global
+    question: Should MCP servers be scoped per workspace or global?
+    context: Determines storage location and lifecycle isolation for MCP server processes.
+    answer: Per workspace. Each workspace has its own MCP server set, matching Claude Code behavior.
+    status: resolved
+  - id: should-hooks-be-managed-via-dedicated-hooks-methods-or-through-config-set
+    question: Should hooks be managed via dedicated `hooks.*` methods or through `config.set`?
+    context: Affects API surface and whether hooks are first-class or just config entries.
+    answer: Dedicated `hooks.*` methods for clearer semantics and better validation.
+    status: resolved
+  - id: should-mcp-servers-auto-start-when-added
+    question: Should MCP servers auto-start when added?
+    context: Affects whether consumers need a separate `mcp.start` call after `mcp.add`.
+    answer: Yes, `mcp.add` immediately starts the server process to reduce round-trips.
+    status: resolved

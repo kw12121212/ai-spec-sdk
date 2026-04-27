@@ -1,0 +1,61 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: llm-provider-provider-registry
+mapping:
+  implementation:
+    - src/llm-provider/provider-registry.ts
+    - src/token-tracking/counters/index.ts
+  tests:
+    - test/provider-registry.test.ts
+    - test/token-tracking/counters.test.ts
+operations:
+  ADDED:
+    TokenCounter Registration:
+      strength: MUST
+      statement: The SDK MUST support registering custom TokenCounter implementations for provider types.
+      scenarios:
+        register-custom-tokencounter:
+          - GIVEN: a developer implements a TokenCounter for provider type "openai"
+          - WHEN: 'they call `token.registerCounter({ providerType: "openai", counter: openaiCounter })`'
+          - THEN: subsequent registrations of type "openai" use this counter
+        override-built-in-counter:
+          - GIVEN: a built-in AnthropicTokenCounter is registered
+          - WHEN: >-
+              a client calls `token.registerCounter` with `providerType: "anthropic"` and a custom
+              counter
+          - THEN: the custom counter replaces the built-in one for all Anthropic providers
+        list-registered-counters:
+          - GIVEN: multiple counters are registered (built-in and custom)
+          - WHEN: the client calls `token.listCounters`
+          - THEN: >-
+              the bridge returns an array of `{ providerType, description }` for all registered
+              counters
+  MODIFIED:
+    Provider Registration (Extended):
+      strength: MUST
+      statement: >-
+        The SDK MUST allow clients to register LLM provider configurations through the bridge AND
+        associate a TokenCounter with each provider type.
+      scenarios:
+        register-provider-with-automatic-tokencounter-association:
+          - GIVEN: 'a client registers a provider with `type: "anthropic"`'
+          - WHEN: the registration completes
+          - THEN: the system MUST associate the AnthropicTokenCounter with this provider
+          - AND: future queries from this provider use the associated counter for token normalization
+        register-unsupported-provider-type-without-built-in-counter:
+          - GIVEN: 'a client registers a provider with `type: "custom-provider"`'
+          - AND: no built-in TokenCounter exists for "custom-provider"
+          - WHEN: the registration completes
+          - THEN: the system MUST register the provider with a default passthrough counter
+          - AND: the default counter attempts to extract inputTokens/outputTokens from raw usage data
+    Provider Configuration Persistence (Extended):
+      strength: MUST
+      statement: The SDK MUST persist provider configurations AND their associated counter type to disk.
+      scenarios:
+        persist-counter-type-on-registration:
+          - GIVEN: a client registers an Anthropic provider
+          - WHEN: persisted to ConfigStore
+          - THEN: 'the stored configuration includes `counterType: "anthropic"` metadata ---'
+  REMOVED: {}

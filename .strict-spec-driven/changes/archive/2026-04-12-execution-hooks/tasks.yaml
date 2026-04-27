@@ -1,0 +1,110 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: execution-hooks
+sections:
+  Implementation:
+    implementation-1:
+      text: Add `spawn` import from `child_process` in bridge.ts
+      status: complete
+    implementation-2:
+      text: Modify `_fireHooks` to spawn hook commands for all matching hooks
+      status: complete
+    implementation-3:
+      text: Implement blocking execution for `pre_tool_use` hooks (await completion before proceeding)
+      status: complete
+    implementation-4:
+      text: >-
+        Implement non-blocking fire-and-forget execution for `post_tool_use`, `notification`,
+        `stop`, `subagent_stop` hooks
+      status: complete
+    implementation-5:
+      text: Capture hook execution result (exitCode, stdout, stderr, durationMs, timedOut)
+      status: complete
+    implementation-6:
+      text: Extend `bridge/hook_triggered` notification to include execution result fields
+      status: complete
+    implementation-7:
+      text: Add 30-second default timeout enforcement with process kill on timeout
+      status: complete
+    implementation-8:
+      text: Abort tool use when a blocking `pre_tool_use` hook exits non-zero
+      status: complete
+    implementation-9:
+      text: Execute multiple blocking hooks sequentially; stop chain on first non-zero exit
+      status: complete
+    implementation-10:
+      text: Pass workspace directory as cwd for spawned hook processes
+      status: complete
+  Testing:
+    testing-1:
+      text: Run `bun run lint` and verify no type errors
+      status: complete
+      command: bun run lint
+    testing-2:
+      text: Run `bun run test` and verify all existing tests still pass
+      status: complete
+      command: bun run test
+    testing-3:
+      text: >-
+        Add unit test to `test/` and run `bun run test` for: blocking pre_tool_use hook that exits 0
+        allows tool use to proceed
+      status: complete
+      command: test/
+    testing-4:
+      text: >-
+        Add unit test to `test/` and run `bun run test` for: blocking pre_tool_use hook that exits 1
+        aborts tool use
+      status: complete
+      command: test/
+    testing-5:
+      text: >-
+        Add unit test to `test/` and run `bun run test` for: non-blocking hooks fire without
+        awaiting
+      status: complete
+      command: test/
+    testing-6:
+      text: >-
+        Add unit test to `test/` and run `bun run test` for: hook execution timeout kills process
+        after 30s
+      status: complete
+      command: test/
+    testing-7:
+      text: >-
+        Add unit test to `test/` and run `bun run test` for: multiple blocking hooks execute
+        sequentially, chain stops on failure
+      status: complete
+      command: test/
+    testing-8:
+      text: >-
+        Add unit test to `test/` and run `bun run test` for: hook notification includes exitCode,
+        stdout, stderr, durationMs
+      status: complete
+      command: test/
+    testing-9:
+      text: Run `bun run lint` after implementation to confirm no regressions
+      status: complete
+      command: bun run lint
+    testing-10:
+      text: Run `bun run test` after adding new tests to confirm all pass
+      status: complete
+      command: bun run test
+  Verification:
+    verification-1:
+      text: Verify implementation matches proposal.md scope (no feature creep)
+      status: complete
+    verification-2:
+      text: Verify delta spec in specs/hooks/hook-execution.md aligns with implemented behavior
+      status: complete
+    verification-3:
+      text: >-
+        Verify unchanged behaviors: hook registration, removal, listing, file persistence all work
+        as before
+      status: complete
+    verification-4:
+      text: Verify no regressions in existing bridge tests (session start, resume, stop, tool use)
+      status: complete
+testing_gates:
+  validation_task: testing-1
+  unit_test_task: testing-2

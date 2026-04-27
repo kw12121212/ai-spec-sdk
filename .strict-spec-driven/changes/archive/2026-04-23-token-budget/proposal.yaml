@@ -1,0 +1,30 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: token-budget
+  status: complete
+summary:
+  what:
+    - >-
+      Add a token budget allocation system that allows clients to define upfront token budgets for
+      sessions, providers, or global scope, with multi-threshold alerting and configurable depletion
+      behavior.
+  why:
+    - >-
+      The existing quota system enforces hard limits (`warn`/`block`), but does not support
+      proactive budget allocation where a token pool is reserved and drawn down over time. Budgets
+      differ from quotas in three ways: (1) they track allocated vs. consumed vs. remaining balance,
+      (2) they support multiple configurable alert thresholds (e.g., 50%, 75%, 90%), and (3) they
+      allow configurable depletion actions beyond simple block. This is needed for production
+      scenarios where teams need fine-grained cost control and proactive alerting before limits are
+      hit.
+scope:
+  in: []
+  out: []
+unchanged_behavior:
+  - Existing quota rules and enforcement continue to work independently
+  - Token recording in TokenStore is not modified
+  - Stream control behavior is not affected
+  - Quota violation history and quota JSON-RPC methods remain unchanged

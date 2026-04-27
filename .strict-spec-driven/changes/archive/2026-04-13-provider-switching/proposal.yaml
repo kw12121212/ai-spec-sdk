@@ -1,0 +1,45 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: provider-switching
+  status: complete
+summary:
+  what:
+    - >-
+      Add runtime LLM provider switching capability so that active agent sessions can change their
+      backing LLM provider without session restart or context loss. This includes:
+    - A new `provider.switch` JSON-RPC bridge method for explicit provider switching
+    - A new `session.setProvider` method to assign a specific provider to a running session
+    - Session-level provider override that takes precedence over the registry default provider
+    - A `provider_switched` notification emitted when a session's provider changes
+    - Bridge-level validation that the target provider is registered and healthy before switching
+  why:
+    - >-
+      The existing `provider-registry` and `provider-interface` changes established the foundation
+      for managing multiple LLM providers (registration, listing, health checks, default
+      management). However, there is no mechanism to actually **use** a different provider at
+      runtime. Currently, the `model` parameter on `session.start`/`session.resume` only controls
+      the model identifier within the single hardcoded Anthropic adapter — it cannot route to a
+      completely different provider (e.g., OpenAI, local model). This change is the critical bridge
+      between "having multiple providers configured" and "being able to use them." It unblocks the
+      subsequent Milestone 08 changes (`token-tracking`, `quota-management`, `load-balancer`,
+      `provider-fallback`) which all assume sessions can be associated with different providers.
+scope:
+  in: []
+  out: []
+unchanged_behavior:
+  - >-
+    `provider.register`, `provider.list`, `provider.get`, `provider.update`, `provider.remove`,
+    `provider.setDefault`, `provider.getDefault`, `provider.healthCheck` — all existing registry
+    methods remain unchanged
+  - >-
+    Sessions without an explicit `activeProviderId` continue to use the registry default provider
+    (or built-in Anthropic fallback) as before
+  - >-
+    The `model` parameter on `session.start`/`session.resume` continues to work as a model selector
+    within whatever provider is active
+  - >-
+    Sessions that are `completed` or `stopped` cannot have their provider switched (same as other
+    state-transition restrictions)

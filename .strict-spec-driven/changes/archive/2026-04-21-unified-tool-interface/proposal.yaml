@@ -1,0 +1,28 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: proposal-unified-tool-interface
+  status: complete
+summary:
+  what:
+    - >-
+      Create a common, unified tool interface that abstracts away the underlying differences between
+      Language Server Protocol (LSP) tools, Model Context Protocol (MCP) tools, and native custom
+      tools. It will provide a single contract for tool registration, discovery, validation, and
+      execution within the core agent workflow.
+  why:
+    - >-
+      With `lsp-client`, `lsp-tools`, `mcp-adapter`, and `mcp-tool-discovery` already completed, the
+      system now has multiple sources of tools. A unified interface is the immediate logical next
+      step to prevent the core agent orchestrator from becoming tightly coupled to specific
+      protocols and to allow it to seamlessly consume all available tools.
+scope:
+  in: []
+  out: []
+unchanged_behavior:
+  - >-
+    Existing LSP and MCP adapter implementations will remain structurally the same, but will plug
+    into the new interface.
+  - Core transport and authentication logic will not change.

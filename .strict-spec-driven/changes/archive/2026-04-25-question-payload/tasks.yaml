@@ -1,0 +1,34 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: proposal-question-payload
+sections:
+  Implementation:
+    implementation-1:
+      text: Define `QuestionPayload` interface and update session status types in `src/session-store.ts`
+      status: complete
+    implementation-2:
+      text: >-
+        Implement `session.question` emission and `session.resolveQuestion` method in
+        `src/bridge.ts`
+      status: complete
+    implementation-3:
+      text: Update session execution logic to handle the pause/resume flow when a question is asked.
+      status: complete
+  Testing:
+    testing-1:
+      text: Run `npm run lint` — validation task
+      status: complete
+      command: npm run lint
+    testing-2:
+      text: Run `bun test test/session-store.test.ts test/bridge.test.ts` — unit tests
+      status: complete
+      command: bun test test/session-store.test.ts test/bridge.test.ts
+  Verification:
+    verification-1:
+      text: Verify implementation matches proposal scope and JSON-RPC contracts
+      status: complete
+testing_gates:
+  validation_task: testing-1
+  unit_test_task: testing-2

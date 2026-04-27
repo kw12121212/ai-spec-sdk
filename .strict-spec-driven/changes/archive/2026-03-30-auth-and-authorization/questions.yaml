@@ -1,0 +1,16 @@
+schema: strict-spec-driven/question-list/v1
+schema_version: 1
+artifact_type: question_list
+schema_file: templates/strict-spec-driven/schemas/question-list.yaml
+change: auth-and-authorization
+open: []
+resolved:
+  - id: where-should-keys-json-live
+    question: Where should `keys.json` live?
+    context: >-
+      Roadmap said `~/.ai-spec-sessions/keys.json`, but existing code uses
+      `~/.ai-spec-sdk/sessions/`.
+    answer: >-
+      Use `~/.ai-spec-sdk/keys.json` to stay consistent with the existing `sessionsDir` at
+      `~/.ai-spec-sdk/sessions/`.
+    status: resolved

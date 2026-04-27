@@ -1,0 +1,31 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: security-permission-scopes
+mapping:
+  implementation:
+    - src/permission-policy.ts
+  tests:
+    - test/permission-policy.test.ts
+operations:
+  ADDED:
+    approval-required-decision:
+      strength: MUST
+      statement: The system MUST support an `approval_required` decision from a `PermissionPolicy`.
+      scenarios:
+        policy-requires-approval:
+          - GIVEN: a policy that returns `approval_required` for a specific tool and input
+          - WHEN: the policy is evaluated in a chain
+          - THEN: >-
+              the chain evaluation MUST halt and return the `approval_required` decision along with
+              any context provided by the policy.
+  MODIFIED:
+    policy-evaluation:
+      strength: MUST
+      statement: >-
+        The system MUST evaluate a chain of `PermissionPolicy` instances in order and return the
+        first explicit `allow`, `deny`, or `approval_required` decision, or `pass` if no policy
+        makes a decision.
+      scenarios: {}
+  REMOVED: {}

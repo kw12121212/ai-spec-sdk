@@ -1,0 +1,47 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: session-stream-control
+mapping:
+  implementation:
+    - src/session-store.ts
+    - src/bridge.ts
+    - src/llm-provider/adapters/anthropic.ts
+    - src/claude-agent-runner.ts
+  tests:
+    - test/session.test.ts
+    - test/bridge.test.ts
+    - test/anthropic-adapter.test.ts
+operations:
+  ADDED:
+    stream-backpressure:
+      strength: MUST
+      statement: >-
+        The system MUST apply backpressure to the LLM provider stream when the client transport
+        buffer exceeds a high-water mark.
+      scenarios:
+        slow-consumer-triggers-backpressure:
+          - GIVEN: an active streaming session
+          - WHEN: >-
+              the client's network transport buffer (e.g., WebSocket `bufferedAmount`) exceeds the
+              configured high-water mark
+          - THEN: the system MUST delay or pause reading from the LLM provider's stream
+          - AND: >-
+              the system MUST resume reading from the LLM provider only when the transport buffer
+              drains below a low-water mark
+    stream-buffer-disconnect:
+      strength: MUST
+      statement: >-
+        The system MUST forcefully terminate the streaming connection if the transport buffer
+        exceeds a critical maximum threshold to prevent resource exhaustion.
+      scenarios:
+        critical-buffer-limit-exceeded:
+          - GIVEN: an active streaming session where backpressure is applied
+          - WHEN: >-
+              the client's transport buffer continues to grow and exceeds the critical maximum
+              threshold
+          - THEN: the system MUST forcefully close the transport connection
+          - AND: the system MUST terminate the underlying LLM provider stream to release resources
+  MODIFIED: {}
+  REMOVED: {}

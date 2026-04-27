@@ -1,0 +1,36 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: provider-fallback
+  status: complete
+summary:
+  what:
+    - >-
+      Add an ordered fallback chain to provider configuration. When the active provider returns an
+      error during a live request, the SDK automatically retries the request on the next provider in
+      the chain, transparently to the session caller. The chain is configured as
+      `fallbackProviderIds` on the primary provider's `ProviderConfig`. A
+      `provider.fallback.activated` event is emitted whenever the chain advances. A new
+      `provider.getFallbackChain` JSON-RPC method exposes the configured chain for inspection.
+  why:
+    - >-
+      Milestone 08 requires that "fallback to backup provider occurs seamlessly on primary failure."
+      The existing `resolveForSession` method in `ProviderRegistry` performs a silent, hardcoded
+      fallback (session provider → default provider → built-in Claude runner) but it is not
+      configurable, not observable, and cannot extend beyond two levels. This change replaces that
+      implicit fallback with an explicit, user-configured, observable fallback chain, satisfying the
+      milestone's done criterion and giving operators visibility into failover events.
+scope:
+  in: []
+  out: []
+unchanged_behavior:
+  - >-
+    All existing `provider.*` JSON-RPC methods (register, list, get, update, remove, setDefault,
+    getDefault, healthCheck, switch) must behave identically when `fallbackProviderIds` is absent or
+    empty
+  - >-
+    Sessions with no fallback configuration continue using the existing resolution order (session
+    active → default → built-in)
+  - '`provider.healthCheck` remains an on-demand check; it does not trigger fallback'

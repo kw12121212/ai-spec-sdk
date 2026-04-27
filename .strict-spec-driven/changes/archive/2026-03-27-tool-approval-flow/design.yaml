@@ -1,0 +1,51 @@
+schema: strict-spec-driven/change-design/v1
+schema_version: 1
+artifact_type: change_design
+schema_file: templates/strict-spec-driven/schemas/change-design.yaml
+change: tool-approval-flow
+approach:
+  - >-
+    ### SDK hook `@anthropic-ai/claude-agent-sdk` exports `CanUseTool` — an async callback with
+    signature: ```ts (toolName, input, { signal, title?, displayName?, description?, toolUseID, ...
+    }) => Promise<PermissionResult> ``` where `PermissionResult` is `{ behavior: 'allow' } | {
+    behavior: 'deny', message: string }`. When `permissionMode === "approve"`, `_runQuery` receives
+    this callback and passes it as `canUseTool` inside the `sdkOptions` object forwarded to
+    `query()`. No changes to `claude-agent-runner.ts` are needed because all SDK options are already
+    spread into `sdkOptions`. ### Async coordination `BridgeServer` holds: ```ts private
+    pendingApprovals: Map<string, { resolve: (r: PermissionResult) => void; sessionId: string; }>;
+    ``` The `canUseTool` callback created per-session:
+  - Generates a `requestId` (UUID).
+  - Returns a new `Promise` whose `resolve` function is stored in `pendingApprovals`.
+  - >-
+    Emits `bridge/tool_approval_requested` with `{ sessionId, requestId, toolName, input, title,
+    displayName, description }`.
+  - Registers an AbortSignal listener to auto-deny and clean up if the SDK cancels.
+  - >-
+    Suspends until resolved. ### session.approveTool / session.rejectTool Both require `{ sessionId,
+    requestId }`. They look up `pendingApprovals`, validate that `sessionId` matches, resolve the
+    stored promise, and remove the entry. ### stop cleanup `stopSession` iterates
+    `pendingApprovals`, denies all entries whose `sessionId` matches, and removes them. This
+    prevents the agent from hanging indefinitely after a stop.
+decisions:
+  '1':
+    decision: '1.'
+    rationale: >-
+      **`permissionMode: "approve"` as a new string value** — keeps the existing validation path
+      (`PERMISSION_MODES` set), makes the opt-in explicit, and leaves all existing behaviour
+      untouched. 2. **No changes to `claude-agent-runner.ts`** — `canUseTool` is just another SDK
+      option. It's already passed through the `options → sdkOptions` spread. No new parameter needed
+      in `RunClaudeQueryOptions`. 3. **In-memory pending map on `BridgeServer`** — approvals are
+      ephemeral (one per tool call), session-scoped, and have no value after the bridge restarts. 4.
+      **AbortSignal cleanup** — the SDK may cancel a tool call mid-flight (e.g. if the session is
+      stopped from the SDK side). Listening to the signal avoids a leak in `pendingApprovals`. 5.
+      **One-time allow only** — `updatedPermissions` is not set in the allow result. "Always allow"
+      UX can be built in a future change.
+alternatives:
+  - option: '**Modify `RunClaudeQueryOptions` with a `canUseTool` parameter**'
+    reason: unnecessary since options are already a passthrough `Record<string, unknown>`.
+  - option: >-
+      **Store pending approvals on the session object** — would require persisting a
+      non-serialisable function.
+    reason: Rejected; in-memory map on `BridgeServer` is simpler.
+  - option: '**New `permissionMode: "interactive"`** — functionally identical to `"approve"`.'
+    reason: Name `"approve"` is more descriptive of the GUI action.

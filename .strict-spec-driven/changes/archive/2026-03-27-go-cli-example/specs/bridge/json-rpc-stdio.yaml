@@ -1,0 +1,29 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: bridge-json-rpc-stdio
+mapping:
+  implementation: []
+  tests: []
+operations:
+  ADDED:
+    Go CLI Integration Example:
+      strength: MUST
+      statement: >-
+        The project MUST include a Go CLI example under `example/go-cli/` that demonstrates how to
+        start the bridge as a subprocess and communicate via stdio JSON-RPC. The example MUST cover
+        all bridge methods and serve as a reference for downstream integrators.
+      scenarios:
+        example-builds-and-runs:
+          - GIVEN: the SDK has been built (`bun run build`)
+          - WHEN: a developer runs `go build` inside `example/go-cli/`
+          - THEN: the resulting binary can be executed and connects to the bridge via stdio
+        example-demonstrates-notification-handling:
+          - GIVEN: the Go CLI is running
+          - WHEN: >-
+              a session emits `bridge/session_event` or `bridge/tool_approval_requested`
+              notifications
+          - THEN: the CLI renders the events to the terminal in real time
+  MODIFIED: {}
+  REMOVED: {}

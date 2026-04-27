@@ -1,0 +1,69 @@
+schema: strict-spec-driven/roadmap-milestone/v2
+schema_version: 2
+artifact_type: roadmap_milestone
+schema_file: templates/strict-spec-driven/schemas/roadmap-milestone.yaml
+milestone:
+  0013-question-resolution:
+    title: Question Resolution Protocol
+goal: >-
+  Implement an interactive question resolution protocol that enables agents to pause execution for
+  human input, with multi-channel delivery and asynchronous response handling.
+scope:
+  in:
+    - Structured question payload format (question, impact, recommendation, options)
+    - Multi-channel delivery (in-band, webhook, mobile push)
+    - Asynchronous human response handling
+    - Question correlation and session resumption
+    - Delivery status tracking and retry
+    - Escalation on timeout or non-response
+  out:
+    - AI auto-answering without human review
+    - Real-time chat interface
+    - Voice or video interaction
+done_criteria:
+  - Agents can pause and emit structured questions
+  - Questions are delivered through configured channels
+  - Human responses correctly correlate and resume execution
+  - Delivery failures trigger retries with exponential backoff
+  - Unanswered questions escalate according to policy
+planned_changes:
+  question-payload:
+    status: complete
+    summary: structured question format
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+  multi-channel-delivery:
+    status: complete
+    summary: webhook, push notification adapters
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+  response-correlation:
+    status: complete
+    summary: match responses to pending questions
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+  session-resumption:
+    status: planned
+    summary: restore agent state on response
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+  delivery-tracking:
+    status: planned
+    summary: status and retry management
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+  escalation-policy:
+    status: planned
+    summary: timeout and non-response handling
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+dependencies:
+  - 05-developer-ecosystem — leverages webhook infrastructure
+  - 07-agent-lifecycle — integrates with pause/resume state machine
+  - 15-secret-vault — for channel credentials
+risks:
+  - Channel delivery reliability varies; need robust retry
+  - Response correlation requires stable identifiers across restarts
+  - Session resumption must preserve exact execution context
+status: proposed
+notes: []

@@ -1,0 +1,45 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: proposal-task-queue
+sections:
+  Implementation:
+    implementation-1:
+      text: 创建 `src/task-queue-store.ts`，实现基于 JSON 文件持久化的任务队列存储。
+      status: complete
+    implementation-2:
+      text: 在 `src/task-queue-store.ts` 中实现按优先级出队和失败重试机制。
+      status: complete
+    implementation-3:
+      text: 修改 `src/cron-scheduler.ts`，使其在触发时将任务推入队列，而不是直接启动代理会话。
+      status: complete
+    implementation-4:
+      text: 实现队列消费工作线程（Worker），定期轮询并执行队列中的任务。
+      status: complete
+  Testing:
+    testing-1:
+      text: Run lint checks using `bash scripts/check.sh`
+      status: complete
+      command: bash scripts/check.sh
+    testing-2:
+      text: Run unit tests using `bun test test/task-queue-store.test.ts`
+      status: complete
+      command: bun test test/task-queue-store.test.ts
+    testing-3:
+      text: Run unit tests using `bun test test/cron-scheduler.test.ts`
+      status: complete
+      command: bun test test/cron-scheduler.test.ts
+  Verification:
+    verification-1:
+      text: 验证任务可以按优先级被正确调度。
+      status: complete
+    verification-2:
+      text: 验证任务执行失败后可以根据配置的策略进行重试。
+      status: complete
+    verification-3:
+      text: 验证队列配置可以在服务器重启后通过 JSON 文件恢复。
+      status: complete
+testing_gates:
+  validation_task: testing-1
+  unit_test_task: testing-2

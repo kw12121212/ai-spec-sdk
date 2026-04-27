@@ -1,0 +1,59 @@
+schema: strict-spec-driven/roadmap-milestone/v2
+schema_version: 2
+artifact_type: roadmap_milestone
+schema_file: templates/strict-spec-driven/schemas/roadmap-milestone.yaml
+milestone:
+  0002-production-ready:
+    title: Production Ready
+goal: >-
+  Add production-grade infrastructure — structured logging, HTTP/SSE transport, authentication,
+  mobile web UI, and official client SDKs — bringing the bridge from local prototype to deployable
+  service.
+scope:
+  in:
+    - Structured JSON logging with env-configurable level
+    - HTTP/SSE transport (POST /rpc, GET /events, GET /health)
+    - API key authentication with scope-based authorization
+    - Mobile-first web UI served at GET /
+    - TypeScript client SDK (@ai-spec-sdk/client npm package)
+  out:
+    - WebSocket transport (see 04-advanced-runtime)
+    - Rate limiting (see 03-platform-reach)
+    - OpenTelemetry / Prometheus metrics (see 05-developer-ecosystem)
+done_criteria:
+  - Bridge logs structured JSON to stderr with level filtering
+  - HTTP mode starts with --transport http and serves all three endpoints
+  - API key lifecycle (keygen, list, revoke) fully operational
+  - Mobile web UI reachable at GET / from any browser
+  - TypeScript client package installable and tested against real bridge
+planned_changes:
+  structured-logging:
+    status: complete
+    summary: structured JSON logging with level filtering
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+  http-sse-transport:
+    status: complete
+    summary: POST /rpc, GET /events, and GET /health endpoints
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+  auth-and-authorization:
+    status: complete
+    summary: API key auth with scope-based authorization
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+  mobile-web-ui:
+    status: complete
+    summary: mobile-first web UI served at GET /
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+  ts-client-sdk:
+    status: complete
+    summary: '@ai-spec-sdk/client TypeScript npm package'
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+dependencies:
+  - 01-bridge-foundation — HTTP/SSE and auth build on the core bridge
+risks: []
+status: complete
+notes: []

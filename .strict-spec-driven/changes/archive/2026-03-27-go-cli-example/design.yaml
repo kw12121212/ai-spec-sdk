@@ -1,0 +1,99 @@
+schema: strict-spec-driven/change-design/v1
+schema_version: 1
+artifact_type: change_design
+schema_file: templates/strict-spec-driven/schemas/change-design.yaml
+change: go-cli-example
+approach:
+  - >-
+    The example is a standalone Go module at `example/go-cli/` with a flat package structure. It
+    uses only the Go standard library — no third-party dependencies — to keep the example easy to
+    understand and vendor. ### Architecture ``` example/go-cli/ ├── go.mod ├── go.sum ├── main.go #
+    Entry point: parse flags, start REPL ├── bridge/ │ └── client.go # JSON-RPC client: spawn
+    subprocess, send/receive over stdio ├── session/ │ └── session.go # Session manager: start,
+    resume, stop, list, history ├── workflow/ │ └── workflow.go # Workflow runner: list and execute
+    workflows ├── ui/ │ └── renderer.go # Terminal rendering: events, tool approval prompts,
+    multi-line input └── README.md # Build and usage instructions ``` ### JSON-RPC Client
+    (`bridge/client.go`)
+  - Spawns `ai-spec-bridge` as a subprocess with `stdin` piped and `stdout` captured
+  - Implements `Call(method string, params any) (result, error)` for request/response
+  - >-
+    Runs a background goroutine reading `stdout` line-by-line, dispatching notifications to
+    registered handlers via a channel
+  - Tracks request IDs (auto-incrementing integer) and correlates responses
+  - >-
+    Exposes `OnNotification(method string, handler func(notification))` for registering notification
+    callbacks
+  - >-
+    Graceful shutdown: sends SIGTERM, waits for process exit, cleans up goroutines ### Session
+    Manager (`session/session.go`)
+  - Wraps the JSON-RPC client with session-specific methods
+  - Maintains current session ID, model, and workspace state
+  - >-
+    `Start(prompt, workspace, options)` → calls `session.start`, streams events via notification
+    handler
+  - '`Resume(sessionId, prompt, options)` → calls `session.resume`'
+  - '`Stop()` → calls `session.stop`'
+  - '`List(status)` → calls `session.list`'
+  - '`History(sessionId, offset, limit)` → calls `session.history`'
+  - '`ApproveTool(requestId)` → calls `session.approveTool`'
+  - >-
+    `RejectTool(requestId, message)` → calls `session.rejectTool` ### Workflow Runner
+    (`workflow/workflow.go`)
+  - '`List()` → returns available workflow names from capabilities'
+  - >-
+    `Run(name, workspace)` → calls `workflow.run`, streams `bridge/progress` notifications ### UI
+    Renderer (`ui/renderer.go`)
+  - '`RenderEvent(event)` — formats session events for terminal output:'
+  - '`assistant_text` — plain text output'
+  - '`tool_use` — shows tool name and input summary'
+  - '`tool_result` — shows result summary'
+  - '`system_init` — shows model and session info'
+  - '`result` — shows final result or error'
+  - '`PromptToolApproval(request)` — prints tool name, input, and y/n prompt, returns user''s decision'
+  - >-
+    `ReadMultiLine()` — reads user input with backslash continuation support for multi-line input
+    ### Main Loop (`main.go`)
+  - Parse CLI flags (`--bridge-path`, `--workspace`, `--model`, `--permission-mode`)
+  - >-
+    Resolve bridge binary path (default: `../../dist/src/cli.js` relative to example dir, or
+    `ai-spec-bridge` from PATH)
+  - Start bridge subprocess via `bridge/client.go`
+  - Print welcome banner with connection info
+  - >-
+    REPL loop: Read input (with multi-line support) If starts with `/`, dispatch to command handler
+    Otherwise, treat as prompt: call `session.start` (first time) or `session.resume` (subsequent)
+    Stream events to UI renderer On `bridge/tool_approval_requested`, call `ui.PromptToolApproval`
+    and respond
+  - On `/quit` or EOF, clean up and exit
+decisions:
+  '1':
+    decision: '1.'
+    rationale: >-
+      **Pure standard library** — No third-party dependencies. This makes the example trivially
+      buildable anywhere Go is installed and avoids dependency management concerns in example code.
+      2. **`permissionMode: "approve"` as default** — This showcases the tool approval flow which is
+      a key differentiator of the SDK. Users can override via `--permission-mode` flag. 3.
+      **Multi-line input via backslash continuation** — A trailing `\` at end of line continues
+      input on the next line. This is simple to implement, works in all terminals, and doesn't
+      require escape sequence handling. 4. **Flat package structure** — Four packages (`bridge`,
+      `session`, `workflow`, `ui`) keeps the code organized without over-engineering. Each package
+      has a single file. 5. **`ai-spec-bridge` must be pre-built** — The Go CLI expects the bridge
+      binary to already exist (built via `bun run build`). The README documents this prerequisite.
+      No attempt to build the SDK from Go.
+alternatives:
+  - option: Single-file example
+    reason: >-
+      A single `main.go` would be simpler but would be 1000+ lines and harder to follow. The package
+      split makes it easier to understand each concern separately.
+  - option: Python example
+    reason: >-
+      Python is more accessible but Go produces a single static binary that's easy to distribute. Go
+      also has better concurrency primitives for handling the background notification reader.
+  - option: TUI framework (bubbletea/lipgloss)
+    reason: >-
+      Would look polished but adds a heavy dependency and obscures the core JSON-RPC integration
+      logic. Plain terminal output keeps focus on the SDK usage patterns.
+  - option: Multi-line via raw terminal mode
+    reason: >-
+      Detecting Shift+Enter requires raw terminal mode which adds complexity. Backslash continuation
+      achieves the same goal portably.

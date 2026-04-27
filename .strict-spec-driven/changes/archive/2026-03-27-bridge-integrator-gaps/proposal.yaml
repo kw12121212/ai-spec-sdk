@@ -1,0 +1,42 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: bridge-integrator-gaps
+  status: complete
+summary:
+  what:
+    - >-
+      Fill three integrator-facing gaps in the JSON-RPC bridge: 1. **Event schema formalization** —
+      formally specify the `bridge/session_event` notification contract so integrators have a
+      stable, machine-readable event surface rather than an opaque blob. 2. **Agent behavior control
+      parameters** — expose `model`, `allowedTools`, `disallowedTools`, `permissionMode`,
+      `maxTurns`, and `systemPrompt` as validated first-class parameters on `session.start` and
+      `session.resume`. 3. **Session listing** — add a `session.list` bridge method that returns
+      summaries of up to 100 most recent sessions so host tools can build session management UIs.
+  why:
+    - >-
+      Any production-grade integrator (IDE plugin, Web UI, CI pipeline) requires three things the
+      current bridge does not provide:
+    - >-
+      A **stable event contract** — without it, integrators must reverse-engineer raw SDK messages
+      and their logic will break on SDK updates.
+    - >-
+      **Explicit agent controls** — tool permissions and model selection cannot safely be left to
+      opaque `options` passthrough; they need validation and a known default (Full Access /
+      `bypassPermissions`).
+    - >-
+      **Session enumeration** — without `session.list`, a host tool cannot show the user what
+      sessions exist or recover without side-channel storage.
+scope:
+  in: []
+  out: []
+unchanged_behavior:
+  - >-
+    Existing methods (`bridge.capabilities`, `skills.list`, `workflow.run`, `session.start`,
+    `session.resume`, `session.stop`, `session.status`) retain their current request/response
+    contracts
+  - Proxy parameter handling is unchanged
+  - Workspace validation and `cwd` rejection are unchanged
+  - Sessions not found still return `-32011`

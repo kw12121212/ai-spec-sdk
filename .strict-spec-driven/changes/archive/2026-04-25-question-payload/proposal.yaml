@@ -1,0 +1,23 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: proposal-question-payload
+  status: complete
+summary:
+  what:
+    - >-
+      Implement the structured question payload format and the foundational types needed to support
+      the Question Resolution Protocol.
+  why:
+    - >-
+      Agents need a rigorous way to pause execution and ask humans for clarification, direction, or
+      approval without relying on unstructured chat interfaces. A structured payload ensures
+      questions include context, impact, and actionable options.
+scope:
+  in: []
+  out: []
+unchanged_behavior:
+  - Existing agent tools, quotas, task queues, and team registries remain unaffected.
+  - The standard session stream (text/tool calls) continues to function as before.

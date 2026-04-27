@@ -1,0 +1,37 @@
+schema: strict-spec-driven/question-list/v1
+schema_version: 1
+artifact_type: question_list
+schema_file: templates/strict-spec-driven/schemas/question-list.yaml
+change: bridge-integrator-gaps
+open: []
+resolved:
+  - id: does-session-list-need-pagination
+    question: Does `session.list` need pagination?
+    context: >-
+      In-memory storage means session counts are bounded by process lifetime; pagination adds API
+      complexity.
+    answer: No pagination. Cap the response at the 100 most recent sessions.
+    status: resolved
+  - id: how-detailed-should-the-agentmessage-event-schema-be
+    question: How detailed should the `agent_message` event schema be?
+    context: >-
+      More detail gives integrators a stable contract; less detail reduces coupling to SDK
+      internals.
+    answer: >-
+      Very detailed — enumerate all observable message sub-types with field-level descriptions and
+      map each to a stable `messageType` label.
+    status: resolved
+  - id: should-permissionmode-valid-values-be-enumerated-in-the-spec
+    question: Should `permissionMode` valid values be enumerated in the spec?
+    context: An open string allows future extension but removes the contract value of the parameter.
+    answer: >-
+      Yes — enumerate `"default"`, `"acceptEdits"`, `"bypassPermissions"`. Unknown values return
+      `-32602`.
+    status: resolved
+  - id: what-is-the-default-value-for-permissionmode
+    question: What is the default value for `permissionMode`?
+    context: Programmatic integrators typically do not want interactive permission prompts.
+    answer: >-
+      `"bypassPermissions"` (Full Access). When the caller omits `permissionMode`, the bridge
+      applies this default.
+    status: resolved

@@ -1,0 +1,95 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: proposal-agent-session-sdk-wiring
+sections:
+  Implementation:
+    implementation-1:
+      text: >-
+        `session-store.ts`: add `sdkSessionId: string | null` field to `Session`; add
+        `setSdkSessionId(sessionId, sdkSessionId)` method
+      status: complete
+    implementation-2:
+      text: >-
+        `claude-agent-runner.ts`: add `cwd` and `env` fields to `RunClaudeQueryOptions`; pass both
+        to `query()` options
+      status: complete
+    implementation-3:
+      text: >-
+        `bridge.ts` `_runQuery`: accept `cwd` param; detect `system/init` event and call
+        `store.setSdkSessionId`; forward `cwd` and `env` to `runClaudeQuery`
+      status: complete
+    implementation-4:
+      text: >-
+        `bridge.ts` `startSession`: pass `cwd: resolvedWorkspace`; validate no `cwd` key in
+        `options` (throw `-32602`); validate and translate `proxy` param into env entries; merge
+        with `options.env`
+      status: complete
+    implementation-5:
+      text: >-
+        `bridge.ts` `resumeSession`: read `cwd` from stored session; reject if `sdkSessionId` is
+        null (throw `-32012`); pass `resume: session.sdkSessionId`; apply same proxy and `cwd` guard
+        logic
+      status: complete
+    implementation-6:
+      text: >-
+        Define `ProxyParams` interface (`http?`, `https?`, `noProxy?`) and `validateProxy` helper in
+        `bridge.ts`
+      status: complete
+  Testing:
+    testing-1:
+      text: >-
+        `session.test.ts`: assert that stub receives `cwd` equal to the fixture workspace path on
+        `session.start`
+      status: complete
+      command: session.test.ts
+    testing-2:
+      text: >-
+        `session.test.ts`: assert that `session.resume` passes `resume` equal to the SDK
+        `session_id` from the stub's init event (not the bridge UUID)
+      status: complete
+      command: session.test.ts
+    testing-3:
+      text: >-
+        `session.test.ts`: assert that `session.start` with a `proxy` object causes the stub to
+        receive matching `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` in `env`
+      status: complete
+      command: session.test.ts
+    testing-4:
+      text: '`session.test.ts`: assert that `session.start` with `options.cwd` returns a `-32602` error'
+      status: complete
+      command: session.test.ts
+    testing-5:
+      text: >-
+        `session.test.ts`: assert that `session.resume` when `sdkSessionId` is null returns a
+        `-32012` error
+      status: complete
+      command: session.test.ts
+    testing-6:
+      text: >-
+        `session.test.ts`: assert that a partial proxy (only `http`) only sets `HTTP_PROXY`, leaves
+        others absent
+      status: complete
+      command: session.test.ts
+    testing-7:
+      text: Lint passes (`bun run lint` or equivalent)
+      status: complete
+      command: bun run lint
+    testing-8:
+      text: All unit tests pass (`bun test`)
+      status: complete
+      command: bun test
+  Verification:
+    verification-1:
+      text: Every item in proposal scope has a corresponding passing test
+      status: complete
+    verification-2:
+      text: No existing tests were removed or weakened
+      status: complete
+    verification-3:
+      text: Delta specs match what was actually built
+      status: complete
+testing_gates:
+  validation_task: testing-1
+  unit_test_task: testing-2

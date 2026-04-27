@@ -1,0 +1,53 @@
+schema: strict-spec-driven/roadmap-milestone/v2
+schema_version: 2
+artifact_type: roadmap_milestone
+schema_file: templates/strict-spec-driven/schemas/roadmap-milestone.yaml
+milestone:
+  0004-advanced-runtime:
+    title: Advanced Runtime
+goal: >-
+  Enable real-time bidirectional communication via WebSocket and multi-agent coordination with
+  parent-child session relationships.
+scope:
+  in:
+    - >-
+      WebSocket transport with JSON-RPC 2.0 framing, ping/pong keepalive, and session-scoped event
+      subscriptions
+    - >-
+      Parent-child agent sessions via session.spawn, with child completion events propagated to
+      parent
+  out:
+    - Binary WebSocket frames or permessage-deflate compression
+    - Distributed multi-bridge orchestration
+    - Persistent agent networks or agent pools
+    - Cost allocation per sub-agent
+done_criteria:
+  - >-
+    Bridge starts with --transport ws; clients send requests and receive notifications on a single
+    connection
+  - >-
+    session.spawn creates a child session; parent receives bridge/subagent_event notifications on
+    completion
+  - Child sessions visible in session.list with parentSessionId filter
+planned_changes:
+  websocket-transport:
+    status: complete
+    summary: bidirectional WebSocket transport with ping/pong keepalive
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+  multi-agent-orchestration:
+    status: complete
+    summary: parent-child agent sessions via session.spawn
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+dependencies:
+  - >-
+    02-production-ready — WebSocket builds on HTTP/SSE transport patterns; multi-agent requires
+    session persistence
+risks:
+  - >-
+    multi-agent-orchestration adds significant SessionStore complexity; notification ordering and
+    delivery need careful design.
+  - The two changes are independent and can ship separately if needed.
+status: complete
+notes: []

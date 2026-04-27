@@ -1,0 +1,26 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: bridge-json-rpc-stdio
+mapping:
+  implementation:
+    - src/bridge.ts
+  tests:
+    - test/provider-switching-bridge.test.ts
+operations:
+  ADDED:
+    Provider Switch Methods in Capabilities:
+      strength: MUST
+      statement: >-
+        The `bridge.capabilities` `methods` array MUST include `"provider.switch"` and
+        `"session.setProvider"`.
+      scenarios:
+        new-methods-appear-in-capabilities:
+          - GIVEN: the bridge is running
+          - WHEN: a client calls `bridge.capabilities`
+          - THEN: >-
+              the response `methods` array contains both `"provider.switch"` and
+              `"session.setProvider"`
+  MODIFIED: {}
+  REMOVED: {}

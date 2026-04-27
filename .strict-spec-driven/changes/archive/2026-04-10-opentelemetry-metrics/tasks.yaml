@@ -1,0 +1,112 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: opentelemetry-metrics
+sections:
+  Implementation:
+    implementation-1:
+      text: >-
+        Create `src/metrics.ts` with `MetricsCollector` class: counters, gauges, and `render()`
+        producing Prometheus text format
+      status: complete
+    implementation-2:
+      text: Add `# HELP` and `# TYPE` annotations for all five metrics in `render()` output
+      status: complete
+    implementation-3:
+      text: >-
+        Integrate `MetricsCollector` instantiation into `src/http-server.ts` alongside rate limiter
+        and logger
+      status: complete
+    implementation-4:
+      text: >-
+        Add `GET /metrics` route in HTTP fetch handler with auth check (`session:read` scope when
+        auth enabled, open when `--no-auth`)
+      status: complete
+    implementation-5:
+      text: >-
+        Exempt `GET /metrics` from rate limiting (add to exempt path list alongside `/events`,
+        `/health`)
+      status: complete
+    implementation-6:
+      text: Increment `bridge_requests_total{method,status}` after each `POST /rpc` dispatch
+      status: complete
+    implementation-7:
+      text: Accumulate `bridge_rpc_duration_seconds{method}` count and sum around RPC dispatch
+      status: complete
+    implementation-8:
+      text: Increment `bridge_tokens_consumed_total` on session completion when token data is available
+      status: complete
+    implementation-9:
+      text: >-
+        Track `bridge_sessions_active` gauge: increment on session start, decrement on session
+        stop/complete
+      status: complete
+    implementation-10:
+      text: Increment `bridge_rate_limit_rejections_total` when returning HTTP 429
+      status: complete
+  Testing:
+    testing-1:
+      text: Run `bun run lint` — typecheck passes with no new errors
+      status: complete
+      command: bun run lint
+    testing-2:
+      text: Run `bun test` — all existing and new tests pass
+      status: complete
+      command: bun test
+    testing-3:
+      text: 'Unit test: `GET /metrics` returns 200 with correct `Content-Type` and Prometheus text body'
+      status: complete
+      command: GET /metrics
+    testing-4:
+      text: 'Test: `GET /metrics` returns 200 with correct `Content-Type` and Prometheus text body'
+      status: complete
+      command: GET /metrics
+    testing-5:
+      text: 'Test: `bridge_requests_total` increments per RPC call with correct method and status labels'
+      status: complete
+      command: bridge_requests_total
+    testing-6:
+      text: 'Test: `bridge_rpc_duration_seconds` includes `_count` and `_sum` lines after RPC calls'
+      status: complete
+      command: bridge_rpc_duration_seconds
+    testing-7:
+      text: 'Test: `bridge_sessions_active` reflects active session count after start and stop'
+      status: complete
+      command: bridge_sessions_active
+    testing-8:
+      text: 'Test: `bridge_tokens_consumed_total` increments on session completion with token data'
+      status: complete
+      command: bridge_tokens_consumed_total
+    testing-9:
+      text: 'Test: `bridge_rate_limit_rejections_total` increments on 429 response'
+      status: complete
+      command: bridge_rate_limit_rejections_total
+    testing-10:
+      text: 'Test: `GET /metrics` returns 401 when auth enabled and no token provided'
+      status: complete
+      command: GET /metrics
+    testing-11:
+      text: 'Test: `GET /metrics` returns 200 without auth in `--no-auth` mode'
+      status: complete
+      command: GET /metrics
+    testing-12:
+      text: 'Test: `GET /metrics` is exempt from rate limiting (not rejected with 429)'
+      status: complete
+      command: GET /metrics
+  Verification:
+    verification-1:
+      text: Verify all delta spec requirements have corresponding test coverage
+      status: complete
+    verification-2:
+      text: Verify no existing tests are broken
+      status: complete
+    verification-3:
+      text: Verify `GET /metrics` output parses as valid Prometheus text exposition format
+      status: complete
+    verification-4:
+      text: Verify metrics reset to zero on process restart
+      status: complete
+testing_gates:
+  validation_task: testing-1
+  unit_test_task: testing-2

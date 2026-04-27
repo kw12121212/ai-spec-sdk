@@ -1,0 +1,24 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: workflow-spec-driven-workflows
+mapping:
+  implementation: []
+  tests: []
+operations:
+  ADDED:
+    Workflow Execution in Go CLI Example:
+      strength: MUST
+      statement: >-
+        The Go CLI example MUST demonstrate how to invoke workflows via `workflow.run` and display
+        progress notifications.
+      scenarios:
+        example-runs-a-workflow:
+          - GIVEN: the Go CLI is running
+          - WHEN: a user executes the `/workflow <name>` command
+          - THEN: >-
+              the CLI calls `workflow.run` with the specified workflow name and workspace, and
+              displays `bridge/progress` notifications
+  MODIFIED: {}
+  REMOVED: {}

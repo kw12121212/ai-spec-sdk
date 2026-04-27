@@ -1,0 +1,29 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: tool-approval-flow
+  status: complete
+summary:
+  what:
+    - >-
+      Add a `permissionMode: "approve"` option that routes every tool-use decision to the GUI via a
+      new `bridge/tool_approval_requested` notification and two new JSON-RPC methods
+      (`session.approveTool`, `session.rejectTool`), letting the GUI display a confirmation dialog
+      before each tool executes.
+  why:
+    - >-
+      TODO item 10. When `permissionMode` is `"bypassPermissions"` (the current default) the GUI has
+      no opportunity to gate tool execution. Implementing an explicit approval mode gives GUI
+      consumers full control over which tools run, without requiring a TTY or the built-in Claude
+      Code permission prompts.
+scope:
+  in: []
+  out: []
+unchanged_behavior:
+  - >-
+    Sessions with `permissionMode: "bypassPermissions"`, `"acceptEdits"`, or `"default"` behave
+    exactly as before — no `canUseTool` callback is wired, no approval events are emitted
+  - All existing methods, session state, history, and event buffering are unaffected
+  - The `pendingApprovals` map is entirely in-memory; no persistence file changes

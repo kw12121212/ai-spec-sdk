@@ -1,0 +1,69 @@
+schema: strict-spec-driven/roadmap-milestone/v2
+schema_version: 2
+artifact_type: roadmap_milestone
+schema_file: templates/strict-spec-driven/schemas/roadmap-milestone.yaml
+milestone:
+  0009-permissions-hooks:
+    title: Permissions Model and Execution Hooks
+goal: >-
+  Implement a fine-grained permission model with pluggable policies and enhanced tool approval
+  workflows for enterprise-grade security.
+scope:
+  in:
+    - Fine-grained tool execution permissions (read/write/execute scopes)
+    - Pluggable permission policy interface
+    - Enhanced tool approval flow with multi-level authorization
+    - Resource-based access control (RBAC) for tools and sessions
+    - Permission inheritance in parent-child agent relationships
+    - Audit trail for all permission decisions
+  out:
+    - Integration with external identity providers (OAuth2, LDAP)
+    - Row-level security for data access
+    - Network-level access control
+done_criteria:
+  - Tools can be restricted by scope (file, network, system, etc.)
+  - Custom permission policies can be registered and applied
+  - Multi-level approval chains work for sensitive operations
+  - Child sessions inherit and can extend parent permissions
+  - All permission denials are logged with context
+planned_changes:
+  permission-scopes:
+    status: complete
+    summary: define tool execution scopes
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+  policy-interface:
+    status: complete
+    summary: pluggable permission policy system
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+  approval-chains:
+    status: complete
+    summary: multi-level authorization workflows
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+  rbac-system:
+    status: complete
+    summary: role-based access control
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+  permission-inheritance:
+    status: complete
+    summary: parent-child permission propagation
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+  permission-audit:
+    status: complete
+    summary: audit logging for permission events
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+dependencies:
+  - 03-platform-reach — builds on existing custom tool registration
+  - 04-advanced-runtime — integrates with parent-child session relationships
+  - 07-agent-lifecycle — leverages execution hooks for permission checks
+risks:
+  - Permission checks add overhead to every tool execution
+  - Complex inheritance rules may lead to unexpected access grants
+  - Policy plugins must be sandboxed to prevent privilege escalation
+status: complete
+notes: []

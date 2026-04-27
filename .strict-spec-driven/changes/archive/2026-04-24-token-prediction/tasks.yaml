@@ -1,0 +1,35 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: token-prediction
+sections:
+  Implementation:
+    implementation-1:
+      text: Add `TokenPrediction` type to `src/llm-provider/types.ts`
+      status: complete
+    implementation-2:
+      text: Add optional `predictTokens()` method to `ProviderAdapter` interface
+      status: complete
+    implementation-3:
+      text: Implement generic fallback token prediction logic in `src/llm-provider/provider-registry.ts`
+      status: complete
+    implementation-4:
+      text: Expose prediction results in the streaming session lifecycle
+      status: complete
+  Testing:
+    testing-1:
+      text: Run `bun run lint` — validate TypeScript interfaces and code style
+      status: complete
+      command: bun run lint
+    testing-2:
+      text: Run `bun test` — unit test task for the token prediction logic
+      status: complete
+      command: bun test
+  Verification:
+    verification-1:
+      text: Verify implementation matches proposal scope and correctly predicts token usage
+      status: complete
+testing_gates:
+  validation_task: testing-1
+  unit_test_task: testing-2

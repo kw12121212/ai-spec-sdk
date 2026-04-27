@@ -1,0 +1,37 @@
+schema: strict-spec-driven/change-design/v1
+schema_version: 1
+artifact_type: change_design
+schema_file: templates/strict-spec-driven/schemas/change-design.yaml
+change: proposal-unified-tool-interface
+approach:
+  - >-
+    We will introduce a `UnifiedToolRegistry` or similar abstraction in
+    `src/unified-tool-registry.ts` or `src/capabilities.ts`. This registry will collect tools from
+    `lsp-tools.ts`, `mcp-store.ts`, and `workspace-store.ts` (custom tools). To handle tool name
+    collisions (e.g. if two MCP servers provide tools with the same name), we will automatically
+    prefix the tool names with their provider or server ID during registration. The registry will
+    then map tool executions back to the correct underlying provider based on the prefix.
+decisions:
+  prefixing-tool-names-will-be-prefixed-automatically-to:
+    decision: >-
+      **Prefixing:** Tool names will be prefixed automatically to ensure uniqueness across different
+      providers and servers.
+    rationale: >-
+      **Prefixing:** Tool names will be prefixed automatically to ensure uniqueness across different
+      providers and servers.
+  abstraction-layer-the-core-agent-runner-will-only-interact:
+    decision: >-
+      **Abstraction Layer:** The core agent runner will only interact with the unified interface and
+      will not require specific knowledge of LSP or MCP details.
+    rationale: >-
+      **Abstraction Layer:** The core agent runner will only interact with the unified interface and
+      will not require specific knowledge of LSP or MCP details.
+alternatives:
+  - option: >-
+      **No Prefixing:** We considered requiring manual aliasing for tool name collisions, but this
+      places a burden on the user.
+    reason: Automatic prefixing is safer.
+  - option: >-
+      **Provider-specific Tool Stores:** We considered letting the core orchestrator check multiple
+      stores sequentially.
+    reason: However, a single registry simplifies tool discovery for the agent.

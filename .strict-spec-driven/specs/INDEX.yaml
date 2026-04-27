@@ -1,0 +1,23 @@
+schema: strict-spec-driven/spec-index/v1
+schema_version: 1
+artifact_type: spec_index
+schema_file: templates/strict-spec-driven/schemas/spec-index.yaml
+specs:
+  - id: bridge-websocket-transport
+    title: websocket-transport
+    path: .strict-spec-driven/specs/bridge/websocket-transport.yaml
+  - id: build-native-executable
+    title: Native Executable Build
+    path: .strict-spec-driven/specs/build/native-executable.yaml
+  - id: build-sdk-packaging
+    title: SDK Packaging
+    path: .strict-spec-driven/specs/build/sdk-packaging.yaml
+  - id: session-session-templates
+    title: Session Templates
+    path: .strict-spec-driven/specs/session/session-templates.yaml
+  - id: session-stream-control
+    title: Stream Control
+    path: .strict-spec-driven/specs/session/stream-control.yaml
+  - id: workflow-cron-scheduler
+    title: cron-scheduler
+    path: .strict-spec-driven/specs/workflow/cron-scheduler.yaml

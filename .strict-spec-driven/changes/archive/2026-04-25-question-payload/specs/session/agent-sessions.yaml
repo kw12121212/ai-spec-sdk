@@ -1,0 +1,28 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: session-agent-sessions
+mapping:
+  implementation:
+    - src/session-store.ts
+  tests:
+    - test/session-store.test.ts
+operations:
+  ADDED:
+    session-paused-status:
+      strength: MUST
+      statement: The system MUST support a `paused` status for sessions awaiting external input.
+      scenarios:
+        pause:
+          - GIVEN: an active session
+          - WHEN: the agent emits a question
+          - THEN: the session status changes to `paused`
+  MODIFIED:
+    session-lifecycle:
+      strength: MUST
+      statement: >-
+        The system MUST manage sessions with `active`, `completed`, `stopped`, `interrupted`, or
+        `paused` status.
+      scenarios: {}
+  REMOVED: {}

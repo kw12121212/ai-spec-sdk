@@ -1,0 +1,32 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: proposal-mcp-tool-discovery
+sections:
+  Implementation:
+    implementation-1:
+      text: Send `tools/list` request after MCP server initialization is complete in `McpStore`.
+      status: complete
+    implementation-2:
+      text: Map the returned MCP tools to the agent SDK tool format and expose them.
+      status: complete
+    implementation-3:
+      text: Ensure that dynamically discovered tools can be executed via the existing `tools/call` flow.
+      status: complete
+  Testing:
+    testing-1:
+      text: Run `npm run lint` — lint and validate codebase formatting and typing.
+      status: complete
+      command: npm run lint
+    testing-2:
+      text: Run `bun test` — unit test the new tool discovery flow and tool format mapping.
+      status: complete
+      command: bun test
+  Verification:
+    verification-1:
+      text: Verify implementation matches proposal scope
+      status: complete
+testing_gates:
+  validation_task: testing-1
+  unit_test_task: testing-2

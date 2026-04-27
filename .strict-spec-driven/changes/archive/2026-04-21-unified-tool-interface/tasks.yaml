@@ -1,0 +1,39 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: proposal-unified-tool-interface
+sections:
+  Implementation:
+    implementation-1:
+      text: Define the `UnifiedTool` interface and registry logic.
+      status: complete
+    implementation-2:
+      text: >-
+        Update MCP tool discovery to register tools with the new unified registry using prefixed
+        names.
+      status: complete
+    implementation-3:
+      text: Update LSP tool exposure to use the new unified registry.
+      status: complete
+    implementation-4:
+      text: Update the Claude Agent SDK wiring to consume tools exclusively from the unified registry.
+      status: complete
+  Testing:
+    testing-1:
+      text: Run `bun run lint` — lint or validation task
+      status: complete
+      command: bun run lint
+    testing-2:
+      text: Run `bun test` — unit test task
+      status: complete
+      command: bun test
+  Verification:
+    verification-1:
+      text: >-
+        Verify implementation matches proposal scope by ensuring the agent can invoke an MCP and an
+        LSP tool through the unified registry without collision errors.
+      status: complete
+testing_gates:
+  validation_task: testing-1
+  unit_test_task: testing-2

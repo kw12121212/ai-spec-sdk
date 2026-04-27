@@ -1,0 +1,32 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: proposal-mcp-adapter
+sections:
+  Implementation:
+    implementation-1:
+      text: Update `McpStore` to attach stdio protocol clients to spawned MCP servers.
+      status: complete
+    implementation-2:
+      text: Add `initialize` and `tools/list` protocol methods to the MCP adapter.
+      status: complete
+    implementation-3:
+      text: Update the bridge command router to forward tool calls to the appropriate MCP adapter.
+      status: complete
+  Testing:
+    testing-1:
+      text: Run `npm run lint` — to validate formatting and types.
+      status: complete
+      command: npm run lint
+    testing-2:
+      text: Run `npm run test` — to execute the unit tests for the MCP adapter logic.
+      status: complete
+      command: npm run test
+  Verification:
+    verification-1:
+      text: Verify implementation matches proposal scope
+      status: complete
+testing_gates:
+  validation_task: testing-1
+  unit_test_task: testing-2

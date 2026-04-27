@@ -1,0 +1,27 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: token-tracking-token-usage
+mapping:
+  implementation:
+    - src/token-tracking/store.ts
+    - src/token-tracking/types.ts
+    - src/claude-agent-runner.ts
+  tests:
+    - test/token-tracking/store.test.ts
+    - test/session.test.ts
+operations:
+  ADDED:
+    token-prediction-tracking:
+      strength: MUST
+      statement: The system MUST track and expose pre-execution token predictions.
+      scenarios:
+        success:
+          - GIVEN: a session with a configured LLM provider
+          - WHEN: a message is prepared for execution
+          - THEN: >-
+              the system MUST provide an estimated input token count and predicted cost before
+              sending the request to the provider.
+  MODIFIED: {}
+  REMOVED: {}

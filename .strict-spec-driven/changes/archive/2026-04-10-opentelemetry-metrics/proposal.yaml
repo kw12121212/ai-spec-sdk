@@ -1,0 +1,29 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: opentelemetry-metrics
+  status: complete
+summary:
+  what:
+    - >-
+      Expose a `GET /metrics` endpoint on the HTTP transport that returns bridge runtime counters in
+      Prometheus text exposition format. Counters track request throughput, token consumption,
+      active sessions, and rate-limit rejections.
+  why:
+    - >-
+      Milestone 05 (Developer Ecosystem) requires completing the production observability story.
+      Structured logging covers event-level debugging; runtime diagnostics cover ad-hoc health
+      checks. Metrics fill the gap for continuous quantitative monitoring — operators and Prometheus
+      scrapers need a machine-readable endpoint that tracks request rates, token usage, and session
+      concurrency over time.
+scope:
+  in: []
+  out: []
+unchanged_behavior:
+  - Existing `GET /health`, `GET /events`, `POST /rpc`, and `GET /` endpoints unchanged
+  - Structured logging output and log levels unchanged
+  - Rate-limiting behavior and headers unchanged
+  - Session lifecycle and persistence unchanged
+  - Auth scope assignments for existing methods unchanged

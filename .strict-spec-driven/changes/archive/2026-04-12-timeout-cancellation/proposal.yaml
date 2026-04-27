@@ -1,0 +1,35 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: timeout-cancellation
+  status: complete
+summary:
+  what:
+    - >-
+      Add execution timeout and cancellation support to agent sessions, completing the Agent
+      Lifecycle Deep Management milestone. Concrete deliverables:
+    - New RPC method `session.cancel` to terminate an actively executing session
+    - >-
+      Optional `timeoutMs` parameter on `session.start` and `session.resume` to automatically
+      terminate sessions after a duration
+    - Timeout and cancellation audit logging
+    - Graceful propagation of cancellation signals to running agent operations
+    - Session status transitions for timed-out and cancelled sessions
+  why:
+    - >-
+      Production-grade agent orchestration requires control over execution duration and the ability
+      to terminate misbehaving or unwanted agent runs. Without timeout and cancellation,
+      long-running or stuck agents can consume resources indefinitely. This completes the agent
+      lifecycle story started in the 07-agent-lifecycle milestone.
+scope:
+  in: []
+  out: []
+unchanged_behavior:
+  - All existing RPC methods continue to work with the same request/response shapes
+  - >-
+    `session.stop` behavior remains unchanged (cancellation is a distinct operation for actively
+    running queries)
+  - Audit logging infrastructure is reused without modification
+  - Session persistence format is unchanged (adds optional fields only)

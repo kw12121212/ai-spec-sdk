@@ -1,0 +1,39 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: proposal-stream-control
+sections:
+  Implementation:
+    implementation-1:
+      text: >-
+        Add `stream.pause`, `stream.resume`, and `stream.throttle` JSON-RPC methods to the bridge
+        contract.
+      status: complete
+    implementation-2:
+      text: Implement stream buffering logic in `AgentStateMachine` or the streaming wrapper.
+      status: complete
+    implementation-3:
+      text: Implement token emission rate limiting (throttling).
+      status: complete
+    implementation-4:
+      text: Update `SessionStore` to track stream state (active, paused, throttled).
+      status: complete
+  Testing:
+    testing-1:
+      text: Run `bun run lint` — validate code style and typecheck
+      status: complete
+      command: bun run lint
+    testing-2:
+      text: Run `bun test` — execute unit tests to verify pause, resume, and throttle behavior
+      status: complete
+      command: bun test
+  Verification:
+    verification-1:
+      text: >-
+        Verify implementation matches proposal scope by testing an SSE stream pause and resume
+        without data loss.
+      status: complete
+testing_gates:
+  validation_task: testing-1
+  unit_test_task: testing-2

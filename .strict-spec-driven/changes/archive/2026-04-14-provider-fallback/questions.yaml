@@ -1,0 +1,23 @@
+schema: strict-spec-driven/question-list/v1
+schema_version: 1
+artifact_type: question_list
+schema_file: templates/strict-spec-driven/schemas/question-list.yaml
+change: provider-fallback
+open: []
+resolved:
+  - id: what-triggers-a-fallback-errors-only-or-also-health-check-failures-proactively
+    question: What triggers a fallback — errors only, or also health-check failures proactively?
+    context: >-
+      Determines whether a background health-check loop is in scope for this change or deferred to
+      `load-balancer`.
+    answer: >-
+      Reactive only (on live request error). No background polling. Consistent with the existing
+      on-demand `healthCheck` method.
+    status: resolved
+  - id: is-the-fallback-chain-ordered-and-exhaustive-or-just-primary-one-backup
+    question: Is the fallback chain ordered and exhaustive, or just "primary + one backup"?
+    context: Shapes the schema for fallback config and the retry loop logic.
+    answer: >-
+      Ordered array (`fallbackProviderIds: string[]`) — not significantly harder to implement and
+      avoids a second design round when users want more than one backup.
+    status: resolved

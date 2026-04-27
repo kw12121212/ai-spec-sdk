@@ -1,0 +1,7 @@
+schema: strict-spec-driven/question-list/v1
+schema_version: 1
+artifact_type: question_list
+schema_file: templates/strict-spec-driven/schemas/question-list.yaml
+change: proposal-mcp-adapter
+open: []
+resolved: []

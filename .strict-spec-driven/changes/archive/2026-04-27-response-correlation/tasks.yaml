@@ -1,0 +1,37 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: proposal-response-correlation
+sections:
+  Implementation:
+    implementation-1:
+      text: Add `session.answerQuestion` method to JSON-RPC bridge definition
+      status: complete
+    implementation-2:
+      text: >-
+        Implement validation logic in `SessionStore` or `AgentStateMachine` to ensure session is
+        `waiting_for_input`
+      status: complete
+    implementation-3:
+      text: Implement correlation logic matching `requestId`
+      status: complete
+    implementation-4:
+      text: Store the accepted answer in the session state
+      status: complete
+  Testing:
+    testing-1:
+      text: Run `bun run lint` to ensure type safety and code quality
+      status: complete
+      command: bun run lint
+    testing-2:
+      text: Run `bun test` to execute unit tests verifying answer validation and correlation
+      status: complete
+      command: bun test
+  Verification:
+    verification-1:
+      text: Verify implementation matches proposal scope by testing the complete JSON-RPC answer flow
+      status: complete
+testing_gates:
+  validation_task: testing-1
+  unit_test_task: testing-2

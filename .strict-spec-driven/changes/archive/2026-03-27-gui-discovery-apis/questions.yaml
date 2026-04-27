@@ -1,0 +1,17 @@
+schema: strict-spec-driven/question-list/v1
+schema_version: 1
+artifact_type: question_list
+schema_file: templates/strict-spec-driven/schemas/question-list.yaml
+change: gui-discovery-apis
+open: []
+resolved:
+  - id: should-tool-approval-flow-item-10-be-included
+    question: Should tool approval flow (item 10) be included?
+    context: It's the most complex item and has an open TODO question about whether it's needed.
+    answer: No — deferred. bypassPermissions is acceptable for now.
+    status: resolved
+  - id: should-items-7-8-9-be-implemented-together-or-separately
+    question: Should items 7, 8, 9 be implemented together or separately?
+    context: They are all small additive features.
+    answer: Together in one batch.
+    status: resolved

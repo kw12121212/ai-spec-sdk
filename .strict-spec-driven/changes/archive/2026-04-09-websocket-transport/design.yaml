@@ -1,0 +1,47 @@
+schema: strict-spec-driven/change-design/v1
+schema_version: 1
+artifact_type: change_design
+schema_file: templates/strict-spec-driven/schemas/change-design.yaml
+change: proposal-websocket-transport
+approach:
+  - >-
+    We will utilize Bun's native WebSocket support in `src/http-server.ts` to handle upgrade
+    requests on the `/ws` path. A new `WebSocketTransport` class will manage the connections,
+    framing JSON-RPC 2.0 messages for requests and notifications. The client SDKs will implement
+    corresponding `WebSocketTransport` classes that manage connection lifecycle, request
+    multiplexing, and automatic reconnection.
+decisions:
+  native-bun-websockets-we-will-use-bun-serve-websocket:
+    decision: '**Native Bun WebSockets:** We will use `Bun.serve({ websocket: ...'
+    rationale: >-
+      })` instead of introducing an external dependency like `ws`, as the project is already built
+      on Bun.
+  endpoint-path-the-websocket-server-will-listen-on-the-ws:
+    decision: >-
+      **Endpoint Path:** The WebSocket server will listen on the `/ws` path, sharing the same port
+      as the HTTP server.
+    rationale: >-
+      **Endpoint Path:** The WebSocket server will listen on the `/ws` path, sharing the same port
+      as the HTTP server.
+  reconnection-strategy-client-sdks-will-implement-automatic:
+    decision: >-
+      **Reconnection Strategy:** Client SDKs will implement automatic reconnection with exponential
+      backoff to handle network interruptions gracefully, mirroring the SSE reconnection behavior.
+    rationale: >-
+      **Reconnection Strategy:** Client SDKs will implement automatic reconnection with exponential
+      backoff to handle network interruptions gracefully, mirroring the SSE reconnection behavior.
+alternatives:
+  - option: >-
+      **External `ws` Library:** Considered using the `ws` npm package for broader Node.js
+      compatibility, but rejected in favor of Bun's native implementation to minimize dependencies
+      and leverage the existing runtime environment.
+    reason: >-
+      **External `ws` Library:** Considered using the `ws` npm package for broader Node.js
+      compatibility, but rejected in favor of Bun's native implementation to minimize dependencies
+      and leverage the existing runtime environment.
+  - option: >-
+      **Separate Port:** Considered running the WebSocket server on a separate port, but rejected to
+      simplify deployment and configuration by multiplexing over the existing HTTP port.
+    reason: >-
+      **Separate Port:** Considered running the WebSocket server on a separate port, but rejected to
+      simplify deployment and configuration by multiplexing over the existing HTTP port.

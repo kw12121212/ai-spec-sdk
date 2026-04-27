@@ -1,0 +1,217 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: token-tracking-token-usage
+mapping:
+  implementation:
+    - src/budget/types.ts
+    - src/budget/registry.ts
+    - src/budget/enforcer.ts
+    - src/bridge.ts
+    - src/capabilities.ts
+    - src/session-store.ts
+  tests:
+    - test/budget/registry.test.ts
+    - test/budget/enforcer.test.ts
+    - test/budget/bridge-methods.test.ts
+operations:
+  ADDED:
+    Budget Pool Creation:
+      strength: MUST
+      statement: >-
+        The SDK MUST allow clients to create token budget pools with an allocated amount, scope, and
+        configurable alert thresholds. A BudgetPool MUST have the following fields: | Field | Type |
+        Required | Description | |---|---|---|---| | `budgetId` | string | yes | Unique identifier |
+        | `scope` | `"session" \| "provider" \| "global"` | yes | Granularity | | `scopeId` | string
+        | no | Target identifier for session/provider scope | | `allocated` | number (integer > 0) |
+        yes | Total tokens allocated | | `thresholds` | number[] (0–1, sorted ascending) | no |
+        Alert thresholds; default `[0.8]` | | `depletionAction` | `"block" \| "throttle" \|
+        "notify"` | no | Action when exhausted; default `"notify"` |
+      scenarios:
+        create-a-session-scoped-budget:
+          - GIVEN: >-
+              a client calls `budget.create` with `{ budgetId: "b1", scope: "session", scopeId:
+              "session-123", allocated: 50000, thresholds: [0.5, 0.8, 0.95], depletionAction:
+              "block" }`
+          - WHEN: the bridge processes the request
+          - THEN: >-
+              the bridge stores the pool and returns `{ success: true, budgetId: "b1", remaining:
+              50000 }`
+        reject-duplicate-budgetid:
+          - GIVEN: a pool with budgetId "b1" already exists
+          - WHEN: the client calls `budget.create` with budgetId "b1"
+          - THEN: the bridge returns error `-32602` with message "Budget pool already exists"
+        reject-missing-scopeid-for-session-provider-scope:
+          - GIVEN: 'a client sets `scope: "session"` but omits `scopeId`'
+          - WHEN: the client calls `budget.create`
+          - THEN: the bridge returns error `-32602` indicating `scopeId` is required
+        reject-non-positive-allocated:
+          - GIVEN: 'a client provides `allocated: 0` or `allocated: -100`'
+          - WHEN: the client calls `budget.create`
+          - THEN: the bridge returns error `-32602` indicating `allocated` must be positive
+    Budget Pool Retrieval:
+      strength: MUST
+      statement: The SDK MUST allow clients to retrieve individual budget pools and list all active pools.
+      scenarios:
+        get-an-existing-budget-pool:
+          - GIVEN: a pool with budgetId "b1" exists
+          - WHEN: 'the client calls `budget.get` with `{ budgetId: "b1" }`'
+          - THEN: >-
+              the bridge returns the full pool configuration plus computed `consumed` and
+              `remaining` from TokenStore
+        get-non-existent-budget-pool:
+          - GIVEN: no pool with budgetId "unknown" exists
+          - WHEN: 'the client calls `budget.get` with `{ budgetId: "unknown" }`'
+          - THEN: the bridge returns error `-32072` with message "Budget pool not found"
+        list-all-budget-pools:
+          - GIVEN: multiple pools exist across scopes
+          - WHEN: the client calls `budget.list`
+          - THEN: the bridge returns an array of all pools with computed consumed/remaining
+        list-returns-empty-array-when-no-pools-exist:
+          - GIVEN: no budget pools are configured
+          - WHEN: the client calls `budget.list`
+          - THEN: the bridge returns an empty array `[]`
+    Budget Pool Adjustment:
+      strength: MUST
+      statement: The SDK MUST allow clients to adjust the allocated amount of an existing budget pool.
+      scenarios:
+        increase-budget-allocation:
+          - GIVEN: a pool with budgetId "b1" has allocated 50000 and consumed 20000
+          - WHEN: 'the client calls `budget.adjust` with `{ budgetId: "b1", allocated: 80000 }`'
+          - THEN: the pool's allocated is updated to 80000 and remaining becomes 60000
+        decrease-budget-below-consumed:
+          - GIVEN: a pool with budgetId "b1" has allocated 50000 and consumed 40000
+          - WHEN: 'the client calls `budget.adjust` with `{ budgetId: "b1", allocated: 30000 }`'
+          - THEN: the pool's allocated is updated to 30000 and remaining is 0 (clamped, not negative)
+    Budget Pool Removal:
+      strength: MUST
+      statement: The SDK MUST allow clients to remove budget pools individually or clear all pools at once.
+      scenarios:
+        remove-an-existing-budget-pool:
+          - GIVEN: a pool with budgetId "b1" exists
+          - WHEN: 'the client calls `budget.remove` with `{ budgetId: "b1" }`'
+          - THEN: 'the bridge removes the pool and returns `{ success: true, budgetId: "b1" }`'
+        remove-non-existent-budget-pool:
+          - GIVEN: no pool with budgetId "unknown" exists
+          - WHEN: 'the client calls `budget.remove` with `{ budgetId: "unknown" }`'
+          - THEN: the bridge returns error `-32072` with message "Budget pool not found"
+    Budget Status Query:
+      strength: MUST
+      statement: The SDK MUST provide a method to query current consumption status for budget pools.
+      scenarios:
+        get-status-for-all-pools:
+          - GIVEN: multiple pools exist
+          - WHEN: the client calls `budget.getStatus` with no filter
+          - THEN: >-
+              the bridge returns an array of `BudgetStatus` objects, each containing: `budgetId`,
+              `scope`, `scopeId`, `allocated`, `consumed`, `remaining`, `percentage`,
+              `triggeredThresholds` (array of already-fired thresholds)
+        filter-status-by-scope:
+          - GIVEN: pools exist for multiple scopes
+          - WHEN: 'the client calls `budget.getStatus` with `{ scope: "session" }`'
+          - THEN: only session-scoped pools are included
+    Pre-Query Budget Enforcement:
+      strength: MUST
+      statement: >-
+        The SDK MUST evaluate applicable budget pools before each LLM query and block the query if
+        any pool with `depletionAction: "block"` is exhausted.
+      scenarios:
+        query-proceeds-when-budget-has-remaining-tokens:
+          - GIVEN: a session-scoped budget with allocated 50000 and consumed 30000
+          - WHEN: a new query is about to execute
+          - THEN: the query proceeds normally
+        query-blocked-when-budget-exhausted-with-block-action:
+          - GIVEN: >-
+              a session-scoped budget with allocated 50000, consumed 50000, and depletionAction
+              "block"
+          - WHEN: a new query is about to execute
+          - THEN: the query is NOT executed
+          - AND: the bridge returns error `-32073` with message "Budget exhausted"
+          - AND: 'the error data includes: `budgetId`, `scope`, `allocated`, `consumed`'
+        query-proceeds-with-notify-action-when-exhausted:
+          - GIVEN: >-
+              a session-scoped budget with allocated 50000, consumed 50000, and depletionAction
+              "notify"
+          - WHEN: a new query is about to execute
+          - THEN: the query proceeds AND a `bridge/budget_alert` notification is emitted
+        throttle-action-applies-stream-throttle-when-exhausted:
+          - GIVEN: >-
+              a session-scoped budget with allocated 50000, consumed 50000, and depletionAction
+              "throttle"
+          - WHEN: a new query is about to execute
+          - THEN: the query proceeds with reduced streaming rate
+          - AND: a `bridge/budget_alert` notification is emitted
+    Post-Query Budget Threshold Evaluation:
+      strength: MUST
+      statement: >-
+        The SDK MUST evaluate budget thresholds after each completed query to detect threshold
+        crossings.
+      scenarios:
+        alert-fires-when-threshold-crossed:
+          - GIVEN: >-
+              a session budget with thresholds [0.5, 0.8] and pre-query consumed 40000 of 50000
+              (80%)
+          - WHEN: a query adds 1000 tokens (consumed becomes 41000, 82%)
+          - THEN: no alert fires (0.8 already crossed in prior query)
+        alert-fires-for-newly-crossed-threshold:
+          - GIVEN: >-
+              a session budget with thresholds [0.5, 0.8, 0.95] and pre-query consumed 38000 of
+              50000 (76%)
+          - WHEN: a query adds 2000 tokens (consumed becomes 40000, 80%)
+          - THEN: a `bridge/budget_alert` notification fires for the 0.8 threshold
+    Budget Alert Notification:
+      strength: MUST
+      statement: >-
+        The bridge MUST emit `bridge/budget_alert` notifications when a budget threshold is crossed
+        or depletion occurs. The notification MUST include: - `budgetId` (string) - `scope` (string)
+        - `scopeId` (string or null) - `allocated` (number) - `consumed` (number) - `remaining`
+        (number) - `percentage` (number) - `threshold` (number or null — null for depletion alerts)
+        - `depletionAction` (string or null — set for depletion alerts) - `sessionId` (string — the
+        session that triggered the evaluation)
+      scenarios:
+        threshold-alert-carries-correct-context:
+          - GIVEN: session "s1" has budget "b1" with allocated 10000 and threshold 0.8
+          - WHEN: consumption crosses 8000 tokens during a query
+          - THEN: >-
+              the notification includes budgetId "b1", threshold 0.8, consumed >= 8000, percentage
+              >= 0.8, sessionId "s1"
+    Budget Threshold Deduplication:
+      strength: MUST
+      statement: Each budget threshold MUST fire at most once per budget pool lifecycle.
+      scenarios:
+        threshold-does-not-re-fire:
+          - GIVEN: budget "b1" has threshold 0.8 and it has already fired
+          - WHEN: subsequent queries further increase consumption past 0.8
+          - THEN: no additional `bridge/budget_alert` fires for that threshold
+        threshold-fires-again-after-budget-adjustment:
+          - GIVEN: budget "b1" has threshold 0.8 which has already fired (consumed 8000 of 10000)
+          - WHEN: the client adjusts allocated to 20000 (consumed now 40%)
+          - AND: subsequent queries bring consumption back above 80% of 20000
+          - THEN: the 0.8 threshold fires again
+    Session-Scoped Budget Cleanup:
+      strength: MUST
+      statement: >-
+        The SDK MUST automatically remove session-scoped budget pools when their associated session
+        is destroyed.
+      scenarios:
+        session-budget-removed-on-destroy:
+          - GIVEN: session "s1" has a session-scoped budget with scopeId "s1"
+          - WHEN: the session is destroyed
+          - THEN: the budget pool is automatically removed from the registry
+        provider-and-global-budgets-unaffected-by-session-destroy:
+          - GIVEN: a provider-scoped budget and a global budget exist
+          - WHEN: any session is destroyed
+          - THEN: those pools remain active
+    Budget Methods in Capabilities:
+      strength: MUST
+      statement: The bridge capability response MUST advertise all `budget.*` methods.
+      scenarios:
+        capabilities-include-budget-methods:
+          - GIVEN: a client calls `bridge.capabilities`
+          - WHEN: the bridge returns capabilities
+          - THEN: >-
+              the `methods` array includes: `budget.create`, `budget.get`, `budget.list`,
+              `budget.adjust`, `budget.remove`, `budget.getStatus`
+  MODIFIED: {}
+  REMOVED: {}

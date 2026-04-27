@@ -1,0 +1,36 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: proposal-contract-type-generation
+  status: complete
+summary:
+  what:
+    - >-
+      Auto-generate TypeScript and Python type stubs from `bridge-contract.yaml`, replacing the
+      current hand-written type files.
+  why:
+    - >-
+      **Single source of truth**: The `bridge-contract.yaml` is the authoritative integration
+      reference, but TypeScript (`packages/client/src/types.ts`) and Python
+      (`clients/python/src/ai_spec_sdk/types.py`) types are currently maintained manually.
+    - >-
+      **Synchronization risk**: Manual type files drift from the contract over time, leading to
+      integration bugs and mismatched expectations.
+    - >-
+      **v1 stability guarantee**: Before declaring v1 stable, we need machine-verifiable alignment
+      between the contract and all client SDK types.
+    - >-
+      **Developer productivity**: Auto-generation eliminates tedious manual updates when the
+      contract evolves.
+scope:
+  in: []
+  out: []
+unchanged_behavior:
+  - The bridge runtime behavior remains identical
+  - All existing JSON-RPC method signatures remain unchanged
+  - >-
+    Client SDK public APIs remain source-compatible (types may be regenerated but semantics stay the
+    same)
+  - The `bridge-contract.yaml` file itself is not modified

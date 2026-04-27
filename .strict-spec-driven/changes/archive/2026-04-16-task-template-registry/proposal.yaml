@@ -1,0 +1,25 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: task-template-registry
+  status: complete
+summary:
+  what:
+    - >-
+      Establish a task template registry that allows saving, versioning, and instantiating task
+      templates for collaborative agent workflows.
+  why:
+    - >-
+      This is the foundational piece for milestone `10-task-team-registry`. Without reusable task
+      templates, it is impossible to schedule tasks via cron, manage queues, or define cross-session
+      task dependencies in a structured way.
+scope:
+  in: []
+  out: []
+unchanged_behavior:
+  - The existing session template system remains unchanged.
+  - >-
+    Agent lifecycle execution logic remains the same for now (until cron/queue integrations are
+    built).

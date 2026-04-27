@@ -1,0 +1,68 @@
+schema: strict-spec-driven/change-design/v1
+schema_version: 1
+artifact_type: change_design
+schema_file: templates/strict-spec-driven/schemas/change-design.yaml
+change: http-sse-transport
+approach:
+  - >-
+    The HTTP server is implemented as a thin adapter in `src/http-server.ts`. It creates a
+    `BridgeServer` instance with a custom `notify` callback that routes notifications to the SSE
+    manager instead of stdout. **SSE Manager** (`SseManager` class inside `http-server.ts`):
+  - >-
+    Holds `Map<sessionId, Set<ServerResponse>>` — each SSE connection is a `ServerResponse`
+    registered by `sessionId`
+  - >-
+    On `notify(message)`: inspect message for a `sessionId` field; if present, look up the matching
+    set and write the SSE event to each subscriber; if absent, drop the notification
+  - >-
+    On SSE connection close (client disconnect): remove the `ServerResponse` from the set; remove
+    the map entry when the set becomes empty **Request handling** (single `http.createServer`
+    handler):
+  - >-
+    `POST /rpc`: read body up to 10 MB; reject with 413 on overflow; parse JSON; call
+    `server.handleMessage`; write JSON response; track in-flight count for graceful shutdown
+  - >-
+    `GET /events`: validate `sessionId` query param (400 if missing); register SSE connection; send
+    initial comment `: connected\n\n` to flush; keep alive with 30-second heartbeat comments
+  - '`GET /health`: write `{ status: "ok", apiVersion }` immediately'
+  - 'Anything else: 404 **Graceful shutdown** (`startHttpServer` returns a `shutdown()` function):'
+  - >-
+    On `SIGTERM`: stop accepting new connections (`server.close()`); wait for in-flight `POST /rpc`
+    counter to reach 0 (poll with `setInterval`, 50 ms); then close all SSE connections; resolve
+    **CLI integration** (`src/cli.ts`):
+  - >-
+    Read `AI_SPEC_SDK_TRANSPORT` env (default `"stdio"`) and `AI_SPEC_SDK_PORT` env (default
+    `"8765"`)
+  - Parse `--transport` and `--port` CLI flags (simple `process.argv` scan, no new dependencies)
+  - >-
+    Branch: if transport is `"http"`, call `startHttpServer({ port, sessionsDir })`; otherwise run
+    existing stdio loop
+decisions:
+  no-external-framework:
+    decision: '**No external framework**'
+    rationale: Node.js `http` is sufficient; avoids new dependencies and keeps the bundle small
+  separate-launch-modes:
+    decision: '**Separate launch modes**'
+    rationale: stdio and HTTP are not run simultaneously; simpler operational model, no shared state concerns
+  session-scoped-sse-only:
+    decision: '**Session-scoped SSE only**'
+    rationale: >-
+      notifications without `sessionId` (e.g., future global events) are silently dropped rather
+      than broadcast; prevents accidental information leakage to wrong subscribers
+  fan-out-in-sse-manager:
+    decision: '**Fan-out in SSE manager**'
+    rationale: >-
+      multiple subscribers per sessionId is supported without changing `BridgeServer`; the adapter
+      layer handles the multiplexing
+  transport-in-capabilities:
+    decision: '**`transport` in capabilities**'
+    rationale: lets clients detect which transport is active without out-of-band configuration
+alternatives:
+  - option: Express / Fastify
+    reason: adds a dependency for marginal DX benefit; rejected per project rule of minimal dependencies
+  - option: Dual transport mode
+    reason: >-
+      adds complexity (shared `notify` fan-out across both transports, SSE + stdout); use cases
+      don't justify it
+  - option: Broadcast all notifications to all SSE connections
+    reason: simpler routing but leaks session data across subscribers; rejected

@@ -1,0 +1,60 @@
+schema: strict-spec-driven/change-design/v1
+schema_version: 1
+artifact_type: change_design
+schema_file: templates/strict-spec-driven/schemas/change-design.yaml
+change: permission-scopes
+approach:
+  - >-
+    **Scope registry module** — Create `src/permission-scopes.ts` containing: A `ToolScope` union
+    type enumerating the scope names An immutable `TOOL_SCOPE_MAP` mapping each built-in tool name
+    to its required scope(s) A `resolveScopes(toolName: string): ToolScope[]` function that returns
+    the scope(s) for a tool Custom tools (`custom.*`) always resolve to `system` scope
+  - >-
+    **Scope evaluation** — Add scope checking to `_runQuery` in `bridge.ts`: Before tool execution
+    proceeds, check if the tool's required scopes are within the session's `allowedScopes` (if set)
+    and not in `blockedScopes` (if set) `blockedScopes` takes precedence over `allowedScopes` If no
+    `allowedScopes` is set, all scopes are implicitly allowed (backward compatible) Scope denial
+    aborts the tool use and emits a `bridge/scope_denied` notification
+  - >-
+    **Session parameter extension** — Extend session creation parameters: Add `allowedScopes?:
+    string[]` and `blockedScopes?: string[]` to `session.start`, `session.spawn`, `session.resume`
+    Store scope configuration on the session object Template store supports `allowedScopes` /
+    `blockedScopes` fields
+  - >-
+    **JSON-RPC method** — Add `permissions.scopes` method: Returns the list of all available scopes
+    and the tool-to-scope mapping No parameters required
+  - >-
+    **Audit integration** — Write `scope_denied` audit entries when a tool is blocked by scope
+    restrictions
+decisions:
+  scope-granularity:
+    decision: >-
+      Using compound scopes (e.g., `file:read`, `file:write`) rather than flat scopes (e.g., `file`)
+      to allow fine-grained read-only configurations
+    rationale: >-
+      Using compound scopes (e.g., `file:read`, `file:write`) rather than flat scopes (e.g., `file`)
+      to allow fine-grained read-only configurations
+  evaluation-order:
+    decision: Scopes checked before hooks — scope denial is a hard gate, hooks are a soft gate.
+    rationale: >-
+      Rationale: scope violations represent a configuration error, while hook results represent a
+      runtime decision
+  blocked-takes-precedence:
+    decision: If a scope appears in both `allowedScopes` and `blockedScopes`, the tool is blocked.
+    rationale: This is the safest default
+  custom-tools-default-to-system:
+    decision: Custom tools are shell commands, which is the highest-risk scope.
+    rationale: Explicit opt-in required
+  no-scope-wildcard:
+    decision: No `*` scope that grants all.
+    rationale: Use the absence of `allowedScopes` to mean "all allowed"
+alternatives:
+  - option: '1.'
+    reason: >-
+      **Flat scopes only (file, network, system)** — Rejected because it doesn't allow read-only
+      file access patterns, which is a common security requirement 2. **Scope evaluation in hooks**
+      — Rejected because hooks are pluggable and runtime-configurable; scope restrictions should be
+      a hard session-level constraint 3. **Regex-based scope patterns** — Rejected as
+      over-engineering; the fixed set of scope types covers all built-in tools and is extensible for
+      future tool additions 4. **Per-tool scope override via config** — Deferred to
+      `policy-interface` change; this change keeps scope mapping static and tool-intrinsic

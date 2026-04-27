@@ -1,0 +1,69 @@
+schema: strict-spec-driven/change-design/v1
+schema_version: 1
+artifact_type: change_design
+schema_file: templates/strict-spec-driven/schemas/change-design.yaml
+change: agent-state-machine
+approach:
+  - 'Introduce a two-layer state model:'
+  - >-
+    **Execution state** (`executionState`) — fine-grained, managed by a state machine class,
+    representing the agent's current execution phase
+  - >-
+    **Persistence status** (`status`) — coarse-grained, existing field, representing the session's
+    lifecycle from the client's perspective The `AgentStateMachine` class encapsulates the
+    transition table and validation. It is owned by each session and driven by the bridge during
+    query execution. The existing `SessionStore` methods (`create`, `complete`, `stop`) will drive
+    both layers: they update `executionState` through the state machine and continue updating
+    `status` as before. Transition table: | From | To | Trigger |
+    |-------------------|-------------------|----------------------------------------| | idle |
+    running | query execution begins | | idle | error | query fails to start | | running | completed
+    | query returns successfully | | running | waiting_for_input | agent awaits tool approval / user
+    input| | running | paused | pause requested (future) | | running | error | query throws or agent
+    crashes | | waiting_for_input | running | input / approval received | | waiting_for_input |
+    error | timeout or unrecoverable error | | paused | running | resume requested (future) | |
+    paused | error | resume fails | | error | idle | session reset for retry | Terminal states
+    (`completed`) do not allow further transitions.
+decisions:
+  two-layer-state-model-execution-state-and-persistence-status:
+    decision: '**Two-layer state model:** Execution state and persistence status are separate concerns.'
+    rationale: >-
+      The persistence status is client-facing and stable; execution state is engine-internal and
+      extensible. This avoids breaking existing consumers while allowing fine-grained lifecycle
+      management internally.
+  no-new-rpc-methods-in-this-change-session-pause-session:
+    decision: >-
+      **No new RPC methods in this change:** `session.pause`, `session.resume`, and other new
+      methods are deferred to the `pause-resume` change.
+    rationale: This change only defines the internal state machine and wires it into existing operations.
+  transition-events-as-internal-callbacks-the-state-machine:
+    decision: >-
+      **Transition events as internal callbacks:** The state machine emits events (e.g.,
+      `onTransition(from, to, trigger)`) that future changes (`execution-hooks`, `audit-logging`)
+      can subscribe to.
+    rationale: >-
+      This change defines the event signature but does not implement hook execution or audit
+      persistence.
+  session-stop-mapping-when-session-stop-is-called-the:
+    decision: >-
+      **`session.stop` mapping:** When `session.stop` is called, the execution state transitions to
+      `completed` (if running/waiting) or stays unchanged (if already terminal), and the persistence
+      status is set to `stopped` as before.
+    rationale: >-
+      **`session.stop` mapping:** When `session.stop` is called, the execution state transitions to
+      `completed` (if running/waiting) or stays unchanged (if already terminal), and the persistence
+      status is set to `stopped` as before.
+alternatives:
+  - option: >-
+      **Single unified state field:** Replace `status` with a richer state that covers both
+      execution and persistence.
+    reason: Rejected because it would break the existing contract and require changes to all consumers.
+  - option: >-
+      **State machine as a standalone service:** A shared state machine service that multiple
+      sessions use.
+    reason: >-
+      Rejected because sessions are independent — per-session state machines are simpler and avoid
+      shared mutable state.
+  - option: '**XState or similar library:** Use a state machine library.'
+    reason: >-
+      Rejected per YAGNI — a simple transition table with validation is sufficient and avoids a
+      dependency.

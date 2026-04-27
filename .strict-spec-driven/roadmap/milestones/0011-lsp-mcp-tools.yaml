@@ -1,0 +1,67 @@
+schema: strict-spec-driven/roadmap-milestone/v2
+schema_version: 2
+artifact_type: roadmap_milestone
+schema_file: templates/strict-spec-driven/schemas/roadmap-milestone.yaml
+milestone:
+  0011-lsp-mcp-tools:
+    title: LSP and MCP Tool Integration
+goal: >-
+  Integrate Language Server Protocol (LSP) clients and Model Context Protocol (MCP) adapters as
+  first-class tools for enhanced code intelligence and external service connectivity.
+scope:
+  in:
+    - LSP client integration for code analysis, completion, and diagnostics
+    - MCP server management and tool discovery
+    - Unified tool interface abstracting LSP and MCP operations
+    - Bi-directional communication with LSP servers
+    - MCP resource subscription and notification handling
+  out:
+    - Implementing LSP servers (we are the client)
+    - Hosting MCP servers (we connect to external ones)
+    - Language-specific parsing or AST generation
+done_criteria:
+  - LSP tools can start servers, send requests, and receive responses
+  - MCP tools can connect to servers, list available tools, and invoke them
+  - Unified interface treats LSP and MCP operations consistently
+  - LSP diagnostics are surfaced as agent observations
+  - MCP resource updates trigger agent notifications
+planned_changes:
+  lsp-client:
+    status: complete
+    summary: LSP client implementation
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+  lsp-tools:
+    status: complete
+    summary: code analysis, completion, hover tools
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+  mcp-adapter:
+    status: complete
+    summary: MCP protocol adapter
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+  mcp-tool-discovery:
+    status: complete
+    summary: dynamic MCP tool registration
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+  unified-tool-interface:
+    status: complete
+    summary: common interface for LSP/MCP
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+  lsp-diagnostics:
+    status: complete
+    summary: diagnostic aggregation and reporting
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+dependencies:
+  - 03-platform-reach — builds on custom tool registration infrastructure
+  - 09-permissions-hooks — integrates with permission system for external tools
+risks:
+  - LSP servers may have incompatible versions or capabilities
+  - MCP is evolving; protocol changes may require updates
+  - External server lifecycle management adds complexity
+status: complete
+notes: []

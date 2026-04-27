@@ -1,0 +1,68 @@
+schema: strict-spec-driven/roadmap-milestone/v2
+schema_version: 2
+artifact_type: roadmap_milestone
+schema_file: templates/strict-spec-driven/schemas/roadmap-milestone.yaml
+milestone:
+  0014-persistence-cache:
+    title: Persistence and Cache Layer
+goal: >-
+  Provide durable storage for session state, LLM response caching, and tool execution result caching
+  to improve reliability and performance.
+scope:
+  in:
+    - Session state persistence with crash recovery
+    - LLM response cache with TTL and invalidation
+    - Tool execution result cache for deterministic tools
+    - Persistent storage backends (file, SQLite, external DB)
+    - Cache statistics and monitoring
+    - Selective persistence policies
+  out:
+    - Distributed cache coordination
+    - Real-time replication
+    - Cache warming strategies
+done_criteria:
+  - Sessions survive bridge restarts with full state recovery
+  - Cached LLM responses are served when prompt matches
+  - Deterministic tool results are cached and reused
+  - Storage backend is pluggable and configurable
+  - Cache hit/miss metrics are exposed
+planned_changes:
+  session-persistence:
+    status: complete
+    summary: durable session state storage
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+  llm-response-cache:
+    status: planned
+    summary: cache LLM completions
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+  tool-result-cache:
+    status: planned
+    summary: cache deterministic tool outputs
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+  storage-backends:
+    status: planned
+    summary: file, SQLite, external DB adapters
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+  cache-monitoring:
+    status: planned
+    summary: statistics and metrics
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+  persistence-policies:
+    status: planned
+    summary: selective persistence rules
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+dependencies:
+  - 07-agent-lifecycle — leverages state machine for checkpointing
+  - 08-llm-provider — integrates with provider layer for cache keys
+risks:
+  - Persistence format changes require migration strategy
+  - Cache invalidation must be correct to avoid stale data
+  - Storage backend failures need graceful degradation
+status: proposed
+notes: []

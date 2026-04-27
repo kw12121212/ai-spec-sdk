@@ -1,0 +1,25 @@
+schema: strict-spec-driven/change-design/v1
+schema_version: 1
+artifact_type: change_design
+schema_file: templates/strict-spec-driven/schemas/change-design.yaml
+change: proposal-mcp-tool-discovery
+approach:
+  - >-
+    After successfully establishing an MCP connection (the existing initialization phase), the SDK
+    will send a `tools/list` request to the MCP server. The response will be parsed and each tool
+    will be transformed into the SDK-compatible tool format. These tools will then be registered
+    dynamically to the active session or globally depending on the MCP server configuration.
+decisions:
+  discovery-timing:
+    decision: Discovery happens immediately following a successful initialization with the MCP server.
+    rationale: Discovery happens immediately following a successful initialization with the MCP server.
+  tool-mapping:
+    decision: >-
+      MCP tools will be mapped to the expected JSON schema format required by the Claude Agent SDK
+      so that the agent can invoke them transparently.
+    rationale: >-
+      MCP tools will be mapped to the expected JSON schema format required by the Claude Agent SDK
+      so that the agent can invoke them transparently.
+alternatives:
+  - option: Requiring static configuration of all tools beforehand instead of runtime discovery.
+    reason: This was rejected because it defeats the plug-and-play intent of the Model Context Protocol.

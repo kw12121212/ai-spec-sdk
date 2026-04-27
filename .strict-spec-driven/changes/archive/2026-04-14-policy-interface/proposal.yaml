@@ -1,0 +1,33 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: policy-interface
+  status: complete
+summary:
+  what:
+    - >-
+      Define a pluggable `PermissionPolicy` interface that allows custom permission logic to be
+      registered at session creation time and executed as part of the tool authorization pipeline,
+      before scope checks.
+  why:
+    - >-
+      The completed `permission-scopes` change provides built-in scope-based gating (file:read,
+      network, system, etc.), but the gating logic is hardcoded. Enterprise deployments need to
+      inject custom authorization rules — for example, time-of-day restrictions, per-user quotas,
+      external policy services, or domain-specific compliance checks. Without a pluggable policy
+      interface, every new authorization requirement must modify the bridge core. The policy
+      interface is also a prerequisite for the remaining milestone 09 changes (`approval-chains`,
+      `rbac-system`, `permission-inheritance`, `permission-audit`), which all need a consistent hook
+      point to plug in their respective authorization logic.
+scope:
+  in: []
+  out: []
+unchanged_behavior:
+  - >-
+    Existing scope-based gating (`allowedScopes`/`blockedScopes`) continues to work identically and
+    executes after the policy chain
+  - Hook execution (`pre_tool_use`, `post_tool_use`) continues unchanged
+  - '`allowedTools`/`disallowedTools` filtering is unaffected'
+  - Sessions without policies behave exactly as before

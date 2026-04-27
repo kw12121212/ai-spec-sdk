@@ -1,0 +1,37 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: bridge-json-rpc-stdio
+mapping:
+  implementation: []
+  tests: []
+operations:
+  ADDED:
+    bridge.setLogLevel:
+      strength: MUST
+      statement: >-
+        The bridge MUST expose a `bridge.setLogLevel` method that changes the runtime log level.
+        Parameters: `{ level: string }` where `level` is one of `"trace"`, `"debug"`, `"info"`,
+        `"warn"`, `"error"`. If `level` is not a valid log level, the bridge MUST return a `-32602`
+        error. On success the bridge responds with `{ level: "<new-level>" }`. The change takes
+        effect immediately for all subsequent log output.
+      scenarios:
+        set-log-level-to-debug:
+          - GIVEN: the bridge is running with default log level `info`
+          - WHEN: 'a client calls `bridge.setLogLevel` with `{ level: "debug" }`'
+          - THEN: >-
+              the bridge responds with `{ level: "debug" }` and subsequent log output includes
+              debug-level entries
+        reject-invalid-log-level:
+          - GIVEN: 'a client calls `bridge.setLogLevel` with `{ level: "verbose" }`'
+          - WHEN: the bridge validates the request
+          - THEN: the bridge returns a `-32602` error
+    Log Level Capability Advertisement:
+      strength: MUST
+      statement: >-
+        The `bridge.capabilities` response MUST include `bridge.setLogLevel` in its supported
+        methods list.
+      scenarios: {}
+  MODIFIED: {}
+  REMOVED: {}

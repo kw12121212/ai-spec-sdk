@@ -1,0 +1,27 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: event-webhooks
+  status: complete
+summary:
+  what:
+    - >-
+      Add HMAC-signed HTTP webhook delivery for session lifecycle events. Clients can register
+      webhook URLs that receive POST requests when session events fire (started, completed, stopped,
+      interrupted). Delivery is retried up to 3 times with exponential backoff. Unregistration stops
+      further delivery.
+  why:
+    - >-
+      External integrations (CI/CD pipelines, monitoring dashboards, Slack notifications) need to
+      react to session lifecycle events without polling. Webhooks are the standard pattern for
+      push-based event delivery. This completes the "enable external integrations" goal of milestone
+      05-developer-ecosystem.
+scope:
+  in: []
+  out: []
+unchanged_behavior:
+  - Existing session lifecycle event emission and SSE/WebSocket fan-out must remain unchanged
+  - Existing auth, rate limiting, and metrics behavior must not be affected
+  - Bridge startup and shutdown must not be blocked by webhook delivery

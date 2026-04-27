@@ -1,0 +1,26 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: backpressure-handling
+  status: complete
+summary:
+  what:
+    - >-
+      Implement flow control for slow consumers during streaming operations. When a client reads
+      tokens slower than the LLM provider generates them, the system will apply backpressure to
+      avoid unbounded memory buffering and out-of-memory errors.
+  why:
+    - >-
+      Currently, if a client's network connection is slow or it processes tokens slowly, the server
+      must buffer all generated tokens in memory. This can lead to resource exhaustion and server
+      crashes under load. Applying backpressure ensures system stability by pacing the LLM provider
+      or forcefully closing the connection if the buffer limit is reached.
+scope:
+  in: []
+  out: []
+unchanged_behavior:
+  - The core streaming functionality (pause, resume, throttle, reasoning streams) remains the same.
+  - Clients that consume streams fast enough will see no difference in behavior.
+  - Standard JSON-RPC and REST requests that are not streaming are unaffected.

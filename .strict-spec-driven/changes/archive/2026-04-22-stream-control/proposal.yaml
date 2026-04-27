@@ -1,0 +1,28 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: proposal-stream-control
+  status: complete
+summary:
+  what:
+    - >-
+      Implement granular token stream control (pause, resume, throttle) for the ai-spec-sdk. This
+      change allows clients to dynamically control the flow of streamed tokens from the LLM
+      provider.
+  why:
+    - >-
+      This is the first step in Milestone 12 (Streaming and Token Management Enhancement). Granular
+      stream control is a prerequisite for advanced streaming features like handling reasoning
+      streams, managing backpressure, and allocating token budgets safely. Without it, slow
+      consumers could be overwhelmed by high-throughput LLM token streams.
+scope:
+  in: []
+  out: []
+unchanged_behavior:
+  - Existing non-streaming RPC methods remain unchanged.
+  - >-
+    The default behavior for a stream (if not explicitly paused or throttled) remains continuous
+    delivery.
+  - Existing provider interfaces and token tracking logic remain intact.

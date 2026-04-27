@@ -1,0 +1,187 @@
+schema: strict-spec-driven/change-design/v1
+schema_version: 1
+artifact_type: change_design
+schema_file: templates/strict-spec-driven/schemas/change-design.yaml
+change: proposal-provider-registry
+approach:
+  - >-
+    ### Architecture Overview The provider registry follows a **centralized registry pattern** with
+    these components:
+  - >-
+    **ProviderRegistry** (new class in `src/llm-provider/provider-registry.ts`) In-memory store of
+    provider configurations (Map<string, ProviderConfig>) In-memory store of initialized provider
+    instances (Map<string, LLMProvider>) Default provider tracking (string | null) Validation logic
+    for configurations CRUD operations with lifecycle management
+  - >-
+    **JSON-RPC Integration** (modifications to `src/bridge.ts`) New `provider.*` method namespace
+    Delegates all provider operations to ProviderRegistry instance Returns structured JSON-RPC
+    responses or errors
+  - >-
+    **Persistence Layer** (integration with existing `ConfigStore`) Save/load provider configs to
+    `.claude/settings.json` under key `llmProviders` Workspace-scoped defaults via session template
+    config
+  - >-
+    **Session Template Integration** (optional enhancement) Session templates can specify a
+    `defaultProviderId` field When a session is created from a template, it uses that template's
+    default provider ### Data Flow ``` Client → JSON-RPC → Bridge → ProviderRegistry → LLMProvider
+    instances ↓ ConfigStore (persistence) ``` ### Key Operations #### Registration Flow
+  - Client sends `provider.register` with ProviderConfig
+  - Bridge validates required fields (id, type)
+  - Bridge validates type-specific requirements (e.g., apiKey for anthropic/openai)
+  - Registry stores configuration in memory
+  - Registry persists to ConfigStore
+  - 'Returns success with provider ID #### Provider Instantiation (Lazy)'
+  - Client requests operation requiring provider (e.g., health check)
+  - Registry checks if instance exists for that ID
+  - If not, creates adapter instance based on `config.type`
+  - Calls `provider.initialize()`
+  - Caches instance for reuse
+  - >-
+    Returns result #### Default Provider Selection Explicit: `provider.setDefault(providerId)` sets
+    global default Template-based: Session templates can override with `defaultProviderId` Fallback:
+    First registered provider if no explicit default
+decisions:
+  '1':
+    decision: '### 1.'
+    rationale: >-
+      Lazy Initialization Pattern **Decision:** Provider instances are created lazily on first use,
+      not at registration time. **Rationale:**
+  avoids-startup-overhead-and-api-key-validation-delays:
+    decision: Avoids startup overhead and API key validation delays
+    rationale: Avoids startup overhead and API key validation delays
+  allows-registration-of-providers-that-may-not-be-immediately:
+    decision: Allows registration of providers that may not be immediately available
+    rationale: Allows registration of providers that may not be immediately available
+  consistent-with-the-existing-anthropicadapter-pattern-where:
+    decision: >-
+      Consistent with the existing AnthropicAdapter pattern where initialization is separate from
+      construction
+    rationale: >-
+      Consistent with the existing AnthropicAdapter pattern where initialization is separate from
+      construction
+  prevents-cascade-failures-if-one-provider-is-misconfigured-2:
+    decision: 'Prevents cascade failures if one provider is misconfigured ### 2.'
+    rationale: >-
+      In-Memory Primary Store with ConfigStore Persistence **Decision:** Use an in-memory Map as the
+      primary store, with ConfigStore as the persistence layer. **Rationale:**
+  fast-access-during-runtime-operations-no-disk-i-o-on-every:
+    decision: Fast access during runtime operations (no disk I/O on every read)
+    rationale: Fast access during runtime operations (no disk I/O on every read)
+  leverages-existing-configstore-infrastructure:
+    decision: Leverages existing ConfigStore infrastructure
+    rationale: Leverages existing ConfigStore infrastructure
+  simple-serialization-deserialization-of-providerconfig:
+    decision: Simple serialization/deserialization of ProviderConfig objects
+    rationale: Simple serialization/deserialization of ProviderConfig objects
+  aligns-with-project-s-existing-patterns-session-store:
+    decision: Aligns with project's existing patterns (session-store, template-store)
+    rationale: Aligns with project's existing patterns (session-store, template-store)
+  persistence-is-write-through-on-mutations-read-on-startup-3:
+    decision: 'Persistence is write-through on mutations, read-on-startup ### 3.'
+    rationale: >-
+      Type-Based Adapter Factory **Decision:** Use a factory pattern where the registry maps
+      `config.type` string to adapter constructors. **Rationale:**
+  extensible:
+    decision: Extensible
+    rationale: new providers can be added by registering a new adapter factory
+  clean-separation-between-registry-logic-and-provider:
+    decision: Clean separation between registry logic and provider-specific code
+    rationale: Clean separation between registry logic and provider-specific code
+  currently-only-supports-anthropic-type-mapping-to:
+    decision: Currently only supports `anthropic` type (mapping to AnthropicAdapter)
+    rationale: Currently only supports `anthropic` type (mapping to AnthropicAdapter)
+  future-types-openai-local-can-be-added-without-modifying:
+    decision: >-
+      Future types (`openai`, `local`) can be added without modifying registry core
+      **Implementation:** ```typescript type ProviderAdapterFactory = (config: ProviderConfig) =>
+      LLMProvider; const adapterFactories: Record<string, ProviderAdapterFactory> = { anthropic:
+      (config) => new AnthropicAdapter(config), // openai: (config) => new OpenAIAdapter(config), //
+      future // local: (config) => new LocalModelAdapter(config), // future }; ``` ### 4.
+    rationale: >-
+      Validation Strategy **Decision:** Validate at registration time with clear error messages, but
+      allow some flexibility via the index signature. **Rationale:**
+  fail-fast:
+    decision: Fail fast
+    rationale: catch configuration errors before they cause runtime failures
+  required-fields:
+    decision: Required fields
+    rationale: '`id` (string, non-empty), `type` (one of supported types)'
+  type-specific-validation:
+    decision: 'Type-specific validation:'
+    rationale: 'Type-specific validation:'
+  anthropic-openai:
+    decision: '`anthropic`/`openai`'
+    rationale: requires `apiKey` either in config or environment variable
+  local:
+    decision: '`local`'
+    rationale: requires `baseUrl` or similar endpoint config
+  allow-extra-fields-via-key:
+    decision: Allow extra fields via `[key
+    rationale: 'string]: unknown` in ProviderConfig for future extensibility'
+  return-structured-json-rpc-errors-with-validation-details-5:
+    decision: 'Return structured JSON-RPC errors with validation details ### 5.'
+    rationale: >-
+      Global Singleton Registry Instance **Decision:** Create a single ProviderRegistry instance
+      shared across the bridge lifetime. **Rationale:**
+  simplifies-state-management-no-need-to-pass-registry-around:
+    decision: Simplifies state management (no need to pass registry around)
+    rationale: Simplifies state management (no need to pass registry around)
+  consistent-with-other-singletons-in-the-codebase-session:
+    decision: Consistent with other singletons in the codebase (session-store, config-store, etc.)
+    rationale: Consistent with other singletons in the codebase (session-store, config-store, etc.)
+  all-json-rpc-methods-access-the-same-registry-state:
+    decision: All JSON-RPC methods access the same registry state
+    rationale: All JSON-RPC methods access the same registry state
+  can-be-accessed-from-workflow-execution-context-if-needed:
+    decision: Can be accessed from workflow execution context if needed
+    rationale: Can be accessed from workflow execution context if needed
+alternatives:
+  - option: >-
+      ### Alternative A: Database-Backed Registry **Approach:** Use SQLite or another embedded
+      database instead of ConfigStore.
+    reason: '**Rejected because:**'
+  - option: Adds a dependency (better-sqlite3, etc.) beyond current stack
+    reason: Adds a dependency (better-sqlite3, etc.) beyond current stack
+  - option: Overkill for configuration data (not high-volume transactions)
+    reason: Overkill for configuration data (not high-volume transactions)
+  - option: Existing ConfigStore already handles this pattern well
+    reason: Existing ConfigStore already handles this pattern well
+  - option: >-
+      Would require migration infrastructure for schema changes ### Alternative B: Eager
+      Initialization at Registration **Approach:** Create and initialize provider instances
+      immediately when registered.
+    reason: '**Rejected because:**'
+  - option: Slows down registration, especially with network-dependent providers
+    reason: Slows down registration, especially with network-dependent providers
+  - option: API key validation might fail even if the key works later
+    reason: API key validation might fail even if the key works later
+  - option: Doesn't align with existing lazy patterns in the codebase
+    reason: Doesn't align with existing lazy patterns in the codebase
+  - option: >-
+      Makes registration synchronous/blocking which complicates error handling ### Alternative C:
+      Per-Workspace Provider Registries **Approach:** Each workspace has its own isolated provider
+      registry.
+    reason: '**Rejected because:**'
+  - option: Adds complexity to session-provider association
+    reason: Adds complexity to session-provider association
+  - option: Duplicates provider configurations across workspaces
+    reason: Duplicates provider configurations across workspaces
+  - option: Harder to manage shared API keys and quotas
+    reason: Harder to manage shared API keys and quotas
+  - option: Workspace-scoped defaults via templates achieve similar goals without full isolation
+    reason: Workspace-scoped defaults via templates achieve similar goals without full isolation
+  - option: >-
+      Could be revisited if multi-tenant requirements emerge ### Alternative D: Configuration File
+      Only (No Runtime API) **Approach:** Providers defined only in config files, no JSON-RPC
+      management API.
+    reason: '**Rejected because:**'
+  - option: Limits dynamic provider management (adding/removing at runtime)
+    reason: Limits dynamic provider management (adding/removing at runtime)
+  - option: Requires restarts for configuration changes
+    reason: Requires restarts for configuration changes
+  - option: Less flexible for programmatic integrations
+    reason: Less flexible for programmatic integrations
+  - option: Contradicts the goal of runtime configurability in milestone 08
+    reason: Contradicts the goal of runtime configurability in milestone 08
+  - option: JSON-RPC API enables UI-based management in the future
+    reason: JSON-RPC API enables UI-based management in the future

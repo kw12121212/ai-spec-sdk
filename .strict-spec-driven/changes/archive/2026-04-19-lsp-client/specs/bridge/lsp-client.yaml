@@ -1,0 +1,36 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: bridge-lsp-client
+mapping:
+  implementation:
+    - src/lsp-client.ts
+    - src/lsp-types.ts
+    - src/index.ts
+  tests:
+    - test/lsp-client.test.ts
+operations:
+  ADDED:
+    lsp-process-management:
+      strength: MUST
+      statement: The system MUST be able to spawn an LSP server as a child process and manage its lifecycle.
+      scenarios:
+        success:
+          - GIVEN: a valid path to an LSP server executable
+          - WHEN: the client connects
+          - THEN: the process is spawned and the initialization handshake completes successfully.
+    lsp-json-rpc-communication:
+      strength: MUST
+      statement: >-
+        The system MUST send and receive standard LSP JSON-RPC 2.0 messages over the child process
+        standard I/O streams.
+      scenarios:
+        success:
+          - GIVEN: an initialized LSP client
+          - WHEN: a request (e.g., `textDocument/hover`) is sent
+          - THEN: >-
+              a properly formatted JSON-RPC request is written to stdin and the response parsed from
+              stdout.
+  MODIFIED: {}
+  REMOVED: {}

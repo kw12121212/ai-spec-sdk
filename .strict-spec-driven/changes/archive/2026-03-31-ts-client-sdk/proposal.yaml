@@ -1,0 +1,29 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: proposal-ts-client-sdk
+  status: complete
+summary:
+  what:
+    - >-
+      Create an official npm package `@ai-spec-sdk/client` providing a type-safe TypeScript client
+      for the ai-spec-sdk bridge. The client supports both stdio (subprocess) and HTTP/SSE
+      transports with typed methods for all 39 bridge methods and an event listener API.
+  why:
+    - >-
+      The bridge exposes 39+ JSON-RPC methods over stdio and HTTP/SSE transports. Currently every
+      consumer (Go CLI, mobile web UI, future Python SDK) must implement its own JSON-RPC framing,
+      transport logic, and type mapping. An official TypeScript client gives Node.js/Bun users a
+      zero-boilerplate, type-safe integration path.
+scope:
+  in: []
+  out: []
+unchanged_behavior:
+  - >-
+    The existing bridge server code (`src/bridge.ts`, `src/http-server.ts`, `src/cli.ts`) is not
+    modified.
+  - The bridge contract (`docs/bridge-contract.yaml`) is unchanged.
+  - All existing tests continue to pass unchanged.
+  - The client is a pure consumer; no new bridge methods or capabilities are needed.

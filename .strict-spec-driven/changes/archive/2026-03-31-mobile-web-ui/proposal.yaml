@@ -1,0 +1,28 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: mobile-web-ui
+  status: complete
+summary:
+  what:
+    - >-
+      Add a mobile-first web UI served by the bridge at `GET /`, implemented as a single
+      self-contained HTML file with inline CSS and JS. The UI provides a login screen, chat view
+      with real-time agent output via SSE, tool approval/reject buttons, and a session list view —
+      all optimized for phone browsers (375px+) with dark mode support.
+  why:
+    - >-
+      The bridge already has HTTP/SSE transport and API key authentication. A web UI is the simplest
+      way to let users interact with the agent from any phone or tablet without installing anything.
+      Zero install, zero framework, zero build step — just open the URL and chat.
+scope:
+  in: []
+  out: []
+unchanged_behavior:
+  - All existing bridge JSON-RPC methods remain unchanged
+  - HTTP transport endpoints (`POST /rpc`, `GET /events`, `GET /health`) remain unchanged
+  - Authentication and authorization rules remain unchanged
+  - Stdio transport is unaffected
+  - SSE fan-out behavior is unaffected

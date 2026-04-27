@@ -1,0 +1,75 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: multi-agent-orchestration-proposal
+sections:
+  Implementation:
+    implementation-1:
+      text: 'Add `parentSessionId?: string` to `SessionConfig` type and session metadata models.'
+      status: complete
+    implementation-2:
+      text: >-
+        Implement `session.spawn` JSON-RPC method in the bridge handler that accepts a
+        `parentSessionId` parameter.
+      status: complete
+    implementation-3:
+      text: >-
+        Update `SessionStore` to track child sessions and cascade `session.stop` to all active
+        children recursively.
+      status: complete
+    implementation-4:
+      text: >-
+        Update `SessionStore` to propagate `bridge/subagent_event` to parent sessions when a child
+        session completes or emits messages.
+      status: complete
+    implementation-5:
+      text: Enhance `session.list` method with optional `parentSessionId` filtering capability.
+      status: complete
+    implementation-6:
+      text: >-
+        Update `@ai-spec-sdk/client` (TypeScript SDK) to include `spawn` method and
+        `parentSessionId` on list options.
+      status: complete
+    implementation-7:
+      text: >-
+        Update `ai-spec-sdk` (Python SDK) to include `spawn` method and `parentSessionId` on list
+        options.
+      status: complete
+  Testing:
+    testing-1:
+      text: >-
+        Add unit test for `session.spawn` behavior ensuring a child session inherits or receives
+        configuration correctly.
+      status: complete
+      command: session.spawn
+    testing-2:
+      text: Add unit test validating that `session.stop` cascades correctly to child sessions.
+      status: complete
+      command: session.stop
+    testing-3:
+      text: Add unit test ensuring that `session.list` correctly filters by `parentSessionId`.
+      status: complete
+      command: session.list
+    testing-4:
+      text: Run `npm run lint` or equivalent formatting check command.
+      status: complete
+      command: npm run lint
+    testing-5:
+      text: Run unit tests to verify the change (`bun run test` or `npm test`).
+      status: complete
+      command: bun run test
+  Verification:
+    verification-1:
+      text: >-
+        Verify that a `bridge/subagent_event` notification is correctly dispatched to parent
+        subscribers when the child completes.
+      status: complete
+    verification-2:
+      text: >-
+        Verify that Python and TypeScript client implementations function correctly for `spawn`
+        requests.
+      status: complete
+testing_gates:
+  validation_task: testing-1
+  unit_test_task: testing-2

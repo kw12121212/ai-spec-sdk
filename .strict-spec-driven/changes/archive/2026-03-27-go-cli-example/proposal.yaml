@@ -1,0 +1,30 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: go-cli-example
+  status: complete
+summary:
+  what:
+    - >-
+      Create a complete Go CLI example (`example/go-cli/`) that demonstrates how to integrate with
+      `ai-spec-sdk` via the stdio JSON-RPC bridge. The CLI provides an interactive REPL for
+      free-form conversation with Claude, similar to a simplified Claude Code. The example covers
+      all bridge methods: `bridge.capabilities`, `bridge.ping`, `session.start`, `session.resume`,
+      `session.stop`, `session.list`, `session.history`, `session.events`, `session.approveTool`,
+      `session.rejectTool`, `models.list`, `tools.list`, `workspace.register`, `workspace.list`, and
+      `workflow.run`.
+  why:
+    - >-
+      Downstream developers need a working reference implementation that shows how to wire up the
+      stdio JSON-RPC transport, handle streaming notifications, and implement tool approval. A Go
+      CLI is a natural fit because Go produces static binaries, has a small runtime footprint, and
+      is widely used in the CLI tooling ecosystem.
+scope:
+  in: []
+  out: []
+unchanged_behavior:
+  - >-
+    The SDK source code, tests, and build artifacts remain unchanged. The example is a standalone Go
+    module under `example/` with no effect on the main project's build or test pipeline.

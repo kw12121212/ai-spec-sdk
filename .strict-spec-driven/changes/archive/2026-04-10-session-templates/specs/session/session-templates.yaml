@@ -1,0 +1,86 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: session-session-templates
+mapping:
+  implementation: []
+  tests: []
+operations:
+  ADDED:
+    Create Session Template:
+      strength: MUST
+      statement: >-
+        The SDK MUST allow clients to save a named session template containing commonly used session
+        parameters.
+      scenarios:
+        create-a-new-template:
+          - GIVEN: a client provides a template name and session parameters
+          - WHEN: the client calls `template.create`
+          - THEN: the template is persisted and can be retrieved by name
+        update-existing-template:
+          - GIVEN: a template with the given name already exists
+          - WHEN: the client calls `template.create` with the same name
+          - THEN: the existing template is replaced with the new parameters
+    Retrieve Session Template:
+      strength: MUST
+      statement: The SDK MUST allow clients to retrieve a previously created template by name.
+      scenarios:
+        get-existing-template:
+          - GIVEN: a template was previously created with a specific name
+          - WHEN: the client calls `template.get` with that name
+          - THEN: the template is returned with all stored parameters
+        get-non-existent-template:
+          - GIVEN: no template exists with the given name
+          - WHEN: the client calls `template.get`
+          - THEN: null is returned
+    List Session Templates:
+      strength: MUST
+      statement: The SDK MUST allow clients to list all available templates.
+      scenarios:
+        list-all-templates:
+          - GIVEN: multiple templates have been created
+          - WHEN: the client calls `template.list`
+          - THEN: all templates are returned, sorted alphabetically by name
+    Delete Session Template:
+      strength: MUST
+      statement: The SDK MUST allow clients to delete a template by name.
+      scenarios:
+        delete-existing-template:
+          - GIVEN: a template exists with the given name
+          - WHEN: the client calls `template.delete`
+          - THEN: the template is removed and subsequent `template.get` returns null
+    Use Template When Starting Session:
+      strength: MUST
+      statement: >-
+        The SDK MUST allow clients to reference a template when starting a session, with explicit
+        parameters overriding template defaults.
+      scenarios:
+        start-session-with-template:
+          - GIVEN: a template exists with predefined parameters
+          - WHEN: the client calls `session.start` with the `template` parameter
+          - THEN: the session uses the template parameters as defaults
+        explicit-parameters-override-template:
+          - GIVEN: 'a template exists with `model: "claude-3-opus"`'
+          - WHEN: >-
+              the client calls `session.start` with `template` and explicit `model:
+              "claude-3-sonnet"`
+          - THEN: the session uses "claude-3-sonnet" (explicit value overrides template)
+        missing-template-error:
+          - GIVEN: the client provides a template name that does not exist
+          - WHEN: the client calls `session.start` with that template name
+          - THEN: the bridge returns a `-32021` error indicating the template was not found
+    Template Parameter Validation:
+      strength: MUST
+      statement: The SDK MUST validate template parameters using the same rules as `session.start`.
+      scenarios:
+        invalid-model-type:
+          - GIVEN: a client provides a non-string `model` parameter
+          - WHEN: the client calls `template.create`
+          - THEN: the bridge returns a `-32602` error
+        invalid-allowedtools-type:
+          - GIVEN: a client provides a non-array `allowedTools` parameter
+          - WHEN: the client calls `template.create`
+          - THEN: the bridge returns a `-32602` error
+  MODIFIED: {}
+  REMOVED: {}

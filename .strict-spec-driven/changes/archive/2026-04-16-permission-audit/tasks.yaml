@@ -1,0 +1,38 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: proposal-permission-audit
+sections:
+  Implementation:
+    implementation-1:
+      text: No implementation changes needed; `src/bridge.ts` already emits the correct audit logs.
+      status: complete
+  Testing:
+    testing-1:
+      text: >-
+        Add unit tests in `test/bridge.test.ts` to verify `scope_denied` audit entries are created
+        correctly when a tool is blocked by scopes.
+      status: complete
+      command: test/bridge.test.ts
+    testing-2:
+      text: >-
+        Add unit tests in `test/bridge.test.ts` to verify `policy_decision` audit entries are
+        created correctly for allow, deny, and pass policy results.
+      status: complete
+      command: test/bridge.test.ts
+    testing-3:
+      text: 'Run the validation command: `./scripts/check.sh`'
+      status: complete
+      command: ./scripts/check.sh
+    testing-4:
+      text: 'Run the unit test command: `bun test`'
+      status: complete
+      command: bun test
+  Verification:
+    verification-1:
+      text: Run `bun test` to ensure all tests pass.
+      status: complete
+testing_gates:
+  validation_task: testing-1
+  unit_test_task: testing-2

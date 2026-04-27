@@ -1,0 +1,22 @@
+schema: strict-spec-driven/question-list/v1
+schema_version: 1
+artifact_type: question_list
+schema_file: templates/strict-spec-driven/schemas/question-list.yaml
+change: sync-spec-driven-interfaces
+open: []
+resolved:
+  - id: should-skills-list-return-flat-names-or-structured-metadata
+    question: Should `skills.list` return flat names or structured metadata?
+    context: GUI clients need descriptions and parameter info to present actionable UI
+    answer: Return structured `SkillInfo[]` with name, description, hasScript, and parameters
+    status: resolved
+  - id: how-should-maintenance-workflow-map-to-the-script-command
+    question: How should `maintenance` workflow map to the script command?
+    context: The script command is `run-maintenance`, but the workflow name should be user-friendly
+    answer: Expose as `maintenance` in the workflow API, map to `run-maintenance` script internally
+    status: resolved
+  - id: should-migrate-be-a-workflow-even-though-it-has-no-corresponding-skill
+    question: Should `migrate` be a workflow even though it has no corresponding skill?
+    context: '`migrate` is a script command that converts OpenSpec artifacts to spec-driven format'
+    answer: Yes, add as a workflow since `workflow.run` is the bridge's mechanism for invoking scripts
+    status: resolved

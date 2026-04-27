@@ -1,0 +1,65 @@
+schema: strict-spec-driven/main-spec/v1
+schema_version: 1
+artifact_type: main_spec
+schema_file: templates/strict-spec-driven/schemas/main-spec.yaml
+spec:
+  id: bridge-websocket-transport
+  title: websocket-transport
+mapping:
+  implementation:
+    - src/http-server.ts
+    - src/cli.ts
+    - src/bridge.ts
+    - src/runtime-info.ts
+  tests:
+    - test/ws-server.test.ts
+requirements:
+  Support ws transport for bidirectional JSON-RPC 2.0 communication over WebSocket framing.:
+    strength: MUST
+    statement: >-
+      This requirement specifies that the bridge server MUST accept and manage WebSocket connections
+      to facilitate the JSON-RPC 2.0 protocol identically to the HTTP/SSE and STDIO transports.
+    scenarios: {}
+  Accept connections on the `/ws` path, sharing the same port as the HTTP server.:
+    strength: MUST
+    statement: >-
+      The WebSocket endpoint MUST be mapped to `/ws` so that it uses the same underlying HTTP server
+      port, simplifying deployment and avoiding cross-origin complexities.
+    scenarios: {}
+  Implement ping/pong keepalive messages.:
+    strength: MUST
+    statement: >-
+      The bridge server MUST periodically send ping frames to connected clients and expect pong
+      frames in return to detect and aggressively prune dead connections.
+    scenarios: {}
+  Support session-scoped event subscriptions over the WebSocket connection.:
+    strength: MUST
+    statement: >-
+      Events emitted within a specific session MUST be fanned out to all WebSocket clients that have
+      successfully authenticated and bound themselves to that session ID.
+    scenarios: {}
+  'Ensure `bridge.info` reports `transport: "ws"` when connected via WebSocket.':
+    strength: MUST
+    statement: >-
+      When a client issues a `bridge.info` request over a WebSocket connection, the response MUST
+      indicate the transport type as "ws" to accurately reflect the connection medium.
+    scenarios: {}
+  'Ensure `GET /` reports `transport: "ws"` when the bridge is started with `--transport ws`.':
+    strength: MUST
+    statement: >-
+      If the bridge is configured exclusively for WebSocket transport via command-line arguments,
+      the root health check endpoint MUST report "ws" as the primary transport.
+    scenarios: {}
+  Disconnect idle clients gracefully.:
+    strength: MUST
+    statement: >-
+      The server MUST implement a timeout mechanism to gracefully close WebSocket connections that
+      have not exhibited activity or responded to pings within a configurable threshold.
+    scenarios: {}
+  Handle `SIGTERM` gracefully, draining requests before closing connections.:
+    strength: MUST
+    statement: >-
+      Upon receiving a termination signal, the server MUST stop accepting new WebSocket connections,
+      allow in-flight JSON-RPC requests to complete, and then initiate a clean close handshake with
+      all connected clients before exiting.
+    scenarios: {}

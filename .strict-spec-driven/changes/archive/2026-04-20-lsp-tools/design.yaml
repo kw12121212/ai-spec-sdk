@@ -1,0 +1,27 @@
+schema: strict-spec-driven/change-design/v1
+schema_version: 1
+artifact_type: change_design
+schema_file: templates/strict-spec-driven/schemas/change-design.yaml
+change: proposal-lsp-tools
+approach:
+  - >-
+    Create an adapter class or factory function (e.g., `createLspTools(client: LspClient)`) that
+    returns a list of Claude Agent SDK compatible tool objects. Each tool definition will map its
+    arguments (like `uri`, `line`, `character`) to the standard LSP structures and call the
+    corresponding `client.getConnection().sendRequest(...)`.
+decisions:
+  tool-naming:
+    decision: Prefix tools with `lsp_` (e.g., `lsp_hover`) to avoid collisions with standard or MCP tools.
+    rationale: Prefix tools with `lsp_` (e.g., `lsp_hover`) to avoid collisions with standard or MCP tools.
+  error-handling:
+    decision: >-
+      LSP errors (like missing document or unsupported capability) will be caught and returned as
+      clean text messages in the tool output rather than crashing the tool call.
+    rationale: >-
+      LSP errors (like missing document or unsupported capability) will be caught and returned as
+      clean text messages in the tool output rather than crashing the tool call.
+alternatives:
+  - option: Directly exposing the entire LSP protocol as a single "send_lsp_request" tool.
+    reason: >-
+      This was rejected because agents struggle with constructing raw LSP JSON-RPC payloads and
+      benefit more from well-typed, specific tools like "hover".

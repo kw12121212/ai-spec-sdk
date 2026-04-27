@@ -1,0 +1,24 @@
+schema: strict-spec-driven/change-design/v1
+schema_version: 1
+artifact_type: change_design
+schema_file: templates/strict-spec-driven/schemas/change-design.yaml
+change: token-prediction
+approach:
+  - >-
+    We will add an optional `predictTokens()` method to the `ProviderAdapter` interface in
+    `src/llm-provider/types.ts`. If a specific provider adapter implements this (e.g. using
+    Anthropic's count tokens API), it will be used. If not, the `ProviderRegistry` will fallback to
+    a generic token counting heuristic (e.g., character count / 4) before executing a request.
+decisions:
+  prediction-method:
+    decision: We will use a "Provider & Fallback" approach, as confirmed by the user.
+    rationale: >-
+      Providers can natively support token counting if their APIs allow it, while a generic fallback
+      heuristic ensures estimates are always available.
+alternatives:
+  - option: Generic Heuristic Only
+    reason: Rejected because some providers offer exact token counts for inputs, which are more accurate.
+  - option: Native Only
+    reason: >-
+      Rejected because not all providers expose a token counting API, which would lead to missing
+      predictions for some models.

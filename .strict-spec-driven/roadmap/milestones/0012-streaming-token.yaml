@@ -1,0 +1,68 @@
+schema: strict-spec-driven/roadmap-milestone/v2
+schema_version: 2
+artifact_type: roadmap_milestone
+schema_file: templates/strict-spec-driven/schemas/roadmap-milestone.yaml
+milestone:
+  0012-streaming-token:
+    title: Streaming and Token Management Enhancement
+goal: >-
+  Enhance streaming capabilities with granular token flow control, reasoning process output, and
+  comprehensive token budget management.
+scope:
+  in:
+    - Granular token stream control (pause, resume, throttle)
+    - Reasoning/thinking process streaming output
+    - Token budget allocation and alerts
+    - Per-message token attribution
+    - Streaming backpressure handling
+    - Token usage predictions before execution
+  out:
+    - Client-side rendering of streams
+    - Audio/video streaming
+    - Real-time collaborative streaming
+done_criteria:
+  - Token streams can be paused and resumed without data loss
+  - Reasoning steps are streamed separately from final output
+  - Budget alerts fire at configurable thresholds
+  - Token attribution shows usage per message and tool call
+  - Backpressure prevents memory issues with slow consumers
+planned_changes:
+  stream-control:
+    status: complete
+    summary: pause, resume, throttle streaming
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+  reasoning-stream:
+    status: complete
+    summary: thinking process output
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+  token-budget:
+    status: complete
+    summary: budget allocation and alerts
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+  token-attribution:
+    status: complete
+    summary: per-message usage tracking
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+  backpressure-handling:
+    status: complete
+    summary: flow control for slow consumers
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+  token-prediction:
+    status: complete
+    summary: pre-execution usage estimates
+    details: 'Migration placeholder: add technical and design context for this planned change.'
+    depends_on: []
+dependencies:
+  - 02-production-ready — builds on existing streaming infrastructure
+  - 08-llm-provider — integrates with provider token tracking
+risks:
+  - Stream control adds protocol complexity
+  - Reasoning output may expose sensitive internal state
+  - Token prediction accuracy varies by provider
+status: complete
+notes: []

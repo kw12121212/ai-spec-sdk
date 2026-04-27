@@ -1,0 +1,30 @@
+schema: strict-spec-driven/change-design/v1
+schema_version: 1
+artifact_type: change_design
+schema_file: templates/strict-spec-driven/schemas/change-design.yaml
+change: proposal-response-correlation
+approach:
+  - >-
+    **JSON-RPC Method:** Expose a `session.answerQuestion` method taking `sessionId`, `requestId`,
+    and the `answer` (string or object).
+  - >-
+    **State Validation:** The `SessionStore` or `AgentStateMachine` will verify the session's
+    `executionState` is `waiting_for_input`.
+  - '**Correlation:** The provided `requestId` will be checked against the pending question''s ID.'
+  - >-
+    **Resolution:** If valid, the answer is recorded in the session context, and the session state
+    transitions appropriately to allow resumption.
+decisions:
+  protocol-start-with-json-rpc-for-answers:
+    decision: '**Protocol:** Start with JSON-RPC for answers.'
+    rationale: HTTP webhook endpoints for answers can be added later if required by channel implementations.
+  validation-reject-answers-for-sessions-that-are-no-longer:
+    decision: >-
+      **Validation:** Reject answers for sessions that are no longer `waiting_for_input` (e.g.,
+      timed out or cancelled) to prevent race conditions.
+    rationale: >-
+      **Validation:** Reject answers for sessions that are no longer `waiting_for_input` (e.g.,
+      timed out or cancelled) to prevent race conditions.
+alternatives:
+  - option: '**Direct HTTP POST:** Creating a dedicated REST endpoint for answers.'
+    reason: Rejected for now to maintain consistency with the JSON-RPC primary control plane.

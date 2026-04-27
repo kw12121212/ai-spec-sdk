@@ -1,0 +1,33 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: proposal-lsp-tools
+sections:
+  Implementation:
+    implementation-1:
+      text: >-
+        Implement `src/lsp-tools.ts` with `lsp_hover`, `lsp_definition`, and `lsp_references` tool
+        definitions using Claude Agent SDK types.
+      status: complete
+    implementation-2:
+      text: Export the new tools from `src/index.ts`.
+      status: complete
+  Testing:
+    testing-1:
+      text: Run `bun run lint` — lint and validate TypeScript types.
+      status: complete
+      command: bun run lint
+    testing-2:
+      text: Run `bun test test/lsp-tools.test.ts` — unit test task for the LSP tools.
+      status: complete
+      command: bun test test/lsp-tools.test.ts
+  Verification:
+    verification-1:
+      text: >-
+        Verify implementation matches proposal scope by ensuring all three LSP tools correctly
+        format requests and parse responses.
+      status: complete
+testing_gates:
+  validation_task: testing-1
+  unit_test_task: testing-2

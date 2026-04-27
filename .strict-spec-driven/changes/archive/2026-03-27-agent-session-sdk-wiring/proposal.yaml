@@ -1,0 +1,34 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: proposal-agent-session-sdk-wiring
+  status: complete
+summary:
+  what:
+    - >-
+      Wire the bridge's session model correctly to the Claude Agent SDK's `query()` call by: 1.
+      Passing `cwd` derived from the validated `workspace` to every SDK query 2. Capturing the
+      SDK-assigned `session_id` from the `system/init` event and storing it per bridge session 3.
+      Using the stored SDK `session_id` when resuming a session (not the bridge's internal UUID) 4.
+      Accepting an optional `proxy` parameter on `session.start` and `session.resume` that is
+      translated into `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` entries merged into the SDK `env`
+      option 5. Rejecting any caller-supplied `cwd` in `options` with a `-32602` error, since `cwd`
+      is bridge-managed
+  why:
+    - >-
+      The bridge currently passes the wrong working directory to the SDK (defaults to bridge process
+      cwd, not the workspace) and the wrong session ID when resuming (bridge UUID instead of SDK
+      session_id). These two bugs mean sessions run in the wrong directory and resume is silently
+      broken. The proxy gap means the SDK cannot reach the Anthropic API behind a corporate HTTP
+      proxy unless the bridge process already has the right environment, which is not always
+      controllable by callers.
+scope:
+  in: []
+  out: []
+unchanged_behavior:
+  - All existing JSON-RPC methods, error codes, and response shapes remain unchanged
+  - Sessions without a `proxy` param behave identically to today (after cwd and resume fixes)
+  - '`session.stop` and `session.status` are unaffected'
+  - Workflow execution path is unaffected

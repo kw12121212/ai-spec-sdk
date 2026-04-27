@@ -1,0 +1,56 @@
+schema: strict-spec-driven/change-design/v1
+schema_version: 1
+artifact_type: change_design
+schema_file: templates/strict-spec-driven/schemas/change-design.yaml
+change: opentelemetry-metrics
+approach:
+  - >-
+    Introduce a `MetricsCollector` class in `src/metrics.ts` that maintains in-memory counters and
+    gauges. The HTTP server's fetch handler adds a `GET /metrics` route that calls
+    `metricsCollector.render()` to produce Prometheus text output. The collector is instantiated
+    alongside the rate limiter and logger when the HTTP server starts. Key integration points:
+  - >-
+    **RPC dispatch** — after each `POST /rpc` completes, increment
+    `bridge_requests_total{method,status}` and observe duration into
+    `bridge_rpc_duration_seconds{method}`
+  - >-
+    **Token tracking** — after a session completes with token usage, increment
+    `bridge_tokens_consumed_total`
+  - '**Session lifecycle** — increment/decrement `bridge_sessions_active` gauge on session start/stop'
+  - >-
+    **Rate limiting** — increment `bridge_rate_limit_rejections_total` when a 429 is returned The
+    `render()` method produces standard Prometheus text exposition format with `TYPE` and `HELP`
+    annotations. No external dependencies.
+decisions:
+  '1':
+    decision: '1.'
+    rationale: >-
+      **No OpenTelemetry SDK** — the milestone scope is Prometheus text format only; adding the OTel
+      SDK would introduce a large dependency for a single-format use case. Hand-rolling the text
+      format keeps the bundle small and matches the approach called out in the milestone risks
+      section. 2. **Auth requirement for /metrics** — metrics expose operational data (request
+      rates, token counts) that could reveal usage patterns. Requiring `session:read` scope when
+      auth is enabled keeps them protected. When `--no-auth` is used, metrics are publicly
+      accessible like all other endpoints. 3. **Method and status labels only** — limiting labels to
+      `method` (JSON-RPC method name) and `status` (HTTP status code string) keeps cardinality
+      bounded. Session IDs, API key IDs, and other high-cardinality values are excluded to prevent
+      metric explosion. 4. **Gauge for active sessions** — `bridge_sessions_active` uses a gauge
+      (not counter) because it goes up and down. The session store already tracks active sessions;
+      the gauge reflects the current count at render time. 5. **Duration as a simple summary** —
+      `bridge_rpc_duration_seconds` accumulates count and sum to allow average computation, avoiding
+      histogram bucket complexity while still providing useful latency data.
+alternatives:
+  - option: '**`prom-client` npm package**'
+    reason: >-
+      adds a dependency for trivial text formatting; rejected to keep the runtime dependency-free
+      for this feature, matching the milestone risk note about hand-rolled format.
+  - option: '**OTLP export alongside Prometheus**'
+    reason: out of scope per milestone; can be added later without changing the collector interface.
+  - option: >-
+      **Metrics on stdio transport** — stdio is a single-process, single-client pipe; metrics
+      scraping doesn't apply.
+    reason: HTTP-only is the right boundary.
+  - option: '**Unauthenticated /metrics always**'
+    reason: >-
+      would leak operational data in production; the `session:read` scope requirement is a
+      reasonable middle ground.

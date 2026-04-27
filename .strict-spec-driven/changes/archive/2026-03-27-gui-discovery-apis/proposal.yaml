@@ -1,0 +1,25 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: gui-discovery-apis
+  status: complete
+summary:
+  what:
+    - >-
+      Add three discovery APIs to the bridge that GUI clients need but currently lack:
+      `models.list`, `workspace.register`/`workspace.list`, and `tools.list`.
+  why:
+    - >-
+      A full-featured Claude Code GUI needs to populate model selectors, display a "recent projects"
+      list, and show available tools. The bridge has no endpoints for any of these today (TODO items
+      7, 8, 9).
+scope:
+  in: []
+  out: []
+unchanged_behavior:
+  - All existing methods (`session.*`, `bridge.*`, `skills.list`, `workflow.run`) behave identically
+  - Session persistence, history, and event buffering are unaffected
+  - '`bridge.capabilities` still lists every pre-existing method; new methods are appended'
+  - No changes to `claude-agent-runner.ts` behavior

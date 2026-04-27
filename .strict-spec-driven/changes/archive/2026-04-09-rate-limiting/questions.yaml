@@ -1,0 +1,27 @@
+schema: strict-spec-driven/question-list/v1
+schema_version: 1
+artifact_type: question_list
+schema_file: templates/strict-spec-driven/schemas/question-list.yaml
+change: rate-limiting
+open: []
+resolved:
+  - id: item
+    question: 默认限流阈值是多少？
+    context: 需要在 spec 和实现中硬编码默认值
+    answer: 每 Key 每分钟 120 次请求
+    status: resolved
+  - id: key-key
+    question: 限流粒度是按 Key 还是按 Key+端点？
+    context: 影响令牌桶的 Map key 设计
+    answer: 仅按 Key，不区分端点
+    status: resolved
+  - id: 429-json-rpc-http
+    question: 429 响应体格式是 JSON-RPC 错误还是普通 HTTP 错误？
+    context: 客户端错误处理方式不同
+    answer: JSON-RPC 错误格式（code `-32029`）
+    status: resolved
+  - id: get-events-sse
+    question: '`GET /events` SSE 连接是否纳入限流？'
+    context: SSE 是长连接，限流语义与 RPC 请求不同
+    answer: 不纳入，仅 `POST /rpc` 受限流约束
+    status: resolved

@@ -1,0 +1,32 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: python-client-sdk
+  status: complete
+summary:
+  what:
+    - >-
+      Provide an official PyPI package (`ai-spec-sdk`) that wraps the official `claude-agent-sdk`
+      Python package for stdio mode and connects to the ai-spec-sdk bridge via HTTP/SSE for
+      full-featured bridge access. The SDK offers a unified async `BridgeClient` API that works
+      across both transports.
+  why:
+    - Python is the dominant language for AI/ML developers — the largest audience for agent tooling
+    - >-
+      The official `claude-agent-sdk` Python package already handles CLI subprocess management,
+      message types, and streaming; wrapping it avoids reinventing that infrastructure
+    - >-
+      HTTP mode unlocks the bridge's full feature set (session persistence, search, branching,
+      config, MCP lifecycle) for Python consumers
+    - >-
+      A unified API means consumers write the same code regardless of transport, switching only the
+      constructor parameter
+scope:
+  in: []
+  out: []
+unchanged_behavior:
+  - The ai-spec-sdk bridge (TypeScript) is not modified
+  - The existing TypeScript Client SDK (`@ai-spec-sdk/client`) is not modified
+  - The `claude-agent-sdk` Python package is used as-is, not forked or patched

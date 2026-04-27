@@ -1,0 +1,108 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: bridge-extensibility
+sections:
+  Implementation:
+    implementation-1:
+      text: >-
+        Create `src/mcp-store.ts` — MCP server registry with process lifecycle, workspace-scoped,
+        disk persistence under workspace `.claude/mcp/`
+      status: complete
+    implementation-2:
+      text: >-
+        Create `src/config-store.ts` — Configuration store with project/user scope resolution,
+        known-key validation, passthrough for unknown keys
+      status: complete
+    implementation-3:
+      text: >-
+        Create `src/hooks-store.ts` — Hook registry with event pattern matching, blocking semantics
+        for `pre_tool_use`, persistence in settings
+      status: complete
+    implementation-4:
+      text: >-
+        Add MCP methods to `src/bridge.ts` dispatch: `mcp.add`, `mcp.remove`, `mcp.start`,
+        `mcp.stop`, `mcp.list`
+      status: complete
+    implementation-5:
+      text: 'Add Config methods to `src/bridge.ts` dispatch: `config.get`, `config.set`, `config.list`'
+      status: complete
+    implementation-6:
+      text: 'Add Hooks methods to `src/bridge.ts` dispatch: `hooks.list`, `hooks.add`, `hooks.remove`'
+      status: complete
+    implementation-7:
+      text: 'Add MCP notifications: `mcp/server_started`, `mcp/server_stopped`, `mcp/server_error`'
+      status: complete
+    implementation-8:
+      text: 'Add Hook notification: `bridge/hook_triggered` with event type, hook ID, and session context'
+      status: complete
+    implementation-9:
+      text: >-
+        Wire hook execution into session lifecycle: fire `pre_tool_use` before tool approval,
+        `post_tool_use` after tool result, `notification` on session events, `stop` on session stop,
+        `subagent_stop` on subagent completion
+      status: complete
+    implementation-10:
+      text: Update `src/capabilities.ts` to include all new methods in capability discovery
+      status: complete
+    implementation-11:
+      text: Re-export new types from `src/index.ts`
+      status: complete
+    implementation-12:
+      text: >-
+        Update Go CLI example under `example/go-cli/` to demonstrate `mcp.add`/`mcp.list` and
+        `config.get`/`config.set`
+      status: complete
+  Testing:
+    testing-1:
+      text: >-
+        Create `test/mcp-store.test.ts` — workspace scoping, add/remove/start/stop, auto-start on
+        add, list with status, persistence
+      status: complete
+      command: test/mcp-store.test.ts
+    testing-2:
+      text: >-
+        Create `test/config-store.test.ts` — scope resolution (project overrides user),
+        get/set/list, known-key validation, passthrough for unknown keys, persistence
+      status: complete
+      command: test/config-store.test.ts
+    testing-3:
+      text: >-
+        Create `test/hooks-store.test.ts` — add/remove/list, event matching, workspace scope,
+        blocking hooks for pre_tool_use, persistence
+      status: complete
+      command: test/hooks-store.test.ts
+    testing-4:
+      text: Lint passes (`bun run lint`)
+      status: complete
+      command: bun run lint
+    testing-5:
+      text: All tests pass (`bun test`)
+      status: complete
+      command: bun test
+  Verification:
+    verification-1:
+      text: Verify all new methods return correct JSON-RPC 2.0 responses
+      status: complete
+    verification-2:
+      text: Verify MCP servers are workspace-scoped and persisted under `.claude/mcp/`
+      status: complete
+    verification-3:
+      text: 'Verify config scope resolution: project values override user values'
+      status: complete
+    verification-4:
+      text: Verify hooks fire at correct lifecycle points during sessions
+      status: complete
+    verification-5:
+      text: Verify `bridge.capabilities` advertises all new methods
+      status: complete
+    verification-6:
+      text: Verify Go CLI example builds and demonstrates MCP and config methods
+      status: complete
+    verification-7:
+      text: Verify no existing tests are broken
+      status: complete
+testing_gates:
+  validation_task: testing-1
+  unit_test_task: testing-2

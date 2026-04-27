@@ -1,0 +1,57 @@
+schema: strict-spec-driven/change-design/v1
+schema_version: 1
+artifact_type: change_design
+schema_file: templates/strict-spec-driven/schemas/change-design.yaml
+change: event-webhooks
+approach:
+  - >-
+    **New module `src/webhooks.ts`** — Contains `WebhookManager` class responsible for:
+    Loading/saving webhook registrations from/to a JSON file on disk Subscribing and unsubscribing
+    webhook URLs Listening to session events and delivering POST requests to registered URLs
+    HMAC-SHA256 signing of payloads Retry logic with exponential backoff
+  - >-
+    **Integration with BridgeServer** — The webhook manager hooks into the existing session event
+    emission via the `notify` callback pattern already used by SSE and WebSocket managers. When a
+    session event is emitted, the webhook manager receives it and queues delivery.
+  - >-
+    **New RPC methods** — `webhook.subscribe` and `webhook.unsubscribe` registered in the existing
+    RPC method dispatch table, requiring `admin` scope.
+  - >-
+    **Persistence** — Webhook registrations stored in a JSON file alongside the sessions directory.
+    Loaded at startup, saved on subscribe/unsubscribe.
+decisions:
+  hmac-sha256-over-asymmetric-signatures-hmac-is-simpler:
+    decision: >-
+      **HMAC-SHA256 over asymmetric signatures** — HMAC is simpler, symmetric, and sufficient for
+      webhook verification.
+    rationale: >-
+      The shared secret is generated once at bridge startup and exposed via the `webhook.subscribe`
+      response so the consumer can verify signatures.
+  in-memory-retry-state-retry-queues-are-not-persisted:
+    decision: '**In-memory retry state** — Retry queues are not persisted.'
+    rationale: >-
+      If the bridge restarts mid-retry, pending deliveries are lost. This avoids complexity and
+      matches the in-memory metrics approach.
+  no-external-dependencies:
+    decision: '**No external dependencies**'
+    rationale: >-
+      Uses Node.js built-in `crypto` for HMAC and `fetch` for HTTP delivery, consistent with the
+      zero-external-dep pattern (metrics, rate limiting).
+  admin-scope-for-webhook-management:
+    decision: '**Admin scope for webhook management**'
+    rationale: >-
+      Webhook registration is a privileged operation; `admin` scope prevents unauthorized URL
+      registration.
+alternatives:
+  - option: >-
+      **Webhook management via REST endpoints (POST/DELETE /webhooks)** — Rejected in favor of RPC
+      methods to stay consistent with the existing JSON-RPC API surface.
+    reason: All other management operations use RPC.
+  - option: '**Persistent retry queue** — Considered but rejected for scope.'
+    reason: >-
+      Adds significant complexity (disk queue, crash recovery) for a v1 feature. In-memory retry is
+      sufficient.
+  - option: >-
+      **Configurable event types per subscription** — Considered but out of scope per milestone
+      definition (no webhook filtering).
+    reason: All subscribers receive all session lifecycle events.

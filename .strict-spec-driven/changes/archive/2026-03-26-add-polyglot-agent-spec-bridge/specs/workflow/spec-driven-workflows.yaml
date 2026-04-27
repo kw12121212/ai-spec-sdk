@@ -1,0 +1,57 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: workflow-spec-driven-workflows
+mapping:
+  implementation: []
+  tests: []
+operations:
+  ADDED:
+    Supported Workflow Invocation:
+      strength: MUST
+      statement: >-
+        The SDK MUST let clients invoke supported spec-driven workflow operations against an
+        explicit workspace through the bridge.
+      scenarios:
+        run-a-supported-workflow-operation:
+          - GIVEN: a workspace path that the bridge can access
+          - AND: a client requests a supported workflow operation
+          - WHEN: the bridge executes that workflow
+          - THEN: the bridge returns a machine-readable result describing the workflow outcome
+    Workflow Result Reporting:
+      strength: MUST
+      statement: >-
+        The SDK MUST return workflow results in a structured form that includes success state,
+        relevant artifact paths or change identifiers, and validation output when applicable.
+      scenarios:
+        return-verification-output:
+          - GIVEN: a client invokes a workflow operation that performs validation
+          - WHEN: the workflow completes
+          - THEN: >-
+              the bridge response includes structured validation results rather than only
+              human-formatted text
+    Workflow Capability Mapping:
+      strength: SHOULD
+      statement: >-
+        The SDK SHOULD return machine-readable metadata that maps supported high-level workflow
+        operations to bundled spec-driven capabilities.
+      scenarios:
+        inspect-workflow-support-metadata:
+          - GIVEN: a client requests bridge capabilities
+          - WHEN: the bridge returns supported workflow operations
+          - THEN: >-
+              the response includes workflow capability mapping metadata suitable for host UI
+              display
+    Workspace-Scoped Workflow Safety:
+      strength: MUST
+      statement: >-
+        The SDK MUST scope workflow execution to the workspace provided by the caller and MUST fail
+        clearly when the requested workspace state does not satisfy workflow prerequisites.
+      scenarios:
+        reject-missing-spec-driven-prerequisites:
+          - GIVEN: a client invokes a workflow that requires `.spec-driven/` initialization
+          - WHEN: the target workspace does not contain the required prerequisite state
+          - THEN: the bridge returns a structured error that explains the missing prerequisite
+  MODIFIED: {}
+  REMOVED: {}

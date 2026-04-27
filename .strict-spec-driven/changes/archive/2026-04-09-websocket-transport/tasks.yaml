@@ -1,0 +1,77 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: proposal-websocket-transport
+sections:
+  Implementation:
+    implementation-1:
+      text: >-
+        Implement `WebSocketTransport` handler in `src/http-server.ts` utilizing `Bun.serve({
+        websocket: ... })` at `/ws`.
+      status: complete
+    implementation-2:
+      text: Implement JSON-RPC 2.0 message framing and multiplexing within the WebSocket handler.
+      status: complete
+    implementation-3:
+      text: Implement ping/pong keepalive logic.
+      status: complete
+    implementation-4:
+      text: Update session management to register WebSocket connections for event subscriptions.
+      status: complete
+    implementation-5:
+      text: Ensure `bridge.info` and `GET /` report `ws` transport appropriately.
+      status: complete
+    implementation-6:
+      text: >-
+        Implement `WebSocketTransport` class in `@ai-spec-sdk/client` (TypeScript) with automatic
+        reconnection.
+      status: complete
+    implementation-7:
+      text: Implement `WebSocketTransport` class in `ai-spec-sdk` (Python) with automatic reconnection.
+      status: complete
+  Testing:
+    testing-1:
+      text: Run lint validation via `bun run check.sh`
+      status: complete
+      command: bun run check.sh
+    testing-2:
+      text: Run unit tests via `bun run test.sh`
+      status: complete
+      command: bun run test.sh
+    testing-3:
+      text: >-
+        Add unit tests for TypeScript `WebSocketTransport` focusing on connection lifecycle and
+        reconnection logic.
+      status: complete
+      command: WebSocketTransport
+    testing-4:
+      text: >-
+        Add unit tests for Python `WebSocketTransport` focusing on connection lifecycle and
+        reconnection logic.
+      status: complete
+      command: WebSocketTransport
+    testing-5:
+      text: >-
+        Add integration tests for the bridge server's `/ws` endpoint, validating JSON-RPC request
+        multiplexing, event fan-out, and ping/pong keepalive.
+      status: complete
+      command: /ws
+  Verification:
+    verification-1:
+      text: 'Verify `bridge.info` reports `transport: "ws"` over a WebSocket connection.'
+      status: complete
+    verification-2:
+      text: 'Verify `GET /` reports `transport: "ws"` when started with `--transport ws`.'
+      status: complete
+    verification-3:
+      text: >-
+        Verify event subscriptions work correctly, fanning out events to multiple connected
+        WebSocket clients.
+      status: complete
+    verification-4:
+      text: Verify graceful shutdown (`SIGTERM`) drains requests and closes connections properly.
+      status: complete
+testing_gates:
+  validation_task: testing-1
+  unit_test_task: testing-2

@@ -1,0 +1,42 @@
+schema: strict-spec-driven/question-list/v1
+schema_version: 1
+artifact_type: question_list
+schema_file: templates/strict-spec-driven/schemas/question-list.yaml
+change: python-client-sdk
+open: []
+resolved:
+  - id: >-
+      should-we-use-the-official-claude-agent-sdk-python-package-or-build-our-own-subprocess-management
+    question: >-
+      Should we use the official `claude-agent-sdk` Python package or build our own subprocess
+      management?
+    context: The official SDK handles CLI subprocess lifecycle and message protocol.
+    answer: Use `claude-agent-sdk` as the foundation for stdio transport (user confirmed).
+    status: resolved
+  - id: should-we-provide-both-sync-and-async-apis
+    question: Should we provide both sync and async APIs?
+    context: '`claude-agent-sdk` is async-only; sync would require event loop threading.'
+    answer: Async only — matches `claude-agent-sdk` and avoids complexity.
+    status: resolved
+  - id: should-claude-agent-sdk-be-a-required-dependency-or-an-optional-extra
+    question: Should `claude-agent-sdk` be a required dependency or an optional extra?
+    context: >-
+      If required, all users get it even if they only use HTTP mode. If optional, stdio users must
+      remember the extra.
+    answer: Required — stdio is the default and primary value proposition.
+    status: resolved
+  - id: should-method-names-use-snakecase-or-camelcase
+    question: Should method names use snake_case or camelCase?
+    context: TS Client SDK uses camelCase (`sessionStart`). Python convention is snake_case.
+    answer: camelCase — match the TS Client SDK for API consistency across languages.
+    status: resolved
+  - id: >-
+      for-stdio-transport-should-sessionstart-block-until-completion-or-return-immediately-with-event-streaming
+    question: >-
+      For stdio transport, should `sessionStart` block until completion or return immediately with
+      event streaming?
+    context: '`claude-agent-sdk` supports both patterns. The bridge returns sessionId immediately.'
+    answer: >-
+      Return immediately with sessionId, stream events via `on("session_event", handler)`. Matches
+      bridge behavior, non-blocking, supports concurrent sessions.
+    status: resolved

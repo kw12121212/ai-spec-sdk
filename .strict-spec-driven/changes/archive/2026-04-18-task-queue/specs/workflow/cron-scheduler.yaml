@@ -1,0 +1,20 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: workflow-cron-scheduler
+mapping:
+  implementation:
+    - src/cron-scheduler.ts
+  tests:
+    - test/cron-scheduler.test.ts
+operations:
+  ADDED: {}
+  MODIFIED:
+    schedule-task-templates:
+      strength: MUST
+      statement: >-
+        The system MUST support defining a cron schedule on a task template and automatically
+        enqueuing it into the task queue when due.
+      scenarios: {}
+  REMOVED: {}

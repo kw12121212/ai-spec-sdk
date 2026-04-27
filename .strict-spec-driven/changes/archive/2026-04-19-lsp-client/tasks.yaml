@@ -1,0 +1,32 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: proposal-lsp-client
+sections:
+  Implementation:
+    implementation-1:
+      text: Implement `src/lsp-client.ts` with LSP process spawning and JSON-RPC initialization
+      status: complete
+    implementation-2:
+      text: Define the core LSP request/response types in `src/lsp-types.ts`
+      status: complete
+    implementation-3:
+      text: Export the LSP client via `src/index.ts`
+      status: complete
+  Testing:
+    testing-1:
+      text: Run `bun run lint` — lint or validation task
+      status: complete
+      command: bun run lint
+    testing-2:
+      text: Run `bun test` — unit test task
+      status: complete
+      command: bun test
+  Verification:
+    verification-1:
+      text: Verify implementation matches proposal scope
+      status: complete
+testing_gates:
+  validation_task: testing-1
+  unit_test_task: testing-2

@@ -1,0 +1,56 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: audit-logging
+  status: complete
+summary:
+  what:
+    - >-
+      Add a comprehensive execution audit trail that records all agent state transitions, tool
+      executions, hook invocations, and session lifecycle events to a dedicated append-only audit
+      log. The bridge exposes a `audit.query` JSON-RPC method for retrieving filtered audit entries,
+      and emits `bridge/audit_event` notifications in real time as audit entries are written.
+  why:
+    - >-
+      Milestone 07 (Agent Lifecycle Deep Management) targets production-grade agent orchestration.
+      The existing structured logging (`observability/structured-logging.md`) covers general bridge
+      operational events at configurable log levels, but it is not designed as an immutable audit
+      trail. Audit logging serves distinct purposes:
+    - >-
+      **Compliance and accountability**: Enterprise deployments require tamper-evident records of
+      every agent action, state change, and tool invocation.
+    - >-
+      **Security forensics**: When a tool executes or a permission decision is made, operators need
+      an immutable record of what happened, when, and who triggered it.
+    - >-
+      **Debugging complex workflows**: Multi-agent orchestration (milestone 04) and parent-child
+      sessions create event flows that are difficult to reconstruct from general-purpose logs alone.
+    - >-
+      **Foundation for future features**: `pause-resume` and `timeout-cancellation` (remaining
+      milestone 07 items) both depend on an audit trail to record checkpoint and cancellation
+      events. Milestone 09 (permissions-hooks) will integrate permission decisions into this audit
+      trail. The existing `session.history` provides per-session event logs but is scoped to
+      individual session conversation flow, not cross-session audit events like state transitions,
+      hook results, and permission decisions.
+scope:
+  in: []
+  out: []
+unchanged_behavior:
+  - >-
+    Existing `session.start`, `session.resume`, `session.stop`, `session.spawn`, `session.branch`
+    methods retain their current request/response contracts — audit logging is a side effect, not a
+    behavioral change
+  - >-
+    Existing `bridge/session_event` and `bridge/hook_triggered` notifications continue to emit with
+    unchanged payloads
+  - >-
+    Existing `session.history` continues to return conversation-level history entries; audit entries
+    are a separate concern
+  - >-
+    Existing structured logging to stderr continues unchanged; audit log is a separate output
+    channel
+  - >-
+    Agent execution flow, hook blocking/non-blocking semantics, and permission approval workflow
+    remain unchanged

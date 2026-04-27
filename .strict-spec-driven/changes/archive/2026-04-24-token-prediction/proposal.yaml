@@ -1,0 +1,24 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: token-prediction
+  status: complete
+summary:
+  what:
+    - >-
+      This change introduces pre-execution token usage estimates for LLM requests. It allows
+      consumers to predict the token cost of a request before streaming output starts.
+  why:
+    - >-
+      This is the final planned feature of the `12-streaming-token.md` milestone. Providing token
+      predictions allows for budget management, quota enforcement, and flow control before incurring
+      the cost of an actual LLM API call.
+scope:
+  in: []
+  out: []
+unchanged_behavior:
+  - >-
+    Existing token tracking and budget alerts during or after execution must continue to function
+    normally without disruption.

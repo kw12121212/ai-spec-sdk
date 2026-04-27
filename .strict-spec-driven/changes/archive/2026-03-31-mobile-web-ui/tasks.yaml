@@ -1,0 +1,112 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: mobile-web-ui
+sections:
+  Implementation:
+    implementation-1:
+      text: Create `src/ui/index.html` with HTML structure for login, session list, and chat views
+      status: complete
+    implementation-2:
+      text: >-
+        Implement CSS: mobile-first layout, dark mode via `prefers-color-scheme`, responsive
+        breakpoints, touch-friendly sizing (44px min targets, 16px min font)
+      status: complete
+    implementation-3:
+      text: >-
+        Implement login view: API key input, `localStorage` persistence, `bridge.capabilities`
+        validation, error display
+      status: complete
+    implementation-4:
+      text: >-
+        Implement `rpc()` helper: JSON-RPC 2.0 `POST /rpc` wrapper with Bearer token from
+        `localStorage`
+      status: complete
+    implementation-5:
+      text: >-
+        Implement session list view: `session.list` call, status badges, prompt preview, timestamp
+        display, tap handlers
+      status: complete
+    implementation-6:
+      text: >-
+        Implement chat view — new session form: workspace input (free text + `workspace.list`
+        picker), prompt input, permission mode selector
+      status: complete
+    implementation-7:
+      text: >-
+        Implement chat view — SSE event rendering: `EventSource` connection, render `agent_message`
+        by `messageType` (assistant_text, tool_use, tool_result, result), auto-scroll with scroll-up
+        pause
+      status: complete
+    implementation-8:
+      text: >-
+        Implement chat view — follow-up prompts: `session.resume` with new prompt on existing
+        session
+      status: complete
+    implementation-9:
+      text: >-
+        Implement chat view — session resume: tap interrupted session from list, call
+        `session.resume`, open SSE
+      status: complete
+    implementation-10:
+      text: >-
+        Implement tool approval UI: render `bridge/tool_approval_requested` notifications,
+        approve/reject buttons calling `session.approveTool`/`session.rejectTool`
+      status: complete
+    implementation-11:
+      text: >-
+        Implement SSE reconnection: exponential backoff reconnect, `session.events` replay with
+        `since` parameter, deduplication by sequence number
+      status: complete
+    implementation-12:
+      text: 'Implement logout: clear `localStorage`, close SSE, return to login view'
+      status: complete
+    implementation-13:
+      text: >-
+        Add `GET /` static file handler to `src/http-server.ts`: serve `src/ui/index.html`, respect
+        `AI_SPEC_SDK_UI_ENABLED` env var, no auth required for `GET /`
+      status: complete
+    implementation-14:
+      text: Update `src/capabilities.ts` to advertise UI support in `bridge.capabilities` response
+      status: complete
+  Testing:
+    testing-1:
+      text: Lint passes (`bun run lint`)
+      status: complete
+      command: bun run lint
+    testing-2:
+      text: 'Unit test: `GET /` returns `src/ui/index.html` content when UI enabled'
+      status: complete
+      command: GET /
+    testing-3:
+      text: 'Unit test: `GET /` returns 404 when `AI_SPEC_SDK_UI_ENABLED=false`'
+      status: complete
+      command: GET /
+    testing-4:
+      text: 'Unit test: `GET /` does not require authentication'
+      status: complete
+      command: GET /
+    testing-5:
+      text: 'Unit test: `GET /` does not interfere with `POST /rpc`, `GET /events`, `GET /health`'
+      status: complete
+      command: GET /
+  Verification:
+    verification-1:
+      text: Verify UI is served at `GET /` on HTTP transport
+      status: complete
+    verification-2:
+      text: Verify login → session list → chat → tool approval → logout flow
+      status: complete
+    verification-3:
+      text: 'Verify dark mode activates on `prefers-color-scheme: dark`'
+      status: pending
+    verification-4:
+      text: Verify mobile viewport (375px) renders correctly with no horizontal scroll
+      status: pending
+    verification-5:
+      text: Verify SSE reconnection replays missed events after network drop
+      status: pending
+testing_gates:
+  validation_task: testing-1
+  unit_test_task: testing-2

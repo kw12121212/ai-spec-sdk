@@ -1,0 +1,35 @@
+schema: strict-spec-driven/change-design/v1
+schema_version: 1
+artifact_type: change_design
+schema_file: templates/strict-spec-driven/schemas/change-design.yaml
+change: proposal-task-dependencies
+approach:
+  - Enhance the task queue schema to optionally store an array of `dependsOn` task IDs.
+  - >-
+    When enqueuing a task, the system will perform a recursive check against existing parent tasks
+    to detect circular dependencies, rejecting the request if one is found.
+  - >-
+    If dependencies exist and are not yet completed successfully, the task will be assigned a
+    `blocked` status rather than `pending`.
+  - >-
+    Modify the task worker or queue store so that when a task succeeds, it checks for any `blocked`
+    tasks that depended on it and transitions them to `pending` if all of their dependencies are now
+    satisfied.
+decisions:
+  timing-only-as-confirmed-dependent-tasks-will-not:
+    decision: >-
+      **Timing Only:** As confirmed, dependent tasks will not automatically consume the output or
+      state of their parents.
+    rationale: The dependency simply controls execution timing.
+  immediate-cycle-detection-circular-dependencies-will-be:
+    decision: >-
+      **Immediate Cycle Detection:** Circular dependencies will be checked synchronously during the
+      enqueue operation to fail fast rather than deadlocking the queue later.
+    rationale: >-
+      **Immediate Cycle Detection:** Circular dependencies will be checked synchronously during the
+      enqueue operation to fail fast rather than deadlocking the queue later.
+alternatives:
+  - option: Passing data state from parent to child.
+    reason: >-
+      This was rejected because it introduces complexity and coupling; timing-only dependencies are
+      simpler and sufficient for the current needs.

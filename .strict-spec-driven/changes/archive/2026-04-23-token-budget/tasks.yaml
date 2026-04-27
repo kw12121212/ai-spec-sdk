@@ -1,0 +1,49 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: token-budget
+sections:
+  Implementation:
+    implementation-1:
+      text: >-
+        Create `src/budget/types.ts` with BudgetPool, BudgetThreshold, BudgetAlert types and
+        `validateBudgetPool` function
+      status: complete
+    implementation-2:
+      text: >-
+        Create `src/budget/registry.ts` with BudgetRegistry class (create, get, list, adjust,
+        remove, getMatchingPools, recordAlert)
+      status: complete
+    implementation-3:
+      text: >-
+        Create `src/budget/enforcer.ts` with pre-query budget check, post-query threshold
+        evaluation, and alert emission
+      status: complete
+    implementation-4:
+      text: >-
+        Register `budget.*` JSON-RPC methods in `src/bridge.ts` (create, get, list, adjust, remove,
+        getStatus)
+      status: complete
+    implementation-5:
+      text: Add budget methods to capabilities in `src/capabilities.ts`
+      status: complete
+    implementation-6:
+      text: Wire budget cleanup into session destroy flow in `src/session-store.ts`
+      status: complete
+  Testing:
+    testing-1:
+      text: Run `bun run lint` — lint validation
+      status: complete
+      command: bun run lint
+    testing-2:
+      text: Run `bun test` — unit tests for budget registry, enforcer, and bridge methods
+      status: complete
+      command: bun test
+  Verification:
+    verification-1:
+      text: Verify implementation matches proposal scope
+      status: complete
+testing_gates:
+  validation_task: testing-1
+  unit_test_task: testing-2

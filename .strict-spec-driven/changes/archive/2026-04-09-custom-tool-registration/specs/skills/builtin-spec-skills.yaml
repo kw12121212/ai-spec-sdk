@@ -1,0 +1,85 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: skills-builtin-spec-skills
+mapping:
+  implementation: []
+  tests: []
+operations:
+  ADDED:
+    Custom Tool Registration:
+      strength: MUST
+      statement: >-
+        The SDK MUST let clients register workspace-scoped shell-command tools that extend the
+        available tool set beyond built-ins.
+      scenarios:
+        register-a-custom-tool:
+          - GIVEN: a registered workspace path and valid tool parameters
+          - WHEN: >-
+              the client calls `tools.register` with `name` (prefixed with `custom.`),
+              `description`, `command`, and optional `args`
+          - THEN: the tool is stored for that workspace and returned with a `registeredAt` timestamp
+        reject-invalid-custom-tool-names:
+          - GIVEN: a client attempts to register a tool with a name not starting with `custom.`
+          - WHEN: the bridge validates the request
+          - THEN: the bridge returns a `-32602` error indicating the naming requirement
+        reject-unregistered-workspace:
+          - GIVEN: >-
+              a client attempts to register a tool for a workspace that was not previously
+              registered via `workspace.register`
+          - WHEN: the bridge validates the request
+          - THEN: the bridge returns a `-32602` error indicating the workspace must be registered first
+    Custom Tool Unregistration:
+      strength: MUST
+      statement: The SDK MUST let clients remove previously registered custom tools from a workspace.
+      scenarios:
+        unregister-a-custom-tool:
+          - GIVEN: a workspace with a previously registered custom tool
+          - WHEN: the client calls `tools.unregister` with the workspace path and tool name
+          - THEN: 'the tool is removed and `{ success: true }` is returned'
+        unregister-non-existent-tool:
+          - GIVEN: a client calls `tools.unregister` for a tool that does not exist
+          - WHEN: the bridge processes the request
+          - THEN: '`{ success: false }` is returned without error'
+    Custom Tool Discovery:
+      strength: MUST
+      statement: >-
+        The SDK MUST include custom tools in the `tools.list` response when a workspace is
+        specified.
+      scenarios:
+        list-tools-for-a-workspace:
+          - GIVEN: a workspace with registered custom tools
+          - WHEN: the client calls `tools.list` with a `workspace` parameter
+          - THEN: the response includes both built-in tools and custom tools for that workspace
+        list-only-built-in-tools:
+          - GIVEN: a client calls `tools.list` without a `workspace` parameter
+          - WHEN: the bridge processes the request
+          - THEN: only built-in tools are returned (backward compatible behavior)
+    Custom Tool Execution:
+      strength: MUST
+      statement: >-
+        The SDK MUST execute custom tools as shell commands in the workspace directory when invoked
+        by the agent.
+      scenarios:
+        execute-custom-tool:
+          - GIVEN: an active session with a custom tool in `allowedTools`
+          - WHEN: the agent invokes the custom tool
+          - THEN: >-
+              the bridge executes the configured `command` with `args` in the session's workspace
+              directory
+          - AND: the stdout/stderr is captured and returned to the agent as the tool result
+        custom-tool-respects-permissions:
+          - GIVEN: a session started with `allowedTools` that does not include a specific custom tool
+          - WHEN: the agent attempts to invoke that tool
+          - THEN: the agent does not receive the tool definition and cannot invoke it
+    Custom Tool Hooks Integration:
+      strength: MUST
+      statement: Custom tool invocations MUST trigger the same hooks as built-in tools.
+      scenarios:
+        pre-tool-use-hook-for-custom-tool:
+          - GIVEN: a registered `pre_tool_use` hook
+          - WHEN: a custom tool is invoked
+          - THEN: the hook receives the tool name and input, and can allow or deny the invocation
+  MODIFIED: {}
+  REMOVED: {}

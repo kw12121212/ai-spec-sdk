@@ -1,0 +1,39 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: workflow-cron-scheduler
+mapping:
+  implementation:
+    - src/cron-scheduler.ts
+    - src/bridge.ts
+    - src/task-template-types.ts
+    - package.json
+  tests:
+    - test/cron-scheduler.test.ts
+operations:
+  ADDED:
+    schedule-task-templates:
+      strength: MUST
+      statement: >-
+        The system MUST support defining a cron schedule on a task template and executing it
+        automatically when due.
+      scenarios:
+        trigger-scheduled-task:
+          - GIVEN: >-
+              a task template with a valid cron schedule (e.g., `* * * * *`) registered in the
+              system
+          - WHEN: the cron schedule becomes due according to the system clock
+          - THEN: >-
+              the system MUST automatically create and start an agent session using that task
+              template.
+    parse-cron-expressions:
+      strength: MUST
+      statement: The system MUST parse standard cron expressions correctly.
+      scenarios:
+        evaluate-cron-schedule:
+          - GIVEN: a cron expression provided for a task template
+          - WHEN: it is evaluated against the current time
+          - THEN: the system accurately determines whether the schedule is due.
+  MODIFIED: {}
+  REMOVED: {}

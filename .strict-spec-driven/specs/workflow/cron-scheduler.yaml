@@ -1,0 +1,34 @@
+schema: strict-spec-driven/main-spec/v1
+schema_version: 1
+artifact_type: main_spec
+schema_file: templates/strict-spec-driven/schemas/main-spec.yaml
+spec:
+  id: workflow-cron-scheduler
+  title: cron-scheduler
+mapping:
+  implementation:
+    - src/cron-scheduler.ts
+    - src/bridge.ts
+    - src/task-template-types.ts
+    - package.json
+  tests:
+    - test/cron-scheduler.test.ts
+requirements:
+  schedule-task-templates:
+    strength: MUST
+    statement: >-
+      The system MUST support defining a cron schedule on a task template and automatically
+      enqueuing it into the task queue when due.
+    scenarios:
+      trigger-scheduled-task:
+        - GIVEN: a task template with a valid cron schedule (e.g., `* * * * *`) registered in the system
+        - WHEN: the cron schedule becomes due according to the system clock
+        - THEN: the system MUST automatically enqueue it into the task queue for execution.
+  parse-cron-expressions:
+    strength: MUST
+    statement: The system MUST parse standard cron expressions correctly.
+    scenarios:
+      evaluate-cron-schedule:
+        - GIVEN: a cron expression provided for a task template
+        - WHEN: it is evaluated against the current time
+        - THEN: the system accurately determines whether the schedule is due.

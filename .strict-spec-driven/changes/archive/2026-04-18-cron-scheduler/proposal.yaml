@@ -1,0 +1,22 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: cron-scheduler
+  status: complete
+summary:
+  what:
+    - Implement cron-based scheduled task execution for agent task templates.
+  why:
+    - >-
+      With the task template registry and team registry complete, we need the ability to run these
+      predefined tasks autonomously on a schedule. This provides immediate value for periodic
+      background jobs and serves as the foundation for asynchronous execution.
+scope:
+  in: []
+  out: []
+unchanged_behavior:
+  - Existing task templates without cron schedules will not be executed automatically.
+  - Task template retrieval, updates, and deletions will remain unaffected.
+  - Session execution semantics for manually triggered sessions will not change.

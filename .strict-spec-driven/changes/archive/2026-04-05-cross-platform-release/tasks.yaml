@@ -1,0 +1,81 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: cross-platform-release
+sections:
+  Implementation:
+    implementation-1:
+      text: >-
+        Add `build:native:linux-x64`, `build:native:linux-arm64`, `build:native:macos-x64`,
+        `build:native:macos-arm64`, `build:native:windows-x64` scripts to root `package.json`, each
+        running `bun build --compile --target=bun-<target> src/cli.ts --outfile
+        dist/ai-spec-bridge-<target>`
+      status: complete
+    implementation-2:
+      text: >-
+        Add `build:native:all` script to root `package.json` wired to `bash
+        scripts/build-native-all.sh`
+      status: complete
+    implementation-3:
+      text: >-
+        Create `scripts/build-native-all.sh` that compiles all 5 targets and generates a `.sha256`
+        file next to each binary (using `sha256sum` with `shasum -a 256` fallback)
+      status: complete
+    implementation-4:
+      text: >-
+        Add `build:pack` script to root `package.json` that runs `npm pack` in `packages/client/`
+        and `python -m build --wheel` in `clients/python/`
+      status: complete
+  Testing:
+    testing-1:
+      text: Run `bun run lint` and confirm no TypeScript errors
+      status: complete
+      command: bun run lint
+    testing-2:
+      text: >-
+        Run `bun run build:native` (existing single-platform) and confirm
+        `dist/ai-spec-bridge-native` is produced unchanged
+      status: complete
+      command: bun run build:native
+    testing-3:
+      text: Run `bun run build:native:linux-x64` and confirm `dist/ai-spec-bridge-linux-x64` is produced
+      status: complete
+      command: bun run build:native:linux-x64
+    testing-4:
+      text: >-
+        Run `bash scripts/build-native-all.sh` and confirm all 5 binaries and their `.sha256` files
+        are produced in `dist/`
+      status: complete
+      command: bash scripts/build-native-all.sh
+    testing-5:
+      text: >-
+        Run `bun run build:pack` and confirm a `.tgz` artifact appears in `packages/client/` and a
+        `.whl` appears in `clients/python/dist/`
+      status: complete
+      command: bun run build:pack
+    testing-6:
+      text: Run `bun test` and confirm all existing tests still pass
+      status: complete
+      command: bun test
+  Verification:
+    verification-1:
+      text: >-
+        `dist/` contains `ai-spec-bridge-linux-x64`, `ai-spec-bridge-linux-arm64`,
+        `ai-spec-bridge-macos-x64`, `ai-spec-bridge-macos-arm64`, `ai-spec-bridge-windows-x64.exe`
+        plus one `.sha256` per binary
+      status: complete
+    verification-2:
+      text: >-
+        `bun run build:pack` output includes a `.tgz` (TS client) and `.whl` (Python client) with no
+        errors
+      status: complete
+    verification-3:
+      text: '`bun run build` (tsc) still passes without modification'
+      status: complete
+    verification-4:
+      text: Existing `build:native` script still works and output path is unchanged
+      status: complete
+testing_gates:
+  validation_task: testing-1
+  unit_test_task: testing-2

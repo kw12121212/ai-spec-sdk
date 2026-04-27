@@ -1,0 +1,93 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: load-balancer
+sections:
+  Implementation:
+    implementation-1:
+      text: Add `BalancerConfig` and `BalancerStatus` types to `src/llm-provider/types.ts`
+      status: complete
+    implementation-2:
+      text: >-
+        Implement `LoadBalancer` class in `src/llm-provider/load-balancer.ts` with round-robin and
+        weighted strategies, reactive exclusion, and configurable cool-down (default 30 s)
+      status: complete
+    implementation-3:
+      text: >-
+        Implement `BalancerRegistry` class in `src/llm-provider/balancer-registry.ts` with create,
+        remove, get, list, and route methods; persist configs to `ConfigStore` under `llmBalancers`
+      status: complete
+    implementation-4:
+      text: >-
+        Wire `balancer.create`, `balancer.remove`, `balancer.list`, and `balancer.status` JSON-RPC
+        handlers in `src/bridge.ts`
+      status: complete
+    implementation-5:
+      text: >-
+        Add `balancerId` support to session creation and `session.setProvider` dispatch in
+        `src/bridge.ts`; when a session has a `balancerId` the bridge calls
+        `BalancerRegistry.route()` to select the active provider
+      status: complete
+    implementation-6:
+      text: >-
+        Emit `bridge/balancer_provider_excluded` event when a provider is reactively excluded, and
+        `bridge/balancer_provider_readmitted` when the cool-down expires
+      status: complete
+    implementation-7:
+      text: >-
+        Load persisted balancer configs on bridge startup (alongside existing provider config
+        loading)
+      status: complete
+  Testing:
+    testing-1:
+      text: Run `bun run typecheck` (or equivalent TSC check) — zero type errors
+      status: complete
+      command: bun run typecheck
+    testing-2:
+      text: Run `bun test` — all existing tests pass, new tests pass
+      status: complete
+      command: bun test
+    testing-3:
+      text: >-
+        Write `test/load-balancer.test.ts`: unit tests for `LoadBalancer` — round-robin rotation,
+        weighted selection, reactive exclusion after failure, re-admission after cool-down,
+        all-excluded edge case
+      status: complete
+      command: test/load-balancer.test.ts
+    testing-4:
+      text: >-
+        Write `test/balancer-registry.test.ts`: unit tests for `BalancerRegistry` —
+        create/remove/list/route lifecycle, persistence round-trip, unknown balancer ID error
+      status: complete
+      command: test/balancer-registry.test.ts
+    testing-5:
+      text: >-
+        Write `test/load-balancer-bridge.test.ts`: bridge-level integration tests for
+        `balancer.create`, `balancer.remove`, `balancer.list`, `balancer.status`, and session
+        routing via `balancerId`
+      status: complete
+      command: test/load-balancer-bridge.test.ts
+  Verification:
+    verification-1:
+      text: Confirm `balancer.create` rejects unknown provider IDs with error `-32001`
+      status: complete
+    verification-2:
+      text: Confirm sessions using `providerId` (not `balancerId`) are unaffected
+      status: complete
+    verification-3:
+      text: >-
+        Confirm `provider.*` JSON-RPC methods are unchanged and all existing provider tests still
+        pass
+      status: complete
+    verification-4:
+      text: Confirm balancer configs survive a simulated bridge restart (ConfigStore round-trip)
+      status: complete
+    verification-5:
+      text: >-
+        Confirm `bridge/balancer_provider_excluded` and `bridge/balancer_provider_readmitted` events
+        are emitted at the correct times
+      status: complete
+testing_gates:
+  validation_task: testing-1
+  unit_test_task: testing-2

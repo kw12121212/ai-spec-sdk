@@ -1,0 +1,33 @@
+schema: strict-spec-driven/question-list/v1
+schema_version: 1
+artifact_type: question_list
+schema_file: templates/strict-spec-driven/schemas/question-list.yaml
+change: load-balancer
+open: []
+resolved:
+  - id: which-balancing-strategies-are-in-scope-for-v1
+    question: Which balancing strategies are in scope for v1?
+    context: Determines implementation surface and `balancer.create` parameter schema.
+    answer: >-
+      Round-robin is required; weighted is optional (supported if `weights` provided, defaults to
+      equal weights otherwise).
+    status: resolved
+  - id: should-the-load-balancer-use-proactive-health-poll-or-reactive-exclusion
+    question: Should the load balancer use proactive health-poll or reactive exclusion?
+    context: >-
+      Proactive polling needs a background interval process; reactive exclusion is simpler and
+      consistent with the existing fallback chain model.
+    answer: >-
+      Reactive exclusion only at v1. A provider is excluded after a live-request failure and
+      re-admitted after a configurable cool-down (default 30 s). No polling background process.
+    status: resolved
+  - id: how-does-the-load-balancer-relate-to-the-existing-per-provider-fallback-chain
+    question: How does the load balancer relate to the existing per-provider fallback chain?
+    context: >-
+      Affects data model — should the balancer manage fallback internally or defer to each
+      provider's own `fallbackProviderIds`?
+    answer: >-
+      Composable. The balancer selects which provider to call; if that provider has a
+      `fallbackProviderIds` chain, fallback activates independently on error. The two mechanisms are
+      orthogonal.
+    status: resolved

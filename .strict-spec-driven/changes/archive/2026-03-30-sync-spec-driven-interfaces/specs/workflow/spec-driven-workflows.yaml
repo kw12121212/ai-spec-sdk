@@ -1,0 +1,46 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: workflow-spec-driven-workflows
+mapping:
+  implementation: []
+  tests: []
+operations:
+  ADDED: {}
+  MODIFIED:
+    Supported Workflow Invocation:
+      strength: MUST
+      statement: >-
+        The SDK MUST let clients invoke supported spec-driven workflow operations against an
+        explicit workspace through the bridge. Supported workflows are: `init`, `propose`, `modify`,
+        `apply`, `verify`, `archive`, `cancel`, `list`, `maintenance`, `migrate`.
+      scenarios:
+        run-the-maintenance-workflow:
+          - GIVEN: >-
+              a workspace path that the bridge can access with an initialized `.spec-driven/`
+              directory
+          - AND: 'a client calls `workflow.run` with `{ workspace, workflow: "maintenance" }`'
+          - WHEN: the bridge executes the `run-maintenance` script subcommand
+          - THEN: the bridge returns a machine-readable result describing the maintenance outcome
+        run-the-migrate-workflow:
+          - GIVEN: a workspace path that contains an existing `openspec/` directory
+          - AND: 'a client calls `workflow.run` with `{ workspace, workflow: "migrate" }`'
+          - WHEN: the bridge executes the `migrate` script subcommand
+          - THEN: the bridge returns a machine-readable result describing the migration outcome
+        unsupported-workflow-is-rejected:
+          - GIVEN: a client calls `workflow.run` with a workflow name not in the supported list
+          - WHEN: the bridge validates the request
+          - THEN: the bridge returns a `-32602` error with the list of supported workflows
+    Workflow Capability Mapping:
+      strength: SHOULD
+      statement: >-
+        The SDK SHOULD return machine-readable metadata that maps supported high-level workflow
+        operations to bundled spec-driven capabilities. The mapping MUST include `maintenance →
+        spec-driven-maintenance` and `migrate → spec-driven-maintenance`.
+      scenarios:
+        inspect-workflow-skill-mapping:
+          - GIVEN: a client requests bridge capabilities
+          - WHEN: the bridge returns the `workflowSkillMap`
+          - THEN: the response includes entries for `maintenance` and `migrate`
+  REMOVED: {}

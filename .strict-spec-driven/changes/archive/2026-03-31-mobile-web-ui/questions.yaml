@@ -1,0 +1,34 @@
+schema: strict-spec-driven/question-list/v1
+schema_version: 1
+artifact_type: question_list
+schema_file: templates/strict-spec-driven/schemas/question-list.yaml
+change: mobile-web-ui
+open: []
+resolved:
+  - id: should-tool-approval-be-in-scope-for-v1
+    question: Should tool approval be in scope for v1?
+    context: >-
+      Tool approval requires handling `bridge/tool_approval_requested` notifications and calling
+      `session.approveTool`/`session.rejectTool`. The bridge already supports these methods.
+    answer: Yes, in scope. Bridge already supports approveTool/rejectTool.
+    status: resolved
+  - id: single-html-file-or-separate-files-in-src-ui
+    question: Single HTML file or separate files in src/ui/?
+    context: Single file is simplest to serve; separate files improve code organization.
+    answer: Single HTML file with inline CSS/JS.
+    status: resolved
+  - id: serve-at-get-or-get-ui
+    question: Serve at `GET /` or `GET /ui/`?
+    context: Root path is simplest for mobile users; sub-path keeps root available for future use.
+    answer: '`GET /`.'
+    status: resolved
+  - id: default-permissionmode-for-the-ui
+    question: Default permissionMode for the UI?
+    context: Bridge defaults to `bypassPermissions`, but a UI-facing user might expect safety prompts.
+    answer: '`bypassPermissions` — consistent with bridge default. Users can select a stricter mode.'
+    status: resolved
+  - id: workspace-selector-free-text-only-or-list-picker
+    question: Workspace selector — free text only, or list picker?
+    context: Free text is simplest; a list picker from `workspace.list` is more user-friendly.
+    answer: Both — free text input with optional list picker via `workspace.list`.
+    status: resolved

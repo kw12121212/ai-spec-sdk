@@ -1,0 +1,25 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: bridge-lsp-tools
+mapping:
+  implementation:
+    - src/lsp-tools.ts
+    - src/index.ts
+  tests:
+    - test/lsp-tools.test.ts
+operations:
+  ADDED:
+    lsp-diagnostics-tool:
+      strength: MUST
+      statement: >-
+        The system MUST provide an `lsp_diagnostics` tool that retrieves the current diagnostics for
+        a specific file.
+      scenarios:
+        success:
+          - GIVEN: an active `LspClient` connection that has received diagnostics for a file
+          - WHEN: the agent calls `lsp_diagnostics` with a valid file URI
+          - THEN: the system returns the stored diagnostics for that file
+  MODIFIED: {}
+  REMOVED: {}

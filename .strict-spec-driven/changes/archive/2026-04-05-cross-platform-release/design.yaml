@@ -1,0 +1,58 @@
+schema: strict-spec-driven/change-design/v1
+schema_version: 1
+artifact_type: change_design
+schema_file: templates/strict-spec-driven/schemas/change-design.yaml
+change: cross-platform-release
+approach:
+  - >-
+    **Native binaries:** Use `bun build --compile --target=bun-<platform>-<arch> src/cli.ts
+    --outfile dist/ai-spec-bridge-<platform>-<arch>` for each of the 5 targets. A shell script
+    `scripts/build-native-all.sh` loops over all targets, runs each compile, and generates a
+    `.sha256` file next to each binary using `sha256sum` (Linux) or `shasum -a 256` (macOS). The
+    root `package.json` gains `build:native:all` wired to this script and five individual
+    `build:native:<target>` entries for per-platform convenience. **SDK packaging:** A `build:pack`
+    entry in root `package.json` calls `npm pack` in `packages/client/` (emits
+    `ai-spec-sdk-client-<ver>.tgz`) and `python -m build --wheel` in `clients/python/` (emits
+    `ai_spec_sdk-<ver>-py3-none-any.whl` in `clients/python/dist/`). Both packages are already
+    buildable — this change just wires a single top-level entry point. **Checksum portability:** The
+    shell script uses `command -v sha256sum` with a fallback to `shasum -a 256` so the script works
+    on both Linux CI runners and macOS developer machines.
+decisions:
+  shell-script-over-npm-script-chain-for-build-native-all-a:
+    decision: >-
+      **Shell script over npm script chain for `build:native:all`** — a shell script can loop,
+      handle per-platform `.exe` suffixes cleanly, and generate checksums in one place.
+    rationale: npm script chaining across 5 platforms with conditional renaming is brittle.
+  preserve-existing-build-native-unchanged:
+    decision: '**Preserve existing `build:native` unchanged**'
+    rationale: >-
+      downstream tools or docs may already reference it; adding the multi-platform scripts alongside
+      avoids breaking anything.
+  python-m-build-wheel-only-not-sdist:
+    decision: '**`python -m build --wheel` only, not sdist**'
+    rationale: >-
+      `.whl` is the installable artifact; sdist is only needed for PyPI upload which is out of
+      scope.
+  artifacts-stay-in-dist-and-clients-python-dist:
+    decision: '**Artifacts stay in `dist/` and `clients/python/dist/`**'
+    rationale: consistent with existing output paths; no new top-level artifact directory.
+  no-ci-workflow-in-this-change:
+    decision: '**No CI workflow in this change**'
+    rationale: >-
+      the roadmap notes explicitly say "local packaging, manual copy." CI runners for
+      cross-compilation are a future concern.
+alternatives:
+  - option: >-
+      **GitHub Actions matrix build for native binaries** — more robust for true cross-compilation
+      (especially Windows), but the milestone scope explicitly defers CI to a future concern.
+    reason: >-
+      Local `bun compile --target` produces the correct binary without a CI runner for the majority
+      of targets.
+  - option: >-
+      **Single monolithic npm script for all targets** — possible with `&&` chains, but unreadable
+      and hard to extend.
+    reason: Shell script is cleaner.
+  - option: '**`npm pack` output moved to a top-level `artifacts/` directory**'
+    reason: >-
+      rejected to avoid restructuring; `.tgz` in `packages/client/` and `.whl` in
+      `clients/python/dist/` are standard tool defaults.

@@ -1,0 +1,60 @@
+schema: strict-spec-driven/main-spec/v1
+schema_version: 1
+artifact_type: main_spec
+schema_file: templates/strict-spec-driven/schemas/main-spec.yaml
+spec:
+  id: build-native-executable
+  title: Native Executable Build
+mapping:
+  implementation:
+    - package.json
+  tests:
+    - test/native-build.test.ts
+requirements:
+  build:native script exists:
+    strength: MUST
+    statement: The project MUST expose a `build:native` script in `package.json`.
+    scenarios: {}
+  build:native produces executable binary:
+    strength: MUST
+    statement: >-
+      Running `build:native` MUST produce a self-contained executable at
+      `dist/ai-spec-bridge-native` (or `dist/ai-spec-bridge-native.exe` on Windows, added
+      automatically by bun).
+    scenarios: {}
+  native binary is self-contained:
+    strength: MUST
+    statement: >-
+      The produced executable MUST start the JSON-RPC stdio bridge when invoked directly, without
+      requiring a separate Node.js or Bun runtime on the target machine.
+    scenarios: {}
+  existing build script unchanged:
+    strength: MUST
+    statement: The `build` script (tsc) MUST remain unchanged and continue to emit JS to `dist/`.
+    scenarios: {}
+  per-platform build scripts exist:
+    strength: MUST
+    statement: >-
+      The project MUST expose `build:native:linux-x64`, `build:native:linux-arm64`,
+      `build:native:macos-x64`, `build:native:macos-arm64`, and `build:native:windows-x64` scripts
+      in `package.json`.
+    scenarios: {}
+  per-platform scripts produce correctly named binaries:
+    strength: MUST
+    statement: >-
+      Each `build:native:<target>` script MUST produce a self-contained executable at
+      `dist/ai-spec-bridge-<target>`. The Windows target MUST produce
+      `dist/ai-spec-bridge-windows-x64.exe`.
+    scenarios: {}
+  build:native:all script compiles all five targets:
+    strength: MUST
+    statement: >-
+      The project MUST expose a `build:native:all` script that compiles all five platform targets
+      and generates a SHA-256 checksum file (`<binary>.sha256`) alongside each binary.
+    scenarios: {}
+  checksum files are generated for all native binaries:
+    strength: MUST
+    statement: >-
+      Running `build:native:all` MUST produce one `.sha256` file per binary, named
+      `<binary-filename>.sha256`, containing the hex digest of that binary.
+    scenarios: {}

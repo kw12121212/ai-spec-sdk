@@ -1,0 +1,25 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: proposal-permission-audit
+  status: complete
+summary:
+  what:
+    - >-
+      Add formal spec definitions and automated test coverage for permission audit events
+      (`scope_denied` and `policy_decision`).
+  why:
+    - >-
+      While the runtime implementation currently emits audit events when a tool is blocked by a
+      scope or when a policy makes a decision, these events are not formally listed in the
+      `audit-logging.md` schema definitions, and they lack explicit coverage in the automated test
+      suite. Formalizing these events is required to complete the "Permissions Model and Execution
+      Hooks" milestone.
+scope:
+  in: []
+  out: []
+unchanged_behavior:
+  - Existing permission checks, scope resolution, and policy evaluation logic remain unchanged.
+  - Existing audit logging mechanisms remain unchanged.

@@ -1,0 +1,25 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: proposal-permission-inheritance
+  status: complete
+summary:
+  what:
+    - >-
+      Implement parent-child permission propagation for multi-agent workflows. When a child session
+      is spawned, it will inherit the permission scopes and policies of its parent session.
+  why:
+    - >-
+      This fulfills a key goal of the "Permissions Model and Execution Hooks" milestone. As
+      multi-agent coordination allows parent sessions to spawn children, those children must operate
+      within the same or stricter security boundaries to prevent privilege escalation.
+scope:
+  in: []
+  out: []
+unchanged_behavior:
+  - >-
+    Root sessions (sessions started via `session.start` without a parent) will continue to
+    initialize scopes and policies exactly as they do today.
+  - Existing policy evaluation and scope checking logic during tool execution remains unchanged.

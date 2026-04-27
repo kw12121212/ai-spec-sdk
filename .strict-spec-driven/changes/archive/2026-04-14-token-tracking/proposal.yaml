@@ -1,0 +1,40 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: token-tracking
+  status: complete
+summary:
+  what:
+    - 实现按会话和按提供商的 token 使用量核算系统，包括：
+    - 自定义 Token Counter 接口，支持多提供商的 token 统计标准化
+    - 会话级和消息级的 token 使用追踪
+    - Token 使用数据的内存存储与查询 API
+    - 与现有 provider 抽象层的集成
+    - 为工具调用级粒度预留扩展点（stretch goal）
+  why:
+    - >-
+      ### 业务动机 1. **成本可观测性**：用户需要了解每个会话、每条消息消耗了多少 token，以便进行成本控制和预算管理 2. **计费基础**：为后续的
+      `quota-management`（配额限制）和 `token-budget`（预算分配）提供数据基础 3. **多提供商一致性**：里程碑 08 的目标是支持多个 LLM
+      提供商（Anthropic、OpenAI、本地模型等），不同提供商的 token 计数方式不同，需要统一抽象层 4. **运营分析**：支持按提供商、按会话、按时间维度的使用量分析 ###
+      技术背景
+    - >-
+      当前 `src/claude-agent-runner.ts` 已从 Claude Agent SDK 和自定义 Provider 获取
+      `TokenUsage`（inputTokens/outputTokens）
+    - 但这些数据仅在单次查询返回时临时存在，没有持久化存储或聚合统计
+    - 现有的 `provider-registry` 规范已完成，provider 抽象层已就绪
+    - >-
+      里程碑 08 的前 3 个变更（provider-interface、provider-registry、provider-switching）已完成，`token-tracking`
+      是该里程碑中第一个未完成的 planned 项目
+scope:
+  in: []
+  out: []
+unchanged_behavior:
+  - 以下行为必须保持不变：
+  - '`runClaudeQuery` 函数签名和返回值结构（仅增加副作用：记录 token）'
+  - Provider.queryStream 的接口和行为
+  - Session store 的现有 CRUD 操作
+  - Bridge 的现有 JSON-RPC 方法（新增方法不影响已有方法）
+  - Provider registry 的注册/列表/更新/删除流程
+  - 错误码体系（新增错误码不冲突已有码段）

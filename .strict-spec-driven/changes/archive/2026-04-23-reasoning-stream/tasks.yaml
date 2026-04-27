@@ -1,0 +1,36 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: proposal-reasoning-stream
+sections:
+  Implementation:
+    implementation-1:
+      text: Update JSON-RPC types or relevant interfaces to include reasoning stream events
+      status: complete
+    implementation-2:
+      text: Modify the LLM provider adapters to capture and emit reasoning tokens
+      status: complete
+    implementation-3:
+      text: >-
+        Update `src/bridge.ts` and `src/session-store.ts` to forward the new reasoning stream events
+        to connected clients
+      status: complete
+  Testing:
+    testing-1:
+      text: Run `npm run lint` — lint and typecheck
+      status: complete
+      command: npm run lint
+    testing-2:
+      text: Run `bun test` — run unit tests to verify reasoning stream behavior
+      status: complete
+      command: bun test
+  Verification:
+    verification-1:
+      text: >-
+        Verify implementation matches proposal scope by ensuring reasoning tokens are successfully
+        isolated from standard output streams
+      status: complete
+testing_gates:
+  validation_task: testing-1
+  unit_test_task: testing-2

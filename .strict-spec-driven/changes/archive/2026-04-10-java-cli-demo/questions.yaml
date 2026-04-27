@@ -1,0 +1,29 @@
+schema: strict-spec-driven/question-list/v1
+schema_version: 1
+artifact_type: question_list
+schema_file: templates/strict-spec-driven/schemas/question-list.yaml
+change: java-cli-demo
+open: []
+resolved:
+  - id: >-
+      should-the-java-cli-use-any-external-json-rpc-library-or-stick-to-jackson-only-for-json-parsing
+    question: >-
+      Should the Java CLI use any external JSON-RPC library or stick to Jackson-only for JSON
+      parsing?
+    context: >-
+      The Go example uses only standard library. Java's standard JSON is weak. Using a JSON-RPC
+      library would simplify implementation but add dependency.
+    answer: Use Jackson only (no JSON-RPC library) — accepted recommendation.
+    status: resolved
+  - id: what-is-the-minimum-java-version-to-target
+    question: What is the minimum Java version to target?
+    context: >-
+      Java 8 is widely compatible but lacks modern features. Java 11 or 17 are LTS versions with
+      better language features.
+    answer: Java 17 — user specified.
+    status: resolved
+  - id: should-the-java-cli-include-a-test-suite-or-is-the-manual-verification-in-tasks-md-sufficient
+    question: Should the Java CLI include a test suite or is the manual verification in tasks.md sufficient?
+    context: The go-cli example includes Go test files. Java typically uses JUnit for testing.
+    answer: Include basic JUnit 5 tests for JsonRpcClient and SessionManager — accepted recommendation.
+    status: resolved

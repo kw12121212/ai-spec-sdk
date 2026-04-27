@@ -1,0 +1,169 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: llm-provider-load-balancer
+mapping:
+  implementation:
+    - src/llm-provider/load-balancer.ts
+    - src/llm-provider/balancer-registry.ts
+    - src/llm-provider/types.ts
+    - src/bridge.ts
+    - src/session-store.ts
+  tests:
+    - test/load-balancer.test.ts
+    - test/balancer-registry.test.ts
+    - test/load-balancer-bridge.test.ts
+operations:
+  ADDED:
+    Balancer Creation:
+      strength: MUST
+      statement: >-
+        The SDK MUST allow clients to create a named load balancer over a set of registered provider
+        IDs via `balancer.create`.
+      scenarios:
+        create-a-round-robin-balancer:
+          - GIVEN: 'a client provides `{ id: "lb1", strategy: "round-robin", providerIds: ["p1", "p2"] }`'
+          - WHEN: the client calls `balancer.create`
+          - THEN: >-
+              the bridge stores the balancer config and returns `{ success: true, balancerId: "lb1"
+              }`
+        create-a-weighted-balancer:
+          - GIVEN: >-
+              a client provides `{ id: "lb2", strategy: "weighted", providerIds: ["p1", "p2"],
+              weights: [3, 1] }`
+          - WHEN: the client calls `balancer.create`
+          - THEN: 'the bridge stores the config and returns `{ success: true, balancerId: "lb2" }`'
+          - AND: >-
+              requests are routed to "p1" approximately 75% of the time and "p2" approximately 25%
+              of the time
+        create-weighted-balancer-without-explicit-weights:
+          - GIVEN: >-
+              a client provides `{ id: "lb3", strategy: "weighted", providerIds: ["p1", "p2"] }`
+              with no `weights` field
+          - WHEN: the client calls `balancer.create`
+          - THEN: the bridge treats each provider as having equal weight (equivalent to round-robin)
+        reject-duplicate-balancer-id:
+          - GIVEN: a balancer with ID "lb1" already exists
+          - WHEN: the client calls `balancer.create` with ID "lb1"
+          - THEN: the bridge returns error `-32002` with message "Balancer already exists"
+        reject-unknown-provider-id-in-balancer:
+          - GIVEN: provider "unknown" is not registered
+          - WHEN: 'the client calls `balancer.create` with `providerIds: ["unknown"]`'
+          - THEN: the bridge returns error `-32001` with message "Provider not found"
+        reject-empty-providerids:
+          - GIVEN: 'a client calls `balancer.create` with `providerIds: []`'
+          - THEN: >-
+              the bridge returns error `-32602` (Invalid params) with a message about required
+              providerIds
+    Balancer Removal:
+      strength: MUST
+      statement: The SDK MUST allow clients to remove a balancer by ID via `balancer.remove`.
+      scenarios:
+        remove-existing-balancer:
+          - GIVEN: a balancer with ID "lb1" exists
+          - WHEN: 'the client calls `balancer.remove` with `{ balancerId: "lb1" }`'
+          - THEN: 'the bridge removes the balancer and returns `{ success: true, balancerId: "lb1" }`'
+        remove-non-existent-balancer:
+          - GIVEN: no balancer with ID "unknown" exists
+          - WHEN: 'the client calls `balancer.remove` with `{ balancerId: "unknown" }`'
+          - THEN: the bridge returns error `-32001` with message "Balancer not found"
+    Balancer Listing:
+      strength: MUST
+      statement: The SDK MUST allow clients to list all configured balancers via `balancer.list`.
+      scenarios:
+        list-balancers:
+          - GIVEN: two balancers "lb1" and "lb2" are configured
+          - WHEN: the client calls `balancer.list`
+          - THEN: 'the bridge returns an array of balancer summaries: `[{ id, strategy, providerCount }]`'
+        list-when-no-balancers-exist:
+          - GIVEN: no balancers are configured
+          - WHEN: the client calls `balancer.list`
+          - THEN: the bridge returns `[]`
+    Balancer Status:
+      strength: MUST
+      statement: >-
+        The SDK MUST allow clients to retrieve per-provider health and exclusion state for a
+        balancer via `balancer.status`.
+      scenarios:
+        status-for-active-balancer:
+          - GIVEN: balancer "lb1" manages providers "p1" and "p2"
+          - AND: '"p2" is currently excluded due to a recent failure'
+          - WHEN: 'the client calls `balancer.status` with `{ balancerId: "lb1" }`'
+          - THEN: >-
+              the bridge returns `{ balancerId: "lb1", providers: [{ providerId: "p1", excluded:
+              false }, { providerId: "p2", excluded: true, excludedUntil: "<ISO timestamp>" }] }`
+        status-for-non-existent-balancer:
+          - GIVEN: no balancer with ID "unknown" exists
+          - WHEN: 'the client calls `balancer.status` with `{ balancerId: "unknown" }`'
+          - THEN: the bridge returns error `-32001` with message "Balancer not found"
+    Request Routing:
+      strength: MUST
+      statement: >-
+        The SDK MUST route session requests through the load balancer when the session is associated
+        with a `balancerId`.
+      scenarios:
+        session-created-with-balancerid:
+          - GIVEN: balancer "lb1" manages providers "p1" and "p2"
+          - WHEN: 'the client calls `session.create` with `{ balancerId: "lb1" }`'
+          - THEN: the bridge creates the session and stores the `balancerId` association
+        round-robin-distribution-across-requests:
+          - GIVEN: 'balancer "lb1" uses `strategy: "round-robin"` with providers "p1" and "p2"'
+          - AND: a session is associated with "lb1"
+          - WHEN: the session executes two sequential requests
+          - THEN: the first request routes to "p1" and the second to "p2" (or vice versa, alternating)
+        reactive-exclusion-on-provider-failure:
+          - GIVEN: balancer "lb1" manages "p1" and "p2"
+          - AND: '"p1" throws an error during a live request'
+          - WHEN: the bridge processes the failure
+          - THEN: '"p1" is excluded from the rotation for the cool-down period (default 30 s)'
+          - AND: subsequent requests from the session route only to "p2"
+        re-admission-after-cool-down:
+          - GIVEN: '"p1" was excluded after a failure'
+          - WHEN: the cool-down period expires
+          - THEN: '"p1" is re-admitted to the rotation'
+        all-providers-excluded:
+          - GIVEN: all providers in balancer "lb1" are currently excluded
+          - WHEN: the session executes a request
+          - THEN: the bridge returns an error indicating no healthy providers are available
+        balancer-composes-with-provider-fallback-chain:
+          - GIVEN: balancer "lb1" selects provider "p1"
+          - AND: '"p1" has `fallbackProviderIds: ["p1-backup"]`'
+          - AND: '"p1" fails during the request'
+          - WHEN: the bridge dispatches the request
+          - THEN: the existing fallback logic activates and retries on "p1-backup"
+          - AND: '"p1" is also reactively excluded from the balancer rotation'
+    Balancer Events:
+      strength: MUST
+      statement: The SDK MUST emit bridge events when a provider is excluded or re-admitted by the balancer.
+      scenarios:
+        exclusion-event:
+          - GIVEN: '"p1" fails during a balancer-routed request'
+          - WHEN: the balancer excludes "p1"
+          - THEN: >-
+              a `bridge/balancer_provider_excluded` event is emitted with `{ balancerId: "lb1",
+              providerId: "p1", reason: "<error message>", excludedUntil: "<ISO timestamp>" }`
+        re-admission-event:
+          - GIVEN: '"p1" is excluded and the cool-down expires'
+          - WHEN: the balancer re-admits "p1"
+          - THEN: >-
+              a `bridge/balancer_provider_readmitted` event is emitted with `{ balancerId: "lb1",
+              providerId: "p1" }`
+    Balancer Persistence:
+      strength: MUST
+      statement: The SDK MUST persist balancer configurations so they survive bridge restarts.
+      scenarios:
+        persist-on-creation:
+          - GIVEN: a client creates a balancer
+          - WHEN: the creation completes
+          - THEN: the balancer config is saved to `ConfigStore` under key `llmBalancers`
+        load-on-startup:
+          - GIVEN: persisted balancer configs exist in `ConfigStore`
+          - WHEN: the bridge initializes
+          - THEN: all persisted balancers are loaded into the `BalancerRegistry`
+        persist-on-removal:
+          - GIVEN: a balancer is removed
+          - WHEN: the removal completes
+          - THEN: the config is removed from `ConfigStore`
+  MODIFIED: {}
+  REMOVED: {}

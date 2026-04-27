@@ -1,0 +1,38 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: proposal-task-dependencies
+sections:
+  Implementation:
+    implementation-1:
+      text: Update task queue types to include `dependsOn` task IDs and `blocked` status
+      status: complete
+    implementation-2:
+      text: Implement circular dependency cycle detection in the enqueue method
+      status: complete
+    implementation-3:
+      text: Modify the enqueue method to set `blocked` status if pending dependencies exist
+      status: complete
+    implementation-4:
+      text: Update the task completion logic to unblock dependent tasks when parents succeed
+      status: complete
+    implementation-5:
+      text: Implement cascading failure logic for dependent tasks when a parent fails permanently
+      status: complete
+  Testing:
+    testing-1:
+      text: Run `bun run typecheck` — lint or validation task
+      status: complete
+      command: bun run typecheck
+    testing-2:
+      text: Run `bun test` — unit test task
+      status: complete
+      command: bun test
+  Verification:
+    verification-1:
+      text: Verify implementation matches proposal scope
+      status: complete
+testing_gates:
+  validation_task: testing-1
+  unit_test_task: testing-2

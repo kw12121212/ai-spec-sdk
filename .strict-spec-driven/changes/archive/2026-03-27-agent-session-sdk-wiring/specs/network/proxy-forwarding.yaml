@@ -1,0 +1,39 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: network-proxy-forwarding
+mapping:
+  implementation: []
+  tests: []
+operations:
+  ADDED:
+    Explicit Proxy Configuration:
+      strength: MUST
+      statement: >-
+        The SDK MUST accept an optional `proxy` parameter on session start and resume requests and
+        MUST translate it into the agent process environment so the agent can reach the Anthropic
+        API through a corporate HTTP proxy.
+      scenarios:
+        proxy-settings-are-applied-to-the-agent-environment:
+          - GIVEN: >-
+              a client starts or resumes a session with a `proxy` parameter containing one or more
+              of `http`, `https`, or `noProxy`
+          - WHEN: the bridge launches the agent query
+          - THEN: >-
+              the agent process environment contains `HTTP_PROXY`, `HTTPS_PROXY`, and/or `NO_PROXY`
+              entries corresponding to the supplied proxy values
+        proxy-fields-are-merged-with-other-caller-provided-env-entries:
+          - GIVEN: a client supplies both a `proxy` parameter and additional entries in `options.env`
+          - WHEN: the bridge builds the agent environment
+          - THEN: >-
+              proxy entries overwrite matching env keys and all other caller-provided env entries
+              are preserved
+        session-without-proxy-is-unaffected:
+          - GIVEN: a client starts or resumes a session without a `proxy` parameter
+          - WHEN: the bridge launches the agent query
+          - THEN: >-
+              no proxy-related entries are added to the agent environment beyond what the caller
+              provided in `options.env`
+  MODIFIED: {}
+  REMOVED: {}

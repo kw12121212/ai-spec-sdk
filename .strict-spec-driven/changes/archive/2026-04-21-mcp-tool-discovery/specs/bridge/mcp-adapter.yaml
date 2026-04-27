@@ -1,0 +1,24 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: bridge-mcp-adapter
+mapping:
+  implementation:
+    - src/mcp-store.ts
+    - src/bridge.ts
+  tests:
+    - test/mcp-store.test.ts
+operations:
+  ADDED:
+    mcp-tool-discovery:
+      strength: MUST
+      statement: The system MUST discover available tools from an MCP server upon connection.
+      scenarios:
+        tool-list:
+          - GIVEN: a connected and initialized MCP server
+          - WHEN: the server is marked as ready
+          - THEN: the system MUST send a `tools/list` request to the MCP server
+          - AND: expose the returned tools for use by the agent SDK
+  MODIFIED: {}
+  REMOVED: {}

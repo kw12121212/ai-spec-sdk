@@ -1,0 +1,33 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: build-native-executable
+mapping:
+  implementation: []
+  tests: []
+operations:
+  ADDED:
+    build:native script exists:
+      strength: MUST
+      statement: The project MUST expose a `build:native` script in `package.json`.
+      scenarios: {}
+    build:native produces executable binary:
+      strength: MUST
+      statement: >-
+        Running `build:native` MUST produce a self-contained executable at
+        `dist/ai-spec-bridge-native` (or `dist/ai-spec-bridge-native.exe` on Windows, added
+        automatically by bun).
+      scenarios: {}
+    native binary is self-contained:
+      strength: MUST
+      statement: >-
+        The produced executable MUST start the JSON-RPC stdio bridge when invoked directly, without
+        requiring a separate Node.js or Bun runtime on the target machine.
+      scenarios: {}
+    existing build script unchanged:
+      strength: MUST
+      statement: The `build` script (tsc) MUST remain unchanged and continue to emit JS to `dist/`.
+      scenarios: {}
+  MODIFIED: {}
+  REMOVED: {}

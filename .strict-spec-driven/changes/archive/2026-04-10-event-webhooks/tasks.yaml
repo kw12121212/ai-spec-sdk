@@ -1,0 +1,81 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: event-webhooks
+sections:
+  Implementation:
+    implementation-1:
+      text: >-
+        Create `src/webhooks.ts` with WebhookManager class: subscribe/unsubscribe, HMAC-SHA256
+        signing, payload delivery, retry with exponential backoff
+      status: complete
+    implementation-2:
+      text: 'Add webhook persistence: load/save registrations to JSON file on disk'
+      status: complete
+    implementation-3:
+      text: >-
+        Register `webhook.subscribe` and `webhook.unsubscribe` RPC methods in bridge.ts with `admin`
+        scope
+      status: complete
+    implementation-4:
+      text: >-
+        Hook WebhookManager into session event emission (session_started, session_completed,
+        session_stopped, session_interrupted)
+      status: complete
+    implementation-5:
+      text: >-
+        Expose webhook secret in `webhook.subscribe` response for consumer-side signature
+        verification
+      status: complete
+    implementation-6:
+      text: Add `webhook.subscribe` and `webhook.unsubscribe` to `bridge.capabilities` response
+      status: complete
+  Testing:
+    testing-1:
+      text: Run `bun run typecheck` to validate TypeScript compilation
+      status: complete
+      command: bun run typecheck
+    testing-2:
+      text: Run `bun test` — verify all existing and new tests pass
+      status: complete
+      command: bun test
+    testing-3:
+      text: 'Add unit tests in `test/webhooks.test.ts`: subscribe/unsubscribe lifecycle'
+      status: complete
+      command: test/webhooks.test.ts
+    testing-4:
+      text: 'Add unit tests in `test/webhooks.test.ts`: HMAC-SHA256 signature generation and verification'
+      status: complete
+      command: test/webhooks.test.ts
+    testing-5:
+      text: 'Add unit tests in `test/webhooks.test.ts`: retry logic with backoff'
+      status: complete
+      command: test/webhooks.test.ts
+    testing-6:
+      text: 'Add unit tests in `test/webhooks.test.ts`: persistence across restart simulation'
+      status: complete
+      command: test/webhooks.test.ts
+    testing-7:
+      text: 'Add unit tests in `test/webhooks.test.ts`: unsubscribe stops delivery'
+      status: complete
+      command: test/webhooks.test.ts
+    testing-8:
+      text: >-
+        Add HTTP integration tests in `test/webhooks.test.ts`: webhook RPC method auth and scope
+        enforcement
+      status: complete
+      command: test/webhooks.test.ts
+  Verification:
+    verification-1:
+      text: Verify implementation matches proposal scope
+      status: complete
+    verification-2:
+      text: Verify existing tests (auth, rate limiting, metrics, SSE) remain green
+      status: complete
+    verification-3:
+      text: Verify no external dependencies added
+      status: complete
+testing_gates:
+  validation_task: testing-1
+  unit_test_task: testing-2

@@ -1,0 +1,23 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: proposal-token-attribution
+  status: complete
+summary:
+  what:
+    - Implement granular token tracking and attribution per message and tool call within the SDK.
+  why:
+    - >-
+      While the current system has robust session and provider-level aggregate tracking, debugging
+      token consumption, cost optimization, and predictive budgeting all require high-fidelity token
+      accounting. By recording token cost at the granular level of individual messages and tool
+      interactions, clients can precisely determine what triggered spikes in their budget
+      consumption.
+scope:
+  in: []
+  out: []
+unchanged_behavior:
+  - Session-level, provider-level, and global quota tracking behaviors and formats remain identical.
+  - Token budget mechanics continue to behave the same way on their respective scopes.

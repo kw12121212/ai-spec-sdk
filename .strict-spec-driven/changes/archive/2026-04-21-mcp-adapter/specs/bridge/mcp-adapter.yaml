@@ -1,0 +1,37 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: bridge-mcp-adapter
+mapping:
+  implementation:
+    - src/mcp-store.ts
+    - src/bridge.ts
+  tests:
+    - test/mcp-store.test.ts
+operations:
+  ADDED:
+    mcp-protocol-connection:
+      strength: MUST
+      statement: >-
+        The system MUST establish an MCP protocol connection to managed MCP servers over their stdio
+        interfaces.
+      scenarios:
+        connect-on-start:
+          - GIVEN: a configured MCP server
+          - WHEN: the server is started
+          - THEN: the system MUST initialize the MCP protocol connection
+          - AND: wait for the initialization response before marking the server as fully ready
+    mcp-tool-execution:
+      strength: MUST
+      statement: The system MUST route tool execution requests to the corresponding MCP server.
+      scenarios:
+        execute-mcp-tool:
+          - GIVEN: an active MCP server exposing a tool named `external_tool`
+          - WHEN: the bridge receives a request to execute `external_tool`
+          - THEN: >-
+              the system MUST forward the request to the MCP server using the MCP protocol
+              `tools/call` method
+          - AND: return the result to the caller
+  MODIFIED: {}
+  REMOVED: {}

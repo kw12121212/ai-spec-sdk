@@ -1,0 +1,58 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: session-agent-sessions
+mapping:
+  implementation: []
+  tests: []
+operations:
+  ADDED:
+    Workspace-Aligned Agent Working Directory:
+      strength: MUST
+      statement: >-
+        The SDK MUST set the agent's working directory to the validated workspace path when starting
+        or resuming a session, and MUST reject any request that supplies `cwd` directly in session
+        options.
+      scenarios:
+        agent-runs-in-the-specified-workspace:
+          - GIVEN: a client starts a session with a valid workspace path
+          - WHEN: the bridge launches the agent query
+          - THEN: the agent's working directory is set to the resolved workspace path
+        reject-explicit-cwd-in-options:
+          - GIVEN: a client supplies a `cwd` key inside the session `options` parameter
+          - WHEN: the bridge validates the request
+          - THEN: the bridge returns a `-32602` error and does not start the session
+    SDK Session ID Retention:
+      strength: MUST
+      statement: >-
+        The SDK MUST capture and retain the session identifier assigned by the Claude Agent SDK upon
+        session initialization so that subsequent resume operations use the correct SDK-side session
+        context.
+      scenarios:
+        sdk-sessionid-is-stored-after-session-start:
+          - GIVEN: a client starts a new session
+          - WHEN: the agent emits its initialization event containing a session identifier
+          - THEN: the bridge stores that SDK-assigned identifier against the bridge session record
+    Correct Session Resume Context:
+      strength: MUST
+      statement: >-
+        The SDK MUST pass the stored SDK-assigned session identifier when resuming a session, and
+        MUST return a clear error when the SDK session identifier is not available.
+      scenarios:
+        resume-uses-sdk-sessionid:
+          - GIVEN: a client previously started a session and received a bridge session identifier
+          - AND: the bridge has stored the corresponding SDK-assigned session identifier
+          - WHEN: the client requests session resumption
+          - THEN: >-
+              the bridge passes the stored SDK session identifier to the agent query so prior
+              conversation context is preserved
+        resume-fails-when-sdk-sessionid-is-unavailable:
+          - GIVEN: a client requests session resumption
+          - AND: the bridge session record has no stored SDK session identifier
+          - WHEN: the bridge attempts to resume
+          - THEN: >-
+              the bridge returns a `-32012` error indicating the SDK session identifier is not
+              available
+  MODIFIED: {}
+  REMOVED: {}

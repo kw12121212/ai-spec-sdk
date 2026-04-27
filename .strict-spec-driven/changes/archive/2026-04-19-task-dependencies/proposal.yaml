@@ -1,0 +1,24 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: proposal-task-dependencies
+  status: complete
+summary:
+  what:
+    - >-
+      Implement cross-session task orchestration by adding task dependencies to the task queue.
+      Tasks can be enqueued with a list of parent task IDs they depend on, and they will only
+      transition to a runnable state once all their parent tasks have successfully completed.
+  why:
+    - >-
+      This change fulfills the "task-dependencies" planned item in the `10-task-team-registry.md`
+      milestone. It enables complex, multi-step, and multi-agent workflows across sessions, moving
+      toward the core goal of collaborative agent orchestration.
+scope:
+  in: []
+  out: []
+unchanged_behavior:
+  - Tasks without dependencies will continue to be enqueued and executed exactly as before.
+  - Task queue priority and retry logic remain unaffected.

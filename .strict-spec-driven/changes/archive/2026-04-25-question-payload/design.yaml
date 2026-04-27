@@ -1,0 +1,35 @@
+schema: strict-spec-driven/change-design/v1
+schema_version: 1
+artifact_type: change_design
+schema_file: templates/strict-spec-driven/schemas/change-design.yaml
+change: proposal-question-payload
+approach:
+  - >-
+    **Types**: Introduce `QuestionPayload` to `src/session-store.ts` (or an appropriate types file)
+    and update `Session.status` to include `"paused"`.
+  - >-
+    **Bridge**: Add `session.question` (server-to-client notification) and `session.resolveQuestion`
+    (client-to-server method) to `src/bridge.ts`.
+  - >-
+    **Session Store**: Add logic to pause a session when a question is asked and resume it when
+    resolved.
+decisions:
+  dedicated-paused-state:
+    decision: >-
+      Rather than keeping the session `active` and blocking the event loop, we transition the
+      session to `paused`.
+    rationale: >-
+      This allows the server to safely suspend processing and cleanly resume when the human
+      responds.
+  structured-payload:
+    decision: We mandate `impact` and `recommendation` fields to enforce high-quality agent questions.
+    rationale: We mandate `impact` and `recommendation` fields to enforce high-quality agent questions.
+alternatives:
+  - option: Unstructured Chat
+    reason: >-
+      Rejected. The roadmap explicitly calls for a structured protocol, not a real-time chat
+      interface.
+  - option: Synchronous Blocking
+    reason: >-
+      Rejected. Blocking the thread or keeping the HTTP request open indefinitely is fragile and
+      doesn't scale to asynchronous multi-channel delivery.
