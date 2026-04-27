@@ -58,7 +58,7 @@ After unsubscription, no further deliveries are sent to that URL.
 - THEN the bridge returns a `-32011` error
 
 ### Requirement: HMAC-SHA256 Signed Delivery
-When a session lifecycle event occurs (`session_started`, `session_completed`, `session_stopped`, `session_interrupted`), the bridge MUST deliver an HTTP POST to each registered webhook URL.
+The bridge MUST deliver an HTTP POST to each registered webhook URL when a session lifecycle event occurs (`session_started`, `session_completed`, `session_stopped`, `session_interrupted`) OR when a session asks a question (`session_question`).
 
 The POST body MUST be a JSON object with: `{ event: string, sessionId: string, timestamp: string, data: object }`.
 
@@ -76,6 +76,11 @@ The `Content-Type` header MUST be `application/json`.
 - GIVEN a webhook is registered
 - WHEN a session completes with session ID "sess-1"
 - THEN the POST body contains `{ event: "session_completed", sessionId: "sess-1", timestamp: "<ISO 8601>", data: { ... } }`
+
+#### Scenario: Delivery payload for question events
+- GIVEN a webhook is registered
+- WHEN an agent asks a question in a session
+- THEN the POST body contains `{ event: "session_question", sessionId: "<session-id>", timestamp: "<ISO 8601>", data: { question: "...", impact: "...", recommendation: "..." } }`
 
 ### Requirement: Delivery Retry
 When a webhook delivery fails (non-2xx response or network error), the bridge MUST retry up to 3 times with exponential backoff (1s, 2s, 4s).

@@ -1430,7 +1430,7 @@ export class BridgeServer {
             requestId
           );
 
-          this.notify({
+          const questionNotification = {
             jsonrpc: "2.0",
             method: "session.question",
             params: {
@@ -1438,7 +1438,9 @@ export class BridgeServer {
               questionId,
               ...payload
             }
-          });
+          };
+          this.notify(questionNotification);
+          this.webhookManager.notify(questionNotification);
         });
       }
     };

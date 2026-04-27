@@ -19,6 +19,7 @@ const LIFECYCLE_EVENTS = new Set([
   "session_completed",
   "session_stopped",
   "session_interrupted",
+  "session_question",
 ]);
 
 const MAX_RETRIES = 3;
@@ -86,8 +87,15 @@ export class WebhookManager {
     const params = msg["params"];
     if (params === null || typeof params !== "object") return;
     const p = params as Record<string, unknown>;
-    const eventType = p["type"];
-    if (typeof eventType !== "string" || !LIFECYCLE_EVENTS.has(eventType)) return;
+
+    let eventType: string;
+    if (msg["method"] === "session.question") {
+      eventType = "session_question";
+    } else {
+      eventType = typeof p["type"] === "string" ? p["type"] : "";
+    }
+    
+    if (!LIFECYCLE_EVENTS.has(eventType)) return;
 
     const sessionId = p["sessionId"];
     if (typeof sessionId !== "string") return;

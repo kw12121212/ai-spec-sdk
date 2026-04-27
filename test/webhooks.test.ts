@@ -172,6 +172,70 @@ test("WebhookManager: HMAC signature is verifiable", { timeout: 30000 }, async (
   }
 });
 
+test("WebhookManager: delivers session_question event when notified with session.question", { timeout: 30000 }, async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "webhook-test-"));
+  try {
+    const mgr = new WebhookManager(dir);
+    const secret = mgr.getSecret();
+
+    let receivedBody = "";
+    let receivedSig = "";
+    let resolveDelivery: () => void;
+    const deliveryPromise = new Promise<void>((r) => { resolveDelivery = r; });
+
+    const server = http.createServer((req, res) => {
+      const chunks: Buffer[] = [];
+      req.on("data", (c: Buffer) => chunks.push(c));
+      req.on("end", () => {
+        receivedBody = Buffer.concat(chunks).toString();
+        receivedSig = req.headers["x-webhook-signature"] as string;
+        res.writeHead(200);
+        res.end("ok");
+        resolveDelivery();
+      });
+    });
+
+    await new Promise<void>((resolve) => server.listen(0, resolve));
+    const serverPort = (server.address() as any).port;
+
+    mgr.subscribe(`http://localhost:${serverPort}/hook`);
+
+    const payload = {
+      question: "Is this correct?",
+      impact: "Will determine the flow",
+      recommendation: "Yes",
+    };
+
+    mgr.notify({
+      jsonrpc: "2.0",
+      method: "session.question",
+      params: {
+        sessionId: "test-1",
+        questionId: "q-123",
+        ...payload
+      }
+    });
+
+    await Promise.race([
+      deliveryPromise,
+      new Promise<void>((r) => setTimeout(r, 10000)),
+    ]);
+
+    const expectedSig = crypto.createHmac("sha256", secret).update(receivedBody).digest("hex");
+    expect(receivedSig).toBe(expectedSig);
+    
+    const parsedBody = JSON.parse(receivedBody);
+    expect(parsedBody.event).toBe("session_question");
+    expect(parsedBody.sessionId).toBe("test-1");
+    expect(parsedBody.data.questionId).toBe("q-123");
+    expect(parsedBody.data.question).toBe("Is this correct?");
+
+    server.close();
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 // ── Unit tests: retry logic ───────────────────────────────────────────────────
 
 test("WebhookManager: does not retry on success", { timeout: 30000 }, async () => {
