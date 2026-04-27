@@ -26,7 +26,7 @@ Implement an interactive question resolution protocol that enables agents to pau
 ## Planned Changes
 - `question-payload` - Declared: complete - structured question format
 - `multi-channel-delivery` - Declared: complete - webhook, push notification adapters
-- `response-correlation` - Declared: planned - match responses to pending questions
+- `response-correlation` - Declared: complete - match responses to pending questions
 - `session-resumption` - Declared: planned - restore agent state on response
 - `delivery-tracking` - Declared: planned - status and retry management
 - `escalation-policy` - Declared: planned - timeout and non-response handling
@@ -45,6 +45,7 @@ Implement an interactive question resolution protocol that enables agents to pau
 - Declared: proposed
 
 ## Notes
+
 
 
 

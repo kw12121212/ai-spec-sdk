@@ -12,6 +12,7 @@ mapping:
     - test/bridge-audit.test.ts
     - test/bridge-tools.test.ts
     - test/cli.test.ts
+    - test/session-question.test.ts
 ---
 ### Requirement: question-events
 The system MUST emit a JSON-RPC notification when a session asks a question and MUST accept a JSON-RPC method to resolve it.
@@ -820,3 +821,13 @@ The `bridge.capabilities` response MUST include `bridge.negotiateVersion` in the
 #### Scenario: Capabilities include negotiateVersion
 - GIVEN a client calls `bridge.capabilities`
 - THEN the `methods` array includes `"bridge.negotiateVersion"`
+
+
+### Requirement: session-answer-question
+The system MUST provide a JSON-RPC method `session.answerQuestion` to allow clients to submit an asynchronous response to a pending question.
+
+#### Scenario: answer pending question
+- GIVEN a session is in the `waiting_for_input` state with a pending question
+- WHEN the client calls `session.answerQuestion` with the `sessionId`, `requestId`, and the `answer`
+- THEN the bridge validates the request and stores the answer for the session
+- AND returns a success response acknowledging the answer

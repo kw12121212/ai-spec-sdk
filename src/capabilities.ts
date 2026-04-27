@@ -146,7 +146,7 @@ export function getCapabilities(transport = "stdio"): Capabilities {
       "session.cleanup",
       "session.approveTool",
       "session.rejectTool",
-      "session.resolveQuestion",
+      "session.answerQuestion",
       "session.branch",
       "session.search",
       "session.setProvider",

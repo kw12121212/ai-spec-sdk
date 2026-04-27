@@ -689,8 +689,8 @@ export class BridgeServer {
           behavior: "deny",
           message: typeof params["message"] === "string" ? params["message"] : "Tool use rejected by user",
         });
-      case "session.resolveQuestion":
-        return this.resolveQuestion(params);
+      case "session.answerQuestion":
+        return this.answerQuestion(params);
       case "mcp.add":
         return this.mcpAdd(params);
       case "mcp.remove":
@@ -1404,11 +1404,11 @@ export class BridgeServer {
         required: ["question", "impact", "recommendation"]
       },
       call: async (input: Record<string, unknown>) => {
-        const questionId = crypto.randomUUID();
+        const requestId = crypto.randomUUID();
         return new Promise<unknown>((resolve) => {
-          this.pendingQuestions.set(questionId, { resolve, sessionId: session.id });
+          this.pendingQuestions.set(requestId, { resolve, sessionId: session.id });
           
-          this.sessionStore.transitionExecutionState(session.id, "paused", "agent_question");
+          this.sessionStore.transitionExecutionState(session.id, "waiting_for_input", "agent_question");
           const sess = this.sessionStore.get(session.id);
           if (sess) {
             sess.status = "paused";
@@ -1435,7 +1435,7 @@ export class BridgeServer {
             method: "session.question",
             params: {
               sessionId: session.id,
-              questionId,
+              requestId,
               ...payload
             }
           };
@@ -3017,32 +3017,36 @@ export class BridgeServer {
     return { requestId, behavior: result.behavior };
   }
 
-  private resolveQuestion(params: Record<string, unknown>): unknown {
-    const { sessionId, questionId, answer } = params;
+  private answerQuestion(params: Record<string, unknown>): unknown {
+    const { sessionId, requestId, answer } = params;
 
     if (!sessionId || typeof sessionId !== "string") {
       throw new BridgeError(-32602, "'sessionId' must be provided");
     }
-    if (!questionId || typeof questionId !== "string") {
-      throw new BridgeError(-32602, "'questionId' must be provided");
+    if (!requestId || typeof requestId !== "string") {
+      throw new BridgeError(-32602, "'requestId' must be provided");
     }
     if (typeof answer !== "string") {
       throw new BridgeError(-32602, "'answer' must be provided as a string");
     }
 
-    if (!this.sessionStore.get(sessionId)) {
+    const session = this.sessionStore.get(sessionId);
+    if (!session) {
       throw new BridgeError(-32011, "Session not found", { sessionId });
     }
 
-    const pending = this.pendingQuestions.get(questionId);
-    if (!pending || pending.sessionId !== sessionId) {
-      throw new BridgeError(-32021, "Pending question not found", { questionId });
+    if (session.executionState !== "waiting_for_input") {
+      throw new BridgeError(-32602, "Session is not waiting for input", { sessionId });
     }
 
-    this.pendingQuestions.delete(questionId);
+    const pending = this.pendingQuestions.get(requestId);
+    if (!pending || pending.sessionId !== sessionId) {
+      throw new BridgeError(-32020, "Pending question request not found", { requestId });
+    }
 
-    const session = this.sessionStore.get(sessionId)!;
-    if (session.executionState === "paused" && session.pauseReason === "agent_question") {
+    this.pendingQuestions.delete(requestId);
+
+    if (session.pauseReason === "agent_question") {
       this.sessionStore.transitionExecutionState(sessionId, "running", "user_resume");
       session.pausedAt = undefined;
       session.pauseReason = undefined;
@@ -3064,7 +3068,7 @@ export class BridgeServer {
 
     pending.resolve(answer);
 
-    return { success: true, questionId };
+    return { success: true, requestId };
   }
 
   private registerWorkspace(params: Record<string, unknown>): unknown {
