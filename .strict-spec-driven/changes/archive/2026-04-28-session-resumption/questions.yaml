@@ -1,0 +1,17 @@
+schema: strict-spec-driven/question-list/v1
+schema_version: 1
+artifact_type: question_list
+schema_file: templates/strict-spec-driven/schemas/question-list.yaml
+change: session-resumption
+open: []
+resolved:
+  - id: persistence-format
+    question: How is the paused execution context persisted and re-hydrated if the server restarts before the human responds?
+    context: Needed to design the correct state restoration mechanisms.
+    answer: Until durable persistence is added in milestone 0014, the pending tool call ID and pause state are tracked in the existing SessionStore. If the server restarts, in-memory callbacks are lost, so we append the human response to the session history as a tool result and re-invoke the agent loop directly.
+    status: resolved
+  - id: resumption-trigger
+    question: Does resumption trigger an immediate LLM turn or just fulfill a pending tool promise?
+    context: Needed to wire the callback to the agent runtime correctly.
+    answer: It fulfills the pending tool promise of the 'ask_human' (or equivalent) tool that caused the pause. If the promise is no longer in memory, it appends the tool response to the history and triggers a new LLM turn.
+    status: resolved

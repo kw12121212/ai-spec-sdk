@@ -1,0 +1,32 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: session-resumption
+sections:
+  Implementation:
+    resolve-questions:
+      text: Resolve open questions around state persistence and the resumption trigger.
+      status: complete
+    write-spec:
+      text: Write the delta spec for session resumption behavior.
+      status: complete
+    implement-resumption:
+      text: Implement the agent state restoration and resumption logic.
+      status: complete
+  Testing:
+    run-build:
+      text: Run build validation.
+      status: complete
+      command: bun run build
+    run-tests:
+      text: Run unit tests.
+      status: complete
+      command: bun test
+  Verification:
+    verify-scope:
+      text: Verify implementation matches proposal scope.
+      status: complete
+testing_gates:
+  validation_task: run-build
+  unit_test_task: run-tests

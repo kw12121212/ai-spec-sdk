@@ -1225,7 +1225,7 @@ export class BridgeServer {
       throw new BridgeError(-32011, "Session not found", { sessionId });
     }
 
-    if (session.executionState !== "paused") {
+    if (session.executionState !== "paused" && session.executionState !== "waiting_for_input") {
       if (!prompt || typeof prompt !== "string") {
         throw new BridgeError(-32602, "'prompt' must be provided");
       }
@@ -1290,7 +1290,7 @@ export class BridgeServer {
       proxyEnv,
     );
 
-    if (session.executionState === "paused") {
+    if (session.executionState === "paused" || session.executionState === "waiting_for_input") {
       const ok = this.sessionStore.transitionExecutionState(sessionId, "running", "user_resume");
       if (!ok) {
         throw new BridgeError(-32602, "State transition failed");
@@ -1312,6 +1312,42 @@ export class BridgeServer {
       );
 
       void this._fireHooks("notification", sessionId, session.workspace);
+
+      const pendingCallId = session.pendingToolCallId;
+      session.pendingToolCallId = undefined;
+      this.sessionStore.persist(session);
+
+      if (pendingCallId) {
+        const pending = this.pendingQuestions.get(pendingCallId);
+        if (pending) {
+          // req-resume-in-memory: fulfill pending promise
+          this.pendingQuestions.delete(pendingCallId);
+          pending.resolve(typeof prompt === "string" ? prompt : "");
+          return { sessionId: session.id, status: "resumed" };
+        } else {
+          // req-resume-rehydrated: re-invoke agent loop
+          this.sessionStore.appendEvent(session.id, {
+            type: "tool_result",
+            message: typeof prompt === "string" ? prompt : "",
+          });
+          
+          session.status = "active";
+          session.stopRequested = false;
+          this.sessionStore.persist(session);
+
+          // Collect custom tools for this workspace
+          const customTools = this._getAvailableCustomTools(session.workspace, controlParams.allowedTools, controlParams.disallowedTools);
+
+          return this._runQuery(
+            session,
+            typeof prompt === "string" ? prompt : "Continue",
+            { ...passthroughOptions, resume: session.sdkSessionId, ...buildControlOptions(controlParams) },
+            { cwd: session.workspace, env: resolvedEnv },
+            requestId,
+            customTools,
+          );
+        }
+      }
 
       return { sessionId: session.id, status: "resumed" };
     } else {
@@ -1414,6 +1450,7 @@ export class BridgeServer {
             sess.status = "paused";
             sess.pausedAt = new Date().toISOString();
             sess.pauseReason = "agent_question";
+            sess.pendingToolCallId = requestId;
             this.sessionStore.persist(sess);
           }
 

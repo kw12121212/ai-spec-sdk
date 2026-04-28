@@ -5,6 +5,10 @@ import os from "node:os";
 import { runWorkflow } from "../src/workflow.js";
 
 test("workflow.run returns parsed verify JSON output", async () => {
+  const dummyScript = path.join(os.tmpdir(), "dummy-spec-script.js");
+  fs.writeFileSync(dummyScript, "console.log(JSON.stringify({ valid: true }));");
+  process.env["SPEC_DRIVEN_SCRIPT"] = dummyScript;
+
   const fixtureWorkspace = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-fixture-"));
 
   fs.mkdirSync(path.join(fixtureWorkspace, ".spec-driven", "changes", "demo-change", "specs"), {
@@ -85,6 +89,10 @@ test("workflow.run returns structured error when script path is invalid", async 
 });
 
 test("workflow.run returns structured error when command execution fails", async () => {
+  const dummyScript = path.join(os.tmpdir(), "failing-spec-script.js");
+  fs.writeFileSync(dummyScript, "process.exit(1);");
+  process.env["SPEC_DRIVEN_SCRIPT"] = dummyScript;
+
   const fixtureWorkspace = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-workflow-fail-"));
   const notifications: Array<{ method: string; params: Record<string, unknown> }> = [];
 

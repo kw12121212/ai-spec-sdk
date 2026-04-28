@@ -12,6 +12,9 @@ specs:
   - id: build-sdk-packaging
     title: SDK Packaging
     path: .strict-spec-driven/specs/build/sdk-packaging.yaml
+  - id: session-resumption
+    title: Session Resumption
+    path: .strict-spec-driven/specs/session/session-resumption.yaml
   - id: session-session-templates
     title: Session Templates
     path: .strict-spec-driven/specs/session/session-templates.yaml

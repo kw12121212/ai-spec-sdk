@@ -1,0 +1,52 @@
+schema: strict-spec-driven/main-spec/v1
+schema_version: 1
+artifact_type: main_spec
+schema_file: templates/strict-spec-driven/schemas/main-spec.yaml
+spec:
+  id: session-resumption
+  title: Session Resumption
+mapping:
+  implementation: []
+  tests: []
+requirements:
+  req-pause-session:
+    strength: MUST
+    statement: >-
+      The session store MUST track the pause state and pending tool call ID when an agent pauses for
+      human input.
+    scenarios:
+      pause-stores-id:
+        - GIVEN: an active agent session
+        - WHEN: the agent invokes a tool that requests human input
+        - THEN: >-
+            the session store MUST persist the pending tool call ID and update the session state to
+            waiting_for_input
+  req-resume-in-memory:
+    strength: MUST
+    statement: >-
+      If the agent is still running in memory, resuming the session MUST fulfill the pending tool
+      promise and continue the execution loop.
+    scenarios:
+      resume-active-memory:
+        - GIVEN: an agent session waiting for human input in memory
+        - WHEN: a session.resume RPC request provides a human response
+        - THEN: the system MUST resolve the pending tool promise with the response text
+  req-resume-rehydrated:
+    strength: MUST
+    statement: >-
+      If the agent was restarted and is no longer in memory, resuming the session MUST append the
+      human response to the session history as a tool result and re-invoke the agent loop.
+    scenarios:
+      resume-rehydrated-agent:
+        - GIVEN: an agent session waiting for human input after a server restart
+        - WHEN: a session.resume RPC request provides a human response
+        - THEN: the system MUST append the response to the session history as a tool_result
+        - AND: the system MUST start a new query loop resuming from the session history
+  req-invalid-resume:
+    strength: MUST
+    statement: Attempting to resume a session that is not in a paused state MUST throw a clear error.
+    scenarios:
+      resume-invalid-state:
+        - GIVEN: an agent session that is completed or active (not waiting for input)
+        - WHEN: a session.resume RPC request is sent without a prompt
+        - THEN: the system MUST throw an error indicating that a prompt is required

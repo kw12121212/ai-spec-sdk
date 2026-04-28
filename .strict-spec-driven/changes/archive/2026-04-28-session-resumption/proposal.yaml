@@ -1,0 +1,22 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: session-resumption
+  status: proposed
+summary:
+  what:
+    - Restore agent state on human response
+    - Enable session resumption after an interactive question is answered
+  why:
+    - Agents need to seamlessly pick up execution where they left off when a human provides an asynchronous response.
+scope:
+  in:
+    - Re-hydrate paused execution context upon receiving a correlated human response
+    - Fulfill pending question/tool promises to trigger the next LLM turn
+  out:
+    - Implementation of multi-channel delivery (already complete)
+    - Persistent storage adapters beyond existing mechanisms
+unchanged_behavior:
+  - Existing session and tool execution flows remain unchanged unless explicitly suspended by a question resolution prompt.

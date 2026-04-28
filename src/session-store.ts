@@ -43,6 +43,7 @@ export interface Session {
   result: unknown;
   pausedAt?: string;
   pauseReason?: string;
+  pendingToolCallId?: string;
   cancelledAt?: string;
   cancelReason?: string;
   timeoutMs?: number;
@@ -156,6 +157,7 @@ export class SessionStore {
       result: null,
       pausedAt: undefined,
       pauseReason: undefined,
+      pendingToolCallId: undefined,
       cancelledAt: undefined,
       cancelReason: undefined,
       timeoutMs: undefined,

@@ -1,0 +1,16 @@
+schema: strict-spec-driven/change-design/v1
+schema_version: 1
+artifact_type: change_design
+schema_file: templates/strict-spec-driven/schemas/change-design.yaml
+change: session-resumption
+approach:
+  - Extend the agent state machine or session lifecycle to intercept correlated responses and re-invoke the stalled context.
+decisions:
+  state-restoration:
+    decision: The agent's paused execution context must be durably stored or kept in memory depending on the configured backend, then restored.
+    rationale: Asynchronous responses can take an unpredictable amount of time; the system must handle resumption even if the original execution context is no longer active in memory.
+alternatives:
+  - option: Keep the agent strictly in-memory (blocking sleep) while waiting for a response.
+    reason: Rejected because responses might take hours or days, which would tie up system resources and not survive restarts.
+risks:
+  - State mismatch or deserialization issues when restoring context after a deployment or restart.
