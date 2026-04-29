@@ -103,3 +103,79 @@ test("session.answerQuestion returns error for invalid state", async () => {
     fs.rmSync(ws, { recursive: true, force: true });
   }
 });
+
+test("session question times out and aborts session", async () => {
+  delete globalThis.__AI_SPEC_SDK_QUERY__;
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-question-abort-"));
+
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* ({ options }: { options: Record<string, unknown> }) {
+    yield { type: "system", subtype: "init", session_id: "s_abort" };
+    const tools = options["tools"] as { name: string; call: (input: any) => Promise<unknown> }[] | undefined;
+    const askTool = tools?.find(t => t.name === "ask_question");
+    if (askTool) {
+      await askTool.call({
+        question: "Blocker?", impact: "High", recommendation: "None",
+        escalation: { timeoutMs: 100, fallbackAction: "abort" }
+      });
+    }
+    yield { result: "should_not_reach" };
+  };
+
+  try {
+    let completedReason = "";
+    const server = new BridgeServer({
+      notify: (msg: any) => {
+        if (msg.method === "bridge/session_event" && msg.params.type === "session_completed") {
+          completedReason = msg.params.cancelReason || "";
+        }
+      }
+    });
+
+    const startPromise = server.handleMessage({
+      jsonrpc: "2.0", id: 1,
+      method: "session.start",
+      params: { workspace: ws, prompt: "hello" },
+    });
+
+    await startPromise; // Start will resolve when aborted
+    
+    // Check that the reason was question_timeout
+    expect(completedReason).toBe("question_timeout");
+  } finally {
+    fs.rmSync(ws, { recursive: true, force: true });
+  }
+});
+
+test("session question times out and continues with default answer", async () => {
+  delete globalThis.__AI_SPEC_SDK_QUERY__;
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "ai-spec-sdk-question-continue-"));
+
+  let resolvedAnswer = "";
+  globalThis.__AI_SPEC_SDK_QUERY__ = async function* ({ options }: { options: Record<string, unknown> }) {
+    yield { type: "system", subtype: "init", session_id: "s_continue" };
+    const tools = options["tools"] as { name: string; call: (input: any) => Promise<unknown> }[] | undefined;
+    const askTool = tools?.find(t => t.name === "ask_question");
+    if (askTool) {
+      resolvedAnswer = (await askTool.call({
+        question: "Continue?", impact: "Low", recommendation: "Yes",
+        escalation: { timeoutMs: 100, fallbackAction: "continue", defaultAnswer: "AutoContinue" }
+      })) as string;
+    }
+    yield { result: "done" };
+  };
+
+  try {
+    const server = new BridgeServer({});
+
+    const startPromise = server.handleMessage({
+      jsonrpc: "2.0", id: 1,
+      method: "session.start",
+      params: { workspace: ws, prompt: "hello" },
+    });
+
+    await startPromise; 
+    expect(resolvedAnswer).toBe("AutoContinue");
+  } finally {
+    fs.rmSync(ws, { recursive: true, force: true });
+  }
+});

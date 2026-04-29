@@ -1,0 +1,17 @@
+schema: strict-spec-driven/question-list/v1
+schema_version: 1
+artifact_type: question_list
+schema_file: templates/strict-spec-driven/schemas/question-list.yaml
+change: escalation-policy
+open: []
+resolved:
+  - id: timeout-enforcement-mechanism
+    question: How should question timeouts be enforced in the SDK? (e.g., active background worker, lazy evaluation, or relying on external cron?)
+    context: We need to determine the architectural approach for detecting a timeout and triggering the escalation policy.
+    status: resolved
+    answer: Active Cron Scheduler (Use the existing cron-scheduler to periodically check and enforce timeouts)
+  - id: escalation-mapping
+    question: How does an escalation action map to the underlying Claude Agent SDK?
+    context: If a question escalates to an abort, does it cancel the underlying SDK stream/run?
+    status: resolved
+    answer: Abort / Default Answer ('abort' throws an error/cancels the run, 'continue' uses a predefined default answer to resume the run)

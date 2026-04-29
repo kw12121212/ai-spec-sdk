@@ -1,0 +1,32 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: escalation-policy
+sections:
+  Implementation:
+    update-specs:
+      text: Create or update specs to define escalation behavior for questions.
+      status: complete
+    implement-escalation-policy:
+      text: Implement timeout tracking and escalation logic in question resolution protocol.
+      status: complete
+  Testing:
+    add-tests:
+      text: Add tests for question timeouts and escalation paths.
+      status: complete
+    run-build:
+      text: Run build validation.
+      status: complete
+      command: bun run build
+    run-tests:
+      text: Run unit tests.
+      status: complete
+      command: bun test
+  Verification:
+    verify-scope:
+      text: Verify implementation matches proposal scope.
+      status: complete
+testing_gates:
+  validation_task: run-build
+  unit_test_task: run-tests

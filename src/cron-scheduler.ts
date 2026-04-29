@@ -6,12 +6,17 @@ import { defaultLogger as logger } from "./logger.js";
 export class CronScheduler {
   private timer: NodeJS.Timeout | null = null;
   private lastCheck: Date;
+  private jobs: Array<() => void> = [];
 
   constructor(
     private taskTemplateStore: TaskTemplateStore,
     private taskQueueStore: TaskQueueStore,
   ) {
     this.lastCheck = new Date();
+  }
+
+  registerJob(job: () => void): void {
+    this.jobs.push(job);
   }
 
   start(intervalMs = 60000): void {
@@ -72,6 +77,16 @@ export class CronScheduler {
             error: error instanceof Error ? error.message : String(error),
           });
         }
+      }
+    }
+
+    for (const job of this.jobs) {
+      try {
+        job();
+      } catch (error) {
+        logger.error("error executing cron job", {
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
     }
 

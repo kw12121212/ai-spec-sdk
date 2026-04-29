@@ -1,0 +1,22 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: escalation-policy
+  status: proposed
+summary:
+  what:
+    - Add timeout and non-response handling policies for pending questions
+  why:
+    - Questions left unanswered should not indefinitely block agents; they need an escalation path (timeout, default fallback, or abort)
+scope:
+  in:
+    - Define escalation policies (e.g., timeout duration, fallback behavior, abort)
+    - Implement a mechanism to track pending question timeouts
+    - Automatically execute the escalation path when a timeout occurs
+  out:
+    - Manual human intervention interfaces
+    - Real-time websocket changes
+unchanged_behavior:
+  - Existing question creation, delivery, and manual response behavior remains unchanged.

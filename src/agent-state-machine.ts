@@ -19,8 +19,8 @@ type TransitionListener = (event: StateTransitionEvent) => void;
 const VALID_TRANSITIONS: Record<AgentExecutionState, ReadonlySet<AgentExecutionState>> = {
   idle: new Set(["running", "error"] as AgentExecutionState[]),
   running: new Set(["completed", "waiting_for_input", "paused", "error"] as AgentExecutionState[]),
-  paused: new Set(["running", "error"] as AgentExecutionState[]),
-  waiting_for_input: new Set(["running", "error"] as AgentExecutionState[]),
+  paused: new Set(["running", "error", "completed"] as AgentExecutionState[]),
+  waiting_for_input: new Set(["running", "error", "completed"] as AgentExecutionState[]),
   error: new Set(["idle"] as AgentExecutionState[]),
   completed: new Set([] as AgentExecutionState[]),
 };

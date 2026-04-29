@@ -1,0 +1,17 @@
+schema: strict-spec-driven/change-design/v1
+schema_version: 1
+artifact_type: change_design
+schema_file: templates/strict-spec-driven/schemas/change-design.yaml
+change: escalation-policy
+approach:
+  - Add an optional `escalation` field to question payloads containing `timeoutMs` and `fallbackAction`.
+  - The session store or task queue must track these timeouts and either trigger a background task or lazily evaluate the timeout upon next activity.
+decisions:
+  escalation-action:
+    decision: Define predefined escalation actions (e.g., `abort`, `continue`, `default-answer`).
+    rationale: Provides clear, deterministic outcomes for agents when a question is abandoned.
+alternatives:
+  - option: Indefinitely pause the agent.
+    reason: Rejected because it wastes resources and leaves sessions in a zombie state.
+risks:
+  - Background timeout enforcement may be complex to implement without reliable cron/worker systems.

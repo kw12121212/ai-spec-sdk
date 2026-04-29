@@ -15,11 +15,18 @@ export interface SessionHistoryEntry {
   message?: unknown;
 }
 
+export interface EscalationPolicy {
+  timeoutMs: number;
+  fallbackAction: "abort" | "continue";
+  defaultAnswer?: string;
+}
+
 export interface QuestionPayload {
   question: string;
   impact: string;
   recommendation: string;
   options?: string[];
+  escalation?: EscalationPolicy;
 }
 
 export interface DeliveryAttempt {

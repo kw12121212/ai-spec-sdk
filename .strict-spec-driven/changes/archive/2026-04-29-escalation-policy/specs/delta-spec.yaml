@@ -1,0 +1,52 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: session-delivery-tracking
+mapping:
+  implementation:
+    - src/session-store.ts
+    - src/delivery-tracker.ts
+    - src/cron-scheduler.ts
+    - src/bridge.ts
+    - src/agent-state-machine.ts
+  tests:
+    - test/delivery-tracker.test.ts
+    - test/session-store.test.ts
+    - test/session-question.test.ts
+operations:
+  ADDED:
+    req-escalation-timeout:
+      strength: MUST
+      statement: The system MUST support an optional escalation policy (timeoutMs and fallbackAction) for questions.
+      scenarios:
+        escalation-provided:
+          - GIVEN: an agent asks a question with an escalation policy
+          - WHEN: the question is stored
+          - THEN: the escalation policy MUST be tracked along with the pending question
+    req-escalation-enforcement-cron:
+      strength: MUST
+      statement: The system MUST use a background cron job to periodically evaluate pending question timeouts.
+      scenarios:
+        cron-evaluates-timeout:
+          - GIVEN: a pending question with a timeout
+          - WHEN: the cron scheduler runs and the current time exceeds the timeout
+          - THEN: the question MUST be escalated according to its fallback action
+    req-escalation-action-abort:
+      strength: MUST
+      statement: The system MUST abort the session if a question times out with the 'abort' fallback action.
+      scenarios:
+        timeout-abort:
+          - GIVEN: a pending question whose timeout has expired with an 'abort' action
+          - WHEN: the escalation is triggered
+          - THEN: the session MUST be aborted and the question marked as escalated
+    req-escalation-action-continue:
+      strength: MUST
+      statement: The system MUST resume the session with a default answer if a question times out with the 'continue' fallback action.
+      scenarios:
+        timeout-continue:
+          - GIVEN: a pending question whose timeout has expired with a 'continue' action
+          - WHEN: the escalation is triggered
+          - THEN: the session MUST resume with the predefined default answer and the question marked as escalated
+  MODIFIED: {}
+  REMOVED: {}

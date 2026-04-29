@@ -6,7 +6,7 @@ import type { PermissionResult } from "@anthropic-ai/claude-agent-sdk";
 import { BridgeError, isJsonRpcRequest } from "./errors.js";
 import { getCapabilities, BUILTIN_SPEC_SKILLS, SUPPORTED_MODELS, BUILTIN_TOOLS, API_VERSION } from "./capabilities.js";
 import { runWorkflow } from "./workflow.js";
-import { SessionStore } from "./session-store.js";
+import { SessionStore, type EscalationPolicy } from "./session-store.js";
 import { WorkspaceStore, type CustomTool } from "./workspace-store.js";
 import { toolRegistry } from "./unified-tool-registry.js";
 import { McpStore } from "./mcp-store.js";
@@ -394,6 +394,8 @@ interface PendingApproval {
 interface PendingQuestion {
   resolve: (answer: string) => void;
   sessionId: string;
+  escalation?: EscalationPolicy;
+  askedAt: number;
 }
 
 export class BridgeServer {
@@ -504,7 +506,34 @@ export class BridgeServer {
     this.taskQueueWorker.start();
 
     this.cronScheduler = new CronScheduler(this.taskTemplateStore, this.taskQueueStore);
-    this.cronScheduler.start();
+    this.cronScheduler.registerJob(() => {
+      const now = Date.now();
+      for (const [requestId, pending] of this.pendingQuestions.entries()) {
+        if (!pending.escalation) continue;
+
+        const elapsed = now - pending.askedAt;
+        if (elapsed >= pending.escalation.timeoutMs) {
+          this.logger.info("pending question timed out", { requestId, sessionId: pending.sessionId });
+
+          if (pending.escalation.fallbackAction === "abort") {
+            this.cancelSession({ sessionId: pending.sessionId, reason: "question_timeout" });
+            this.pendingQuestions.delete(requestId);
+            pending.resolve("Operation aborted due to timeout");
+          } else if (pending.escalation.fallbackAction === "continue") {
+            try {
+              this.answerQuestion({
+                sessionId: pending.sessionId,
+                requestId,
+                answer: pending.escalation.defaultAnswer ?? "No answer provided (timeout)",
+              });
+            } catch (err) {
+              this.logger.error("failed to answer timed out question", { error: err });
+            }
+          }
+        }
+      }
+    });
+    this.cronScheduler.start(1000);
   }
 
   private _buildApprovalCallback(sessionId: string): (
@@ -1438,17 +1467,27 @@ export class BridgeServer {
           question: { type: "string", description: "The specific question to ask the user" },
           impact: { type: "string", description: "The impact of the answer on the current task" },
           recommendation: { type: "string", description: "Your recommendation or preferred option" },
-          options: { type: "array", items: { type: "string" }, description: "Optional predefined options to choose from" }
+          options: { type: "array", items: { type: "string" }, description: "Optional predefined options to choose from" },
+          escalation: {
+            type: "object",
+            description: "Optional escalation policy if the question is not answered in time",
+            properties: {
+              timeoutMs: { type: "number", description: "Timeout in milliseconds" },
+              fallbackAction: { type: "string", enum: ["abort", "continue"], description: "Action to take on timeout" },
+              defaultAnswer: { type: "string", description: "Default answer to use if action is continue" }
+            },
+            required: ["timeoutMs", "fallbackAction"]
+          }
         },
         required: ["question", "impact", "recommendation"]
       },
       call: async (input: Record<string, unknown>) => {
         const requestId = crypto.randomUUID();
         return new Promise<unknown>((resolve) => {
-          this.pendingQuestions.set(requestId, { resolve, sessionId: session.id });
-          
-          this.sessionStore.transitionExecutionState(session.id, "waiting_for_input", "agent_question");
-          const sess = this.sessionStore.get(session.id);
+          const escalation = input.escalation as EscalationPolicy | undefined;
+          this.pendingQuestions.set(requestId, { resolve, sessionId: session.id, escalation, askedAt: Date.now() });
+
+          this.sessionStore.transitionExecutionState(session.id, "waiting_for_input", "agent_question");          const sess = this.sessionStore.get(session.id);
           if (sess) {
             sess.status = "paused";
             sess.pausedAt = new Date().toISOString();
@@ -2283,8 +2322,8 @@ export class BridgeServer {
       throw new BridgeError(-32011, "Session not found", { sessionId });
     }
 
-    if (session.status !== "active") {
-      throw new BridgeError(-32602, "Session is not active", { sessionId });
+    if (session.status !== "active" && session.status !== "paused") {
+      throw new BridgeError(-32602, "Session is not active or paused", { sessionId });
     }
 
     const cancelledAt = new Date().toISOString();
