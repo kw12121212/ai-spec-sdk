@@ -1,0 +1,16 @@
+schema: strict-spec-driven/change-design/v1
+schema_version: 1
+artifact_type: change_design
+schema_file: ../../schemas/change-design.yaml
+change: delivery-tracking
+approach:
+  - Implement a queue and retry scheduler for failed question deliveries.
+decisions:
+  retry-mechanism:
+    decision: Use exponential backoff for failed webhook/push requests.
+    rationale: Transient network failures resolve quickly; exponential backoff avoids hammering recovering services.
+alternatives:
+  - option: Fixed interval retries.
+    reason: Rejected because it doesn't back off during prolonged outages.
+risks:
+  - Complex state management between agent session pause and delivery tracker.

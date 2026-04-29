@@ -14,6 +14,7 @@ import type { McpServerConfig } from "./mcp-store.js";
 import { ConfigStore } from "./config-store.js";
 import { HooksStore } from "./hooks-store.js";
 import type { HookEvent } from "./hooks-store.js";
+import { DeliveryTracker } from "./delivery-tracker.js";
 import { ContextStore } from "./context-store.js";
 import { runClaudeQuery, type QueryResult as ClaudeQueryResult } from "./claude-agent-runner.js";
 import { defaultLogger, VALID_LOG_LEVELS, type Logger, type LogLevel } from "./logger.js";
@@ -412,6 +413,7 @@ export class BridgeServer {
   private pendingApprovals: Map<string, PendingApproval>;
   private pendingQuestions: Map<string, PendingQuestion>;
   private webhookManager: WebhookManager;
+  private deliveryTracker: DeliveryTracker;
   private templateStore: TemplateStore;
   private taskTemplateStore: TaskTemplateStore;
   private teamStore: TeamStore;
@@ -463,6 +465,7 @@ export class BridgeServer {
     this.pendingApprovals = new Map();
     this.pendingQuestions = new Map();
     this.webhookManager = new WebhookManager(sessionsDir);
+    this.deliveryTracker = new DeliveryTracker(this.sessionStore, this.webhookManager, this.notify.bind(this));
     this.templateStore = new TemplateStore(sessionsDir ? path.join(sessionsDir, "templates") : undefined);
     this.taskTemplateStore = new TaskTemplateStore(sessionsDir ? path.join(sessionsDir, "task-templates") : undefined);
     this.taskQueueStore = new TaskQueueStore(sessionsDir ? path.join(sessionsDir, "task-queue") : undefined);

@@ -1,0 +1,32 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: ../../schemas/task-list.yaml
+change: delivery-tracking
+sections:
+  Implementation:
+    spec-delivery-tracking:
+      text: Add Delivery Tracking spec outlining observable behavior.
+      status: complete
+    delivery-tracker-model:
+      text: Add DeliveryAttempt tracking types and update related stores.
+      status: complete
+    retry-logic:
+      text: Add the retry queue and exponential backoff scheduler.
+      status: complete
+  Testing:
+    validate-models:
+      text: Validate types and compilation.
+      status: complete
+      command: npm run typecheck
+    unit-test-tracking:
+      text: Run unit tests for delivery tracking.
+      status: complete
+      command: npm run test
+  Verification:
+    verify-implementation:
+      text: Verify implementation matches proposal scope.
+      status: complete
+testing_gates:
+  validation_task: validate-models
+  unit_test_task: unit-test-tracking

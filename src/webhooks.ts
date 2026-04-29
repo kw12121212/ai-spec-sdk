@@ -108,35 +108,66 @@ export class WebhookManager {
     };
 
     for (const reg of this.registrations) {
-      this.deliver(reg, payload);
+      this.deliver(reg, payload).catch(() => {});
     }
   }
 
-  private deliver(reg: WebhookRegistration, payload: WebhookPayload): void {
+  private async deliver(reg: WebhookRegistration, payload: WebhookPayload): Promise<void> {
     const body = JSON.stringify(payload);
     const signature = crypto.createHmac("sha256", this.secret).update(body).digest("hex");
 
-    this.attemptDelivery(reg.url, body, signature, 0);
+    return this.attemptDelivery(reg.url, body, signature, 0);
   }
 
-  private attemptDelivery(url: string, body: string, signature: string, attempt: number): void {
-    fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Webhook-Signature": signature,
-      },
-      body,
-    })
-      .then((res) => {
-        if (!res.ok && attempt < MAX_RETRIES - 1) {
-          setTimeout(() => this.attemptDelivery(url, body, signature, attempt + 1), RETRY_DELAYS_MS[attempt]);
-        }
-      })
-      .catch(() => {
-        if (attempt < MAX_RETRIES - 1) {
-          setTimeout(() => this.attemptDelivery(url, body, signature, attempt + 1), RETRY_DELAYS_MS[attempt]);
-        }
+  private async attemptDelivery(url: string, body: string, signature: string, attempt: number): Promise<void> {
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Webhook-Signature": signature,
+        },
+        body,
       });
+      if (!res.ok) {
+        throw new Error(`HTTP error: ${res.status}`);
+      }
+    } catch (err) {
+      if (attempt < MAX_RETRIES - 1) {
+        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAYS_MS[attempt]));
+        return this.attemptDelivery(url, body, signature, attempt + 1);
+      }
+      throw err;
+    }
+  }
+
+  async notifyAsync(message: unknown): Promise<void> {
+    if (message === null || typeof message !== "object") return;
+    const msg = message as Record<string, unknown>;
+    const params = msg["params"];
+    if (params === null || typeof params !== "object") return;
+    const p = params as Record<string, unknown>;
+
+    let eventType: string;
+    if (msg["method"] === "session.question") {
+      eventType = "session_question";
+    } else {
+      eventType = typeof p["type"] === "string" ? p["type"] : "";
+    }
+    
+    if (!LIFECYCLE_EVENTS.has(eventType)) return;
+
+    const sessionId = p["sessionId"];
+    if (typeof sessionId !== "string") return;
+
+    const payload: WebhookPayload = {
+      event: eventType,
+      sessionId,
+      timestamp: new Date().toISOString(),
+      data: p,
+    };
+
+    const promises = this.registrations.map(reg => this.deliver(reg, payload));
+    await Promise.all(promises);
   }
 }

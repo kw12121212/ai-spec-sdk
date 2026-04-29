@@ -1,0 +1,47 @@
+schema: strict-spec-driven/main-spec/v1
+schema_version: 1
+artifact_type: main_spec
+schema_file: templates/strict-spec-driven/schemas/main-spec.yaml
+spec:
+  id: session-delivery-tracking
+  title: Delivery Tracking
+mapping:
+  implementation:
+    - src/delivery-tracker.ts
+  tests:
+    - test/delivery-tracker.test.ts
+requirements:
+  req-track-delivery-status:
+    strength: MUST
+    statement: >-
+      The system MUST track the delivery status (pending, delivered, failed) and attempt count of
+      each emitted question.
+    scenarios:
+      initial-pending:
+        - GIVEN: an agent pauses and emits a question
+        - WHEN: the delivery tracker accepts the question
+        - THEN: the initial delivery status MUST be pending with an attempt count of 0
+  req-retry-on-failure:
+    strength: MUST
+    statement: >-
+      The system MUST retry question delivery upon transient failure using exponential backoff up to
+      a maximum of 3 attempts.
+    scenarios:
+      retry-transient-failure:
+        - GIVEN: a pending question in the delivery tracker
+        - WHEN: a delivery attempt fails
+        - THEN: >-
+            the attempt count MUST increment and the status MUST update to failed (or pending if
+            retrying)
+        - AND: a retry MUST be scheduled after the backoff interval
+  req-terminal-failure:
+    strength: MUST
+    statement: >-
+      The system MUST mark a delivery as permanently failed once the maximum retry attempts are
+      exhausted.
+    scenarios:
+      exhausted-retries:
+        - GIVEN: a question delivery has failed 3 times
+        - WHEN: the final delivery attempt fails
+        - THEN: the status MUST be permanently marked as failed
+        - AND: no further retries MUST be scheduled

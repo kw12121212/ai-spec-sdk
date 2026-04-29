@@ -22,6 +22,14 @@ export interface QuestionPayload {
   options?: string[];
 }
 
+export interface DeliveryAttempt {
+  questionId: string;
+  status: "pending" | "delivered" | "failed";
+  attemptCount: number;
+  nextRetryAt: string | null;
+  lastError: string | null;
+}
+
 export interface Session {
   id: string;
   workspace: string;
@@ -51,6 +59,7 @@ export interface Session {
   blockedScopes?: string[];
   roles?: string[];
   policies?: PolicyDescriptor[];
+  deliveryAttempts?: Record<string, DeliveryAttempt>;
 }
 
 function nowIso(): string {
@@ -439,5 +448,19 @@ export class SessionStore {
       logger.info("session cleanup completed", { removedCount, olderThanDays });
     }
     return removedCount;
+  }
+
+  updateDeliveryAttempt(sessionId: string, attempt: DeliveryAttempt): Session | null {
+    const session = this.get(sessionId);
+    if (!session) {
+      return null;
+    }
+    if (!session.deliveryAttempts) {
+      session.deliveryAttempts = {};
+    }
+    session.deliveryAttempts[attempt.questionId] = attempt;
+    session.updatedAt = nowIso();
+    this._persist(session);
+    return session;
   }
 }

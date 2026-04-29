@@ -1,0 +1,12 @@
+schema: strict-spec-driven/question-list/v1
+schema_version: 1
+artifact_type: question_list
+schema_file: ../../schemas/question-list.yaml
+change: delivery-tracking
+open: []
+resolved:
+  - id: retry-parameters
+    question: What are the default values for max retry attempts and backoff intervals?
+    context: Determines how long the system attempts to deliver a question before giving up.
+    answer: Default to 3 attempts with exponential backoff (e.g., 5s, 15s, 45s).
+    status: resolved

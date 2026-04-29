@@ -1,0 +1,24 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: ../../schemas/change-proposal.yaml
+change:
+  id: delivery-tracking
+  status: proposed
+summary:
+  what:
+    - Add status and retry management for question delivery
+  why:
+    - To ensure reliable delivery of questions to operators over potentially flaky networks/channels
+scope:
+  in:
+    - Status tracking for question delivery attempts (pending, delivered, failed)
+    - Retry management with configurable exponential backoff
+    - Delivery state persistence linked to question lifecycle
+  out:
+    - Escalation policy for timeouts and non-responses
+unchanged_behavior:
+  - Agent pause/resume behavior remains unchanged
+roadmap:
+  milestone: 0013-question-resolution
+  planned_change: delivery-tracking
