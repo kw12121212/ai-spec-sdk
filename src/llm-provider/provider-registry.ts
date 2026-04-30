@@ -1,7 +1,10 @@
 import { ConfigStore } from "../config-store.js";
-import type { LLMProvider, ProviderConfig } from "./types.js";
+import type { LLMProvider, ProviderConfig, StorageBackend } from "./types.js";
 import { AnthropicAdapter } from "./adapters/anthropic.js";
 import type { Session } from "../session-store.js";
+import { CachingProviderWrapper } from "./cache-interceptor.js";
+import { MemoryStorageBackend } from "./memory-cache.js";
+import { FileStorageBackend } from "./file-cache.js";
 
 type ProviderAdapterFactory = (config: ProviderConfig) => LLMProvider;
 
@@ -31,10 +34,21 @@ export class ProviderRegistry {
   private adapterFactories: Record<string, ProviderAdapterFactory> = {};
   private configStore: ConfigStore;
   private getSession?: (id: string) => Session | undefined;
+  private storageBackend: StorageBackend;
 
   constructor(configStore?: ConfigStore, options?: { skipLoadFromStore?: boolean; getSession?: (id: string) => Session | undefined }) {
     this.configStore = configStore ?? new ConfigStore();
     this.getSession = options?.getSession;
+    
+    const cacheDir = process.env.LLM_CACHE_DIR;
+    if (cacheDir) {
+      const fileCache = new FileStorageBackend(cacheDir);
+      fileCache.initialize().catch(console.error);
+      this.storageBackend = fileCache;
+    } else {
+      this.storageBackend = new MemoryStorageBackend();
+    }
+
     this.registerDefaultAdapters();
     if (!options?.skipLoadFromStore) {
       this.loadFromStore();
@@ -271,9 +285,11 @@ export class ProviderRegistry {
     const instance = factory(config);
     await instance.initialize();
 
-    this.instances.set(providerId, instance);
+    const cachedInstance = new CachingProviderWrapper(instance, this.storageBackend);
 
-    return instance;
+    this.instances.set(providerId, cachedInstance);
+
+    return cachedInstance;
   }
 
   private maskSensitiveFields(config: ProviderConfig): ProviderConfig {

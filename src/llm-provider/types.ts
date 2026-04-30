@@ -71,6 +71,19 @@ export interface TokenPrediction {
   estimatedCost?: number;
 }
 
+export interface CacheEntry {
+  key: string;
+  result: QueryResult;
+  expiresAt?: number;
+}
+
+export interface StorageBackend {
+  get(key: string): Promise<QueryResult | null>;
+  set(key: string, result: QueryResult, ttlMs?: number): Promise<void>;
+  delete(key: string): Promise<void>;
+  clear(): Promise<void>;
+}
+
 export interface LLMProvider {
   readonly id: string;
   readonly config: ProviderConfig;

@@ -1,0 +1,19 @@
+schema: strict-spec-driven/change-design/v1
+schema_version: 1
+artifact_type: change_design
+schema_file: templates/strict-spec-driven/schemas/change-design.yaml
+change: llm-response-cache
+approach:
+  - >-
+    Implement a caching interceptor pattern in the provider layer and tool execution flow that
+    checks a configurable storage backend before making network calls.
+decisions:
+  pluggable-storage:
+    decision: >-
+      Use a pluggable storage interface for caches (memory, file, SQLite) mapped to the persistence
+      layer.
+    rationale: >-
+      Provides flexibility for different deployment environments (local CLI vs server) while
+      satisfying the milestone's persistent storage backend requirement.
+alternatives: []
+risks: []

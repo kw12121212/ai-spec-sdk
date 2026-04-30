@@ -1,0 +1,38 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: ../../templates/strict-spec-driven/schemas/task-list.yaml
+change: llm-response-cache
+sections:
+  Implementation:
+    define-storage-backend-interface:
+      text: Create interface for pluggable storage backends
+      status: complete
+    implement-memory-cache:
+      text: Implement an in-memory cache backend
+      status: complete
+    implement-file-cache:
+      text: Implement a file-based durable cache backend
+      status: complete
+    cache-interceptor:
+      text: Create a caching interceptor for the LLM ProviderAdapter
+      status: complete
+    integrate-caching:
+      text: Integrate caching interceptor into provider registry and load balancer
+      status: complete
+  Testing:
+    add-cache-tests:
+      text: Add unit tests for memory and file cache backends
+      status: complete
+      command: bun test test/llm-provider/cache.test.ts
+    add-interceptor-tests:
+      text: Add unit tests for caching interceptor logic
+      status: complete
+      command: bun test test/llm-provider/cache-interceptor.test.ts
+    run-validation:
+      text: Run full project validation
+      status: complete
+      command: ./scripts/check.sh
+testing_gates:
+  validation_task: run-validation
+  unit_test_task: add-cache-tests

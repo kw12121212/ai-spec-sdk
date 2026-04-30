@@ -33,7 +33,7 @@ planned_changes:
     details: 'Migration placeholder: add technical and design context for this planned change.'
     depends_on: []
   llm-response-cache:
-    status: planned
+    status: complete
     summary: cache LLM completions
     details: 'Migration placeholder: add technical and design context for this planned change.'
     depends_on: []

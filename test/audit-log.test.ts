@@ -206,6 +206,10 @@ test("cleanup removes old files not in active set", () => {
     const filePath = path.join(dir, "old-sess.auditl");
     expect(fs.existsSync(filePath)).toBeTruthy();
 
+    // Ensure the file's mtime is strictly less than Date.now()
+    const past = new Date(Date.now() - 1000);
+    fs.utimesSync(filePath, past, past);
+
     const removed = log.cleanup(0, new Set(["active-1"]));
     expect(removed).toBe(1);
     expect(!fs.existsSync(filePath)).toBeTruthy();

@@ -12,6 +12,9 @@ specs:
   - id: build-sdk-packaging
     title: SDK Packaging
     path: .strict-spec-driven/specs/build/sdk-packaging.yaml
+  - id: llm-response-cache
+    title: LLM Response Cache
+    path: .strict-spec-driven/specs/llm-provider/llm-response-cache.yaml
   - id: session-delivery-tracking
     title: Delivery Tracking
     path: .strict-spec-driven/specs/session/delivery-tracking.yaml

@@ -1,0 +1,22 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: llm-response-cache
+mapping:
+  implementation:
+    - src/llm-provider/cache.ts
+  tests:
+    - test/llm-provider/cache.test.ts
+operations:
+  ADDED:
+    cache-exact-match:
+      strength: MUST
+      statement: The system MUST return cached responses for identical LLM requests when caching is enabled
+      scenarios:
+        cache-hit-on-identical-request:
+          - GIVEN: A previously completed LLM request is stored in the cache backend
+          - WHEN: An identical request is made to the provider
+          - THEN: The provider MUST return the cached response without invoking the external API
+  MODIFIED: {}
+  REMOVED: {}

@@ -1,0 +1,26 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: llm-response-cache
+  status: proposed
+summary:
+  what:
+    - Implement durable LLM response caching to serve cached completions for identical requests
+  why:
+    - >-
+      Improves performance and reduces cost by reusing deterministic tool results and identical LLM
+      prompts
+scope:
+  in:
+    - >-
+      LLM response cache with TTL and invalidation, tool execution result cache, persistent storage
+      backends (file, SQLite)
+  out:
+    - Distributed cache coordination, Cache warming strategies, Real-time replication
+unchanged_behavior:
+  - Core provider interfaces, external provider SDKs
+roadmap:
+  milestone: 0014-persistence-cache
+  planned_change: llm-response-cache

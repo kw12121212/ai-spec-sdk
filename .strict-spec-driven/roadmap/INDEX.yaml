@@ -1,7 +1,7 @@
 schema: strict-spec-driven/roadmap-index/v2
 schema_version: 2
 artifact_type: roadmap_index
-schema_file: templates/strict-spec-driven/schemas/roadmap-index.yaml
+schema_file: ../schemas/roadmap-index.yaml
 milestones:
   0001-bridge-foundation:
     title: Bridge Foundation
@@ -54,7 +54,7 @@ milestones:
   0013-question-resolution:
     title: Question Resolution Protocol
     path: roadmap/milestones/0013-question-resolution.yaml
-    status: proposed
+    status: complete
   0014-persistence-cache:
     title: Persistence and Cache Layer
     path: roadmap/milestones/0014-persistence-cache.yaml

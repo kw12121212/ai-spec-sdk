@@ -1,0 +1,18 @@
+schema: strict-spec-driven/question-list/v1
+schema_version: 1
+artifact_type: question_list
+schema_file: templates/strict-spec-driven/schemas/question-list.yaml
+change: llm-response-cache
+open: []
+resolved:
+  - id: cache-key-generation
+    question: >-
+      How strictly should the cache key generation handle variations in system prompts, temperature,
+      or context window sizes?
+    context: >-
+      Minor changes in parameters could lead to false cache misses. Need to define canonical request
+      serialization.
+    status: resolved
+    answer: >-
+      Strict Exact Match: Canonicalize JSON of request including model, messages, tools, system
+      prompt, temperature, top_p, max_tokens. (Safest, fewest false hits).
