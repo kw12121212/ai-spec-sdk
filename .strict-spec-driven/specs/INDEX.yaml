@@ -30,3 +30,6 @@ specs:
   - id: workflow-cron-scheduler
     title: cron-scheduler
     path: .strict-spec-driven/specs/workflow/cron-scheduler.yaml
+  - id: workflow-tool-cache
+    title: Tool Cache
+    path: .strict-spec-driven/specs/workflow/workflow-tool-cache.yaml

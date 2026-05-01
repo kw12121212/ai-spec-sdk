@@ -3,10 +3,34 @@ export interface UnifiedTool {
   description?: string;
   inputSchema: any;
   call: (input: any) => Promise<any>;
+  deterministic?: boolean;
+}
+
+function stableStringify(obj: any): string {
+  if (obj === null || typeof obj !== 'object') {
+    return JSON.stringify(obj);
+  }
+  if (Array.isArray(obj)) {
+    return `[${obj.map((item) => stableStringify(item)).join(',')}]`;
+  }
+  const keys = Object.keys(obj).sort();
+  const sortedObj: Record<string, any> = {};
+  for (const key of keys) {
+    sortedObj[key] = stableStringify(obj[key]);
+  }
+  return `{${keys.map((key) => `"${key}":${sortedObj[key]}`).join(',')}}`;
 }
 
 export class UnifiedToolRegistry {
   private tools: Map<string, UnifiedTool> = new Map();
+  private cache: Map<string, any> = new Map();
+
+  /**
+   * Clears the tool execution cache.
+   */
+  clearCache(): void {
+    this.cache.clear();
+  }
 
   /**
    * Registers a tool with an automatic prefix based on the provider ID
@@ -67,6 +91,17 @@ export class UnifiedToolRegistry {
     if (!tool) {
       throw new Error(`Tool not found: ${prefixedName}`);
     }
+
+    if (tool.deterministic) {
+      const cacheKey = `tool:${prefixedName}:${stableStringify(input)}`;
+      if (this.cache.has(cacheKey)) {
+        return this.cache.get(cacheKey);
+      }
+      const result = await tool.call(input);
+      this.cache.set(cacheKey, result);
+      return result;
+    }
+
     return tool.call(input);
   }
 }

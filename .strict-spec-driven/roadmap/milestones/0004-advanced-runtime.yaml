@@ -29,17 +29,7 @@ done_criteria:
     session.spawn creates a child session; parent receives bridge/subagent_event notifications on
     completion
   - Child sessions visible in session.list with parentSessionId filter
-planned_changes:
-  websocket-transport:
-    status: complete
-    summary: bidirectional WebSocket transport with ping/pong keepalive
-    details: 'Migration placeholder: add technical and design context for this planned change.'
-    depends_on: []
-  multi-agent-orchestration:
-    status: complete
-    summary: parent-child agent sessions via session.spawn
-    details: 'Migration placeholder: add technical and design context for this planned change.'
-    depends_on: []
+planned_changes: {}
 dependencies:
   - >-
     02-production-ready — WebSocket builds on HTTP/SSE transport patterns; multi-agent requires

@@ -1,0 +1,14 @@
+schema: strict-spec-driven/question-list/v1
+schema_version: 1
+artifact_type: question_list
+schema_file: templates/strict-spec-driven/schemas/question-list.yaml
+change: tool-result-cache
+open: []
+resolved:
+  - id: cache-key-structure
+    question: How should the cache key for tool executions be constructed?
+    context: Needs to incorporate tool name and arguments.
+    status: resolved
+    answer: >-
+      Use stable JSON stringification (with object keys sorted alphabetically) concatenated with the
+      tool name to ensure deterministic cache keys regardless of argument property order.

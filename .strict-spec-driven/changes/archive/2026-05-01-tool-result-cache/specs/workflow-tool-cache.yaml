@@ -1,0 +1,22 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: workflow-tool-cache
+mapping:
+  implementation:
+    - src/unified-tool-registry.ts
+  tests:
+    - test/unified-tool-registry.test.ts
+operations:
+  ADDED:
+    tool-cache-1:
+      strength: MUST
+      statement: The system MUST cache the results of tools explicitly marked as deterministic.
+      scenarios:
+        Executing a deterministic tool twice:
+          - GIVEN: A tool marked as deterministic
+          - WHEN: The tool is called twice with the same arguments
+          - THEN: The second call MUST return the cached result without executing the tool logic
+  MODIFIED: {}
+  REMOVED: {}

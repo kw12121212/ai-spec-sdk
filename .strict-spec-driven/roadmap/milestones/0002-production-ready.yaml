@@ -26,32 +26,7 @@ done_criteria:
   - API key lifecycle (keygen, list, revoke) fully operational
   - Mobile web UI reachable at GET / from any browser
   - TypeScript client package installable and tested against real bridge
-planned_changes:
-  structured-logging:
-    status: complete
-    summary: structured JSON logging with level filtering
-    details: 'Migration placeholder: add technical and design context for this planned change.'
-    depends_on: []
-  http-sse-transport:
-    status: complete
-    summary: POST /rpc, GET /events, and GET /health endpoints
-    details: 'Migration placeholder: add technical and design context for this planned change.'
-    depends_on: []
-  auth-and-authorization:
-    status: complete
-    summary: API key auth with scope-based authorization
-    details: 'Migration placeholder: add technical and design context for this planned change.'
-    depends_on: []
-  mobile-web-ui:
-    status: complete
-    summary: mobile-first web UI served at GET /
-    details: 'Migration placeholder: add technical and design context for this planned change.'
-    depends_on: []
-  ts-client-sdk:
-    status: complete
-    summary: '@ai-spec-sdk/client TypeScript npm package'
-    details: 'Migration placeholder: add technical and design context for this planned change.'
-    depends_on: []
+planned_changes: {}
 dependencies:
   - 01-bridge-foundation — HTTP/SSE and auth build on the core bridge
 risks: []

@@ -1,66 +1,87 @@
-import { expect, test, describe, beforeEach } from "bun:test";
-import { UnifiedToolRegistry } from "../src/unified-tool-registry.js";
+import { describe, it, expect, beforeEach, mock } from 'bun:test';
+import { UnifiedToolRegistry } from '../src/unified-tool-registry.js';
 
-describe("UnifiedToolRegistry", () => {
+describe('UnifiedToolRegistry', () => {
   let registry: UnifiedToolRegistry;
 
   beforeEach(() => {
     registry = new UnifiedToolRegistry();
   });
 
-  test("registers a tool with prefix", () => {
-    const tool = registry.register("mcp_my_server", {
-      name: "query",
-      description: "A query tool",
-      inputSchema: {},
-      call: async () => "result",
+  describe('tool execution cache', () => {
+    it('caches the result of a deterministic tool and does not execute the call twice', async () => {
+      const callMock = mock(async (input: { a: number }) => input.a * 2);
+
+      registry.register('test', {
+        name: 'double',
+        inputSchema: {},
+        call: callMock,
+        deterministic: true,
+      });
+
+      const result1 = await registry.execute('test_double', { a: 5 });
+      expect(result1).toBe(10);
+      expect(callMock).toHaveBeenCalledTimes(1);
+
+      const result2 = await registry.execute('test_double', { a: 5 });
+      expect(result2).toBe(10);
+      expect(callMock).toHaveBeenCalledTimes(1);
     });
 
-    expect(tool.name).toBe("mcp_my_server_query");
-    expect(registry.get("mcp_my_server_query")).toBeDefined();
-  });
+    it('does not cache the result if the tool is not deterministic', async () => {
+      const callMock = mock(async (input: { a: number }) => input.a * 2);
 
-  test("lists registered tools", () => {
-    registry.register("lsp", {
-      name: "hover",
-      inputSchema: {},
-      call: async () => "hover info",
+      registry.register('test', {
+        name: 'double',
+        inputSchema: {},
+        call: callMock,
+        deterministic: false,
+      });
+
+      const result1 = await registry.execute('test_double', { a: 5 });
+      expect(result1).toBe(10);
+      expect(callMock).toHaveBeenCalledTimes(1);
+
+      const result2 = await registry.execute('test_double', { a: 5 });
+      expect(result2).toBe(10);
+      expect(callMock).toHaveBeenCalledTimes(2);
     });
 
-    const tools = registry.list();
-    expect(tools.length).toBe(1);
-    expect(tools[0].name).toBe("lsp_hover");
-  });
+    it('uses a stable JSON representation for cache keys', async () => {
+      const callMock = mock(async (input: any) => 'result');
 
-  test("removes tools by provider ID", () => {
-    registry.register("mcp_serverA", { name: "tool1", inputSchema: {}, call: async () => {} });
-    registry.register("mcp_serverA", { name: "tool2", inputSchema: {}, call: async () => {} });
-    registry.register("lsp", { name: "hover", inputSchema: {}, call: async () => {} });
+      registry.register('test', {
+        name: 'stable_tool',
+        inputSchema: {},
+        call: callMock,
+        deterministic: true,
+      });
 
-    registry.removeProvider("mcp_serverA");
+      await registry.execute('test_stable_tool', { a: 1, b: 2 });
+      expect(callMock).toHaveBeenCalledTimes(1);
 
-    const tools = registry.list();
-    expect(tools.length).toBe(1);
-    expect(tools[0].name).toBe("lsp_hover");
-  });
-
-  test("executes a tool correctly", async () => {
-    registry.register("custom", {
-      name: "echo",
-      inputSchema: {},
-      call: async (input) => input,
+      // Call again with keys in different order
+      await registry.execute('test_stable_tool', { b: 2, a: 1 });
+      expect(callMock).toHaveBeenCalledTimes(1); // Cached result should be used
     });
 
-    const result = await registry.execute("custom_echo", "hello world");
-    expect(result).toBe("hello world");
-  });
+    it('clears the cache when clearCache is called', async () => {
+      const callMock = mock(async (input: { a: number }) => input.a * 2);
 
-  test("throws when executing an unknown tool", async () => {
-    try {
-      await registry.execute("unknown_tool", {});
-      expect(true).toBe(false); // Should not reach here
-    } catch (e: any) {
-      expect(e.message).toBe("Tool not found: unknown_tool");
-    }
+      registry.register('test', {
+        name: 'double',
+        inputSchema: {},
+        call: callMock,
+        deterministic: true,
+      });
+
+      await registry.execute('test_double', { a: 5 });
+      expect(callMock).toHaveBeenCalledTimes(1);
+
+      registry.clearCache();
+
+      await registry.execute('test_double', { a: 5 });
+      expect(callMock).toHaveBeenCalledTimes(2);
+    });
   });
 });

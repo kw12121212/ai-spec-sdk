@@ -1,0 +1,11 @@
+schema: strict-spec-driven/planned-change/v1
+schema_version: 1
+artifact_type: planned_change
+schema_file: ../../templates/strict-spec-driven/schemas/planned-change.yaml
+planned_change:
+  id: policy-interface
+  milestone: 0009-permissions-hooks
+status: complete
+summary: pluggable permission policy system
+details: 'Migration placeholder: add technical and design context for this planned change.'
+depends_on: []

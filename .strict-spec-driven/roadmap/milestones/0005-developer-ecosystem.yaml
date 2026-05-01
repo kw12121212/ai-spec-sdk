@@ -21,22 +21,7 @@ done_criteria:
   - GET /metrics returns valid Prometheus text format; counters increment correctly per request
   - Webhook delivers HMAC-signed POST within 3 retry attempts; unsubscribe stops delivery
   - session.start accepts template param; explicit params override template defaults
-planned_changes:
-  opentelemetry-metrics:
-    status: complete
-    summary: Prometheus metrics at GET /metrics
-    details: 'Migration placeholder: add technical and design context for this planned change.'
-    depends_on: []
-  event-webhooks:
-    status: complete
-    summary: HMAC-signed HTTP webhook delivery with retry
-    details: 'Migration placeholder: add technical and design context for this planned change.'
-    depends_on: []
-  session-templates:
-    status: complete
-    summary: save and reuse session configurations
-    details: 'Migration placeholder: add technical and design context for this planned change.'
-    depends_on: []
+planned_changes: {}
 dependencies:
   - >-
     02-production-ready — metrics and webhooks require HTTP transport and auth; session-templates

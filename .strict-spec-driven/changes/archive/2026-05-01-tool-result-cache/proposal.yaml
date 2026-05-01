@@ -1,0 +1,21 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: tool-result-cache
+  status: proposed
+summary:
+  what:
+    - Cache deterministic tool outputs
+  why:
+    - To improve reliability and performance by avoiding redundant executions of deterministic tools
+scope:
+  in:
+    - Tool execution caching mechanism, Cache interface integration, Deterministic tool flagging
+  out:
+    - Distributed caching, Cache warming strategies
+unchanged_behavior: []
+roadmap:
+  milestone: 0014-persistence-cache
+  planned_change: tool-result-cache
