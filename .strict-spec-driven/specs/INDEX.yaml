@@ -15,6 +15,9 @@ specs:
   - id: llm-response-cache
     title: LLM Response Cache
     path: .strict-spec-driven/specs/llm-provider/llm-response-cache.yaml
+  - id: persistence-storage-backend
+    title: Storage Backend
+    path: .strict-spec-driven/specs/persistence/storage-backend.yaml
   - id: session-delivery-tracking
     title: Delivery Tracking
     path: .strict-spec-driven/specs/session/delivery-tracking.yaml

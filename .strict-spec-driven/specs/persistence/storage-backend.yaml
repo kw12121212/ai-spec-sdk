@@ -1,0 +1,41 @@
+schema: strict-spec-driven/main-spec/v1
+schema_version: 1
+artifact_type: main_spec
+schema_file: templates/strict-spec-driven/schemas/main-spec.yaml
+spec:
+  id: persistence-storage-backend
+  title: Storage Backend
+mapping:
+  implementation:
+    - src/storage/index.ts
+    - src/storage/types.ts
+    - src/storage/memory-adapter.ts
+    - src/storage/file-adapter.ts
+  tests:
+    - test/storage/memory-adapter.test.ts
+    - test/storage/file-adapter.test.ts
+requirements:
+  storage-backend-1:
+    strength: MUST
+    statement: The StorageBackend interface MUST support asynchronous get, set, delete, and list operations for generic key-value data.
+    scenarios:
+      Implementing the interface:
+        - GIVEN: A storage adapter implementing StorageBackend
+        - WHEN: Invoking get, set, delete, or list
+        - THEN: It MUST return the expected data and interact with the underlying storage asynchronously
+  storage-backend-2:
+    strength: MUST
+    statement: The system MUST provide an in-memory storage adapter that persists data for the lifetime of the process.
+    scenarios:
+      Storing data in memory:
+        - GIVEN: An instance of MemoryStorageAdapter
+        - WHEN: Data is stored and subsequently retrieved
+        - THEN: The data MUST match exactly and remain until deleted or process termination
+  storage-backend-3:
+    strength: MUST
+    statement: The system MUST provide a file-system storage adapter that persists data durably to disk.
+    scenarios:
+      Storing data to file:
+        - GIVEN: An instance of FileStorageAdapter initialized with a specific directory
+        - WHEN: Data is stored
+        - THEN: The data MUST be retrievable even if the process is restarted, as long as it points to the same directory

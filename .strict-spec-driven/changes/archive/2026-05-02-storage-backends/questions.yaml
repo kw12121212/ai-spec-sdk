@@ -1,0 +1,18 @@
+schema: strict-spec-driven/question-list/v1
+schema_version: 1
+artifact_type: question_list
+schema_file: templates/strict-spec-driven/schemas/question-list.yaml
+change: storage-backends
+open: []
+resolved:
+  - id: default-backend
+    question: >-
+      Should we include SQLite as a backend adapter in this initial change or limit it to
+      file-system/memory?
+    context: >-
+      Implementing SQLite might require adding new dependencies to the project, which could expand
+      the scope of this change.
+    status: resolved
+    answer: >-
+      We will limit the initial change to Memory and File-system adapters to keep the scope focused.
+      SQLite can be added as a separate planned change later.

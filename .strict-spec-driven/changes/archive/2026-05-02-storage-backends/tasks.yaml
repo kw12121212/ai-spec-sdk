@@ -1,0 +1,35 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: storage-backends
+sections:
+  Implementation:
+    spec-storage-backend:
+      text: Create main spec for the Storage Backend architecture.
+      status: complete
+    implement-interface:
+      text: Implement the core StorageBackend interface.
+      status: complete
+    implement-memory-adapter:
+      text: Implement the in-memory StorageBackend adapter.
+      status: complete
+    implement-file-adapter:
+      text: Implement the file-system StorageBackend adapter.
+      status: complete
+  Testing:
+    run-build:
+      text: Run build validation.
+      status: complete
+      command: bun run build
+    run-tests:
+      text: Run unit tests.
+      status: complete
+      command: bun test/run.ts
+  Verification:
+    verify-scope:
+      text: Verify implementation matches proposal scope.
+      status: complete
+testing_gates:
+  validation_task: run-build
+  unit_test_task: run-tests
