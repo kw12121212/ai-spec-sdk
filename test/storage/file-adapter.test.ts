@@ -64,4 +64,16 @@ describe("FileStorageAdapter", () => {
     const keys = await nestedAdapter.list();
     expect(keys).toContain("key1");
   });
+
+  test("selective persistence policy filters data", async () => {
+    const policyAdapter = new FileStorageAdapter<{ name: string }>(baseDir, (key) => !key.startsWith("ephemeral:"));
+    await policyAdapter.set("ephemeral:1", { name: "Alice" });
+    await policyAdapter.set("persistent:1", { name: "Bob" });
+
+    const ephemeralVal = await policyAdapter.get("ephemeral:1");
+    expect(ephemeralVal).toBeNull();
+
+    const persistentVal = await policyAdapter.get("persistent:1");
+    expect(persistentVal).toEqual({ name: "Bob" });
+  });
 });

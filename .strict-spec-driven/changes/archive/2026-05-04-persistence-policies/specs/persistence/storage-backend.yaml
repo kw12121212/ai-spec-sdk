@@ -1,0 +1,22 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: persistence-storage-backend
+mapping:
+  implementation:
+    - src/storage/types.ts
+  tests:
+    - test/storage/file-adapter.test.ts
+operations:
+  ADDED:
+    selective-persistence:
+      strength: MUST
+      statement: Storage backends MUST support selective persistence policies to filter data before saving.
+      scenarios:
+        filter-ephemeral:
+          - GIVEN: a persistence policy that excludes ephemeral keys
+          - WHEN: ephemeral data is passed to the storage backend
+          - THEN: the data is not saved to the underlying durable storage
+  MODIFIED: {}
+  REMOVED: {}

@@ -1,0 +1,30 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: persistence-policies
+  status: proposed
+summary:
+  what:
+    - >-
+      Implement selective persistence rules for storage backends to prevent saving transient or
+      sensitive session/tool state.
+  why:
+    - >-
+      To ensure storage efficiency and security by allowing users to define what should and
+      shouldn't be persisted to durable storage.
+scope:
+  in:
+    - >-
+      Selective persistence policy definitions; integration with existing storage adapters to filter
+      persisted data.
+  out:
+    - >-
+      Distributed caching strategies; real-time replication rules; advanced encryption policies
+      (handled by secret vault).
+unchanged_behavior:
+  - Existing core storage backend interfaces; LLM response caching mechanisms.
+roadmap:
+  milestone: 0014-persistence-cache
+  planned_change: persistence-policies

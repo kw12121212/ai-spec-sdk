@@ -5,7 +5,7 @@ schema_file: ../../templates/strict-spec-driven/schemas/planned-change.yaml
 planned_change:
   id: persistence-policies
   milestone: 0014-persistence-cache
-status: planned
+status: complete
 summary: selective persistence rules
 details: 'Migration placeholder: add technical and design context for this planned change.'
 depends_on: []

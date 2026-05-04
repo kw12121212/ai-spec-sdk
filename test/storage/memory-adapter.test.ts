@@ -47,4 +47,16 @@ describe("MemoryStorageAdapter", () => {
     const keys = await adapter.list();
     expect(keys.length).toBe(0);
   });
+
+  test("selective persistence policy filters data", async () => {
+    const adapter = new MemoryStorageAdapter<{ name: string }>((key) => !key.startsWith("ephemeral:"));
+    await adapter.set("ephemeral:1", { name: "Alice" });
+    await adapter.set("persistent:1", { name: "Bob" });
+
+    const ephemeralVal = await adapter.get("ephemeral:1");
+    expect(ephemeralVal).toBeNull();
+
+    const persistentVal = await adapter.get("persistent:1");
+    expect(persistentVal).toEqual({ name: "Bob" });
+  });
 });

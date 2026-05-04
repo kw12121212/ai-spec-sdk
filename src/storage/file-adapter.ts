@@ -1,12 +1,14 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import type { StorageBackend } from "./types.js";
+import type { StorageBackend, PersistencePolicy } from "./types.js";
 
 export class FileStorageAdapter<T = unknown> implements StorageBackend<T> {
   private baseDir: string;
+  private policy?: PersistencePolicy<T>;
 
-  constructor(baseDir: string) {
+  constructor(baseDir: string, policy?: PersistencePolicy<T>) {
     this.baseDir = baseDir;
+    this.policy = policy;
   }
 
   private getFilePath(key: string): string {
@@ -37,6 +39,10 @@ export class FileStorageAdapter<T = unknown> implements StorageBackend<T> {
   }
 
   async set(key: string, value: T): Promise<void> {
+    if (this.policy && !this.policy(key, value)) {
+      return;
+    }
+
     await this.ensureDir();
     const filePath = this.getFilePath(key);
     const tmpPath = `${filePath}.tmp`;

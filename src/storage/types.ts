@@ -1,3 +1,9 @@
+/**
+ * A functional interface to determine if a value should be persisted.
+ * Return true to save, false to ignore.
+ */
+export type PersistencePolicy<T = unknown> = (key: string, value: T) => boolean;
+
 export interface StorageBackend<T = unknown> {
   /**
    * Get a value by key.

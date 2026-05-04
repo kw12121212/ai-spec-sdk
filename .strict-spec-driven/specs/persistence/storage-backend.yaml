@@ -17,7 +17,9 @@ mapping:
 requirements:
   storage-backend-1:
     strength: MUST
-    statement: The StorageBackend interface MUST support asynchronous get, set, delete, and list operations for generic key-value data.
+    statement: >-
+      The StorageBackend interface MUST support asynchronous get, set, delete, and list operations
+      for generic key-value data.
     scenarios:
       Implementing the interface:
         - GIVEN: A storage adapter implementing StorageBackend
@@ -25,7 +27,9 @@ requirements:
         - THEN: It MUST return the expected data and interact with the underlying storage asynchronously
   storage-backend-2:
     strength: MUST
-    statement: The system MUST provide an in-memory storage adapter that persists data for the lifetime of the process.
+    statement: >-
+      The system MUST provide an in-memory storage adapter that persists data for the lifetime of
+      the process.
     scenarios:
       Storing data in memory:
         - GIVEN: An instance of MemoryStorageAdapter
@@ -38,4 +42,14 @@ requirements:
       Storing data to file:
         - GIVEN: An instance of FileStorageAdapter initialized with a specific directory
         - WHEN: Data is stored
-        - THEN: The data MUST be retrievable even if the process is restarted, as long as it points to the same directory
+        - THEN: >-
+            The data MUST be retrievable even if the process is restarted, as long as it points to
+            the same directory
+  selective-persistence:
+    strength: MUST
+    statement: Storage backends MUST support selective persistence policies to filter data before saving.
+    scenarios:
+      filter-ephemeral:
+        - GIVEN: a persistence policy that excludes ephemeral keys
+        - WHEN: ephemeral data is passed to the storage backend
+        - THEN: the data is not saved to the underlying durable storage

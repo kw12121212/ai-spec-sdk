@@ -1,10 +1,12 @@
-import type { StorageBackend } from "./types.js";
+import type { StorageBackend, PersistencePolicy } from "./types.js";
 
 export class MemoryStorageAdapter<T = unknown> implements StorageBackend<T> {
   private store: Map<string, T>;
+  private policy?: PersistencePolicy<T>;
 
-  constructor() {
+  constructor(policy?: PersistencePolicy<T>) {
     this.store = new Map();
+    this.policy = policy;
   }
 
   async get(key: string): Promise<T | null> {
@@ -12,6 +14,9 @@ export class MemoryStorageAdapter<T = unknown> implements StorageBackend<T> {
   }
 
   async set(key: string, value: T): Promise<void> {
+    if (this.policy && !this.policy(key, value)) {
+      return;
+    }
     this.store.set(key, value);
   }
 

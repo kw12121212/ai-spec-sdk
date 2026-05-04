@@ -1,0 +1,17 @@
+schema: strict-spec-driven/change-design/v1
+schema_version: 1
+artifact_type: change_design
+schema_file: templates/strict-spec-driven/schemas/change-design.yaml
+change: persistence-policies
+approach:
+  - >-
+    Introduce a `PersistencePolicy` interface that evaluates data before saving to the storage
+    backend. Adapters will use this policy to filter out transient/sensitive keys.
+decisions:
+  policy-interface:
+    decision: Use a functional filtering interface for policies instead of static JSON schemas.
+    rationale: >-
+      A functional approach allows complex runtime logic (like checking data size or inspecting
+      deeply nested fields) that static schemas struggle to express efficiently.
+alternatives: []
+risks: []

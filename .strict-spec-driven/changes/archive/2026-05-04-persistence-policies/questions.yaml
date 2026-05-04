@@ -1,0 +1,15 @@
+schema: strict-spec-driven/question-list/v1
+schema_version: 1
+artifact_type: question_list
+schema_file: templates/strict-spec-driven/schemas/question-list.yaml
+change: persistence-policies
+open: []
+resolved:
+  - id: policy-scope
+    question: Should persistence policies be defined globally for the storage adapter, per-session, or both?
+    context: >-
+      Depending on the use case, some policies are global (e.g., never persist passwords), while
+      others might be session-specific (e.g., this session is ephemeral).
+    status: resolved
+    answer: >-
+      Globally (Adapter level). Policies will be passed when the storage adapter is initialized, applying to all operations on that adapter.
