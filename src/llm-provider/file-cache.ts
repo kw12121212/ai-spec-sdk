@@ -1,8 +1,10 @@
 import * as fs from "fs/promises";
 import * as path from "path";
-import { StorageBackend, QueryResult, CacheEntry } from "./types.js";
+import { StorageBackend, QueryResult, CacheEntry, CacheStats } from "./types.js";
 
 export class FileStorageBackend implements StorageBackend {
+  private readonly stats: CacheStats = { hits: 0, misses: 0 };
+
   constructor(private readonly cacheDir: string) {}
 
   async initialize(): Promise<void> {
@@ -23,12 +25,15 @@ export class FileStorageBackend implements StorageBackend {
 
       if (entry.expiresAt && entry.expiresAt < Date.now()) {
         await this.delete(key);
+        this.stats.misses++;
         return null;
       }
 
+      this.stats.hits++;
       return entry.result;
     } catch (error: any) {
       if (error.code === "ENOENT") {
+        this.stats.misses++;
         return null;
       }
       throw error;
@@ -64,10 +69,35 @@ export class FileStorageBackend implements StorageBackend {
           await fs.unlink(path.join(this.cacheDir, file));
         }
       }
+      this.stats.hits = 0;
+      this.stats.misses = 0;
     } catch (error: any) {
       if (error.code !== "ENOENT") {
         throw error;
       }
     }
+  }
+
+  async getStats(): Promise<CacheStats> {
+    let sizeBytes = 0;
+    try {
+      const files = await fs.readdir(this.cacheDir);
+      for (const file of files) {
+        if (file.endsWith(".json")) {
+          const stat = await fs.stat(path.join(this.cacheDir, file));
+          sizeBytes += stat.size;
+        }
+      }
+    } catch (error: any) {
+      if (error.code !== "ENOENT") {
+        throw error;
+      }
+    }
+    
+    return {
+      hits: this.stats.hits,
+      misses: this.stats.misses,
+      sizeBytes
+    };
   }
 }

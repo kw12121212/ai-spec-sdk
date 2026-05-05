@@ -1,0 +1,22 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: llm-response-cache
+mapping:
+  implementation:
+    - src/llm-provider/cache-interceptor.ts
+  tests:
+    - test/llm-provider/cache-monitoring.test.ts
+operations:
+  ADDED:
+    cache-metrics-tracking:
+      strength: MUST
+      statement: The cache layer MUST record hit and miss counts for all cache operations
+      scenarios:
+        track-cache-hits-misses:
+          - GIVEN: A cache backend is active and receiving requests
+          - WHEN: A request results in a hit or miss
+          - THEN: The respective hit or miss counter MUST be incremented
+  MODIFIED: {}
+  REMOVED: {}

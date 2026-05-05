@@ -1,0 +1,17 @@
+schema: strict-spec-driven/question-list/v1
+schema_version: 1
+artifact_type: question_list
+schema_file: templates/strict-spec-driven/schemas/question-list.yaml
+change: cache-monitoring
+open: []
+resolved:
+  - id: metrics-export-format
+    question: >-
+      Should the cache metrics be integrated directly with the OpenTelemetry metrics endpoint from
+      milestone 0005, or exposed as a separate cache-specific stats API?
+    context: >-
+      Milestone 0005 added OpenTelemetry metrics at GET /metrics. We can reuse this or build a
+      separate /cache/stats endpoint.
+    answer: >-
+      Integrate directly with the OpenTelemetry metrics endpoint to centralize observability.
+    status: resolved

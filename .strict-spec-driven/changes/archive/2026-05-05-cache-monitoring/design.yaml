@@ -1,0 +1,17 @@
+schema: strict-spec-driven/change-design/v1
+schema_version: 1
+artifact_type: change_design
+schema_file: templates/strict-spec-driven/schemas/change-design.yaml
+change: cache-monitoring
+approach:
+  - >-
+    Extend the existing Cache interceptors and storage backends to track hit/miss counts and payload
+    sizes. Expose these metrics via a unified interface.
+decisions:
+  extend-cache-interface:
+    decision: Extend cache interface with metrics tracking
+    rationale: >-
+      Allows transparent metrics gathering across different storage backends without rewriting the
+      persistence layer.
+alternatives: []
+risks: []

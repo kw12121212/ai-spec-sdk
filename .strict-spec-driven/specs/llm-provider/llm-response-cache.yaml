@@ -23,3 +23,11 @@ requirements:
         - GIVEN: A previously completed LLM request is stored in the cache backend
         - WHEN: An identical request is made to the provider
         - THEN: The provider MUST return the cached response without invoking the external API
+  cache-metrics-tracking:
+    strength: MUST
+    statement: The cache layer MUST record hit and miss counts for all cache operations
+    scenarios:
+      track-cache-hits-misses:
+        - GIVEN: A cache backend is active and receiving requests
+        - WHEN: A request results in a hit or miss
+        - THEN: The respective hit or miss counter MUST be incremented

@@ -9,6 +9,7 @@ import { RateLimiter, RATE_LIMIT_REQUESTS_PER_MINUTE } from "./rate-limiter.js";
 import { loadKeys } from "./key-store.js";
 import { verifyKey, checkScope, METHOD_SCOPES } from "./auth.js";
 import { MetricsCollector } from "./metrics.js";
+import { providerRegistry } from "./llm-provider/provider-registry.js";
 import type { StoredKey } from "./key-store.js";
 
 declare const Bun: any;
@@ -386,7 +387,22 @@ export function startHttpServer(options: HttpServerOptions = {}): Promise<HttpSe
         }
 
         headers.set("Content-Type", "text/plain; version=0.0.4; charset=utf-8");
-        return new Response(metrics.render(), { status: 200, headers });
+        let metricsText = metrics.render();
+        
+        try {
+          const cacheStats = await providerRegistry.getCacheStats();
+          if (cacheStats) {
+            metricsText += `# HELP bridge_cache_hits Total cache hits\n# TYPE bridge_cache_hits counter\nbridge_cache_hits ${cacheStats.hits}\n`;
+            metricsText += `# HELP bridge_cache_misses Total cache misses\n# TYPE bridge_cache_misses counter\nbridge_cache_misses ${cacheStats.misses}\n`;
+            if (cacheStats.sizeBytes !== undefined) {
+              metricsText += `# HELP bridge_cache_size_bytes Total cache size in bytes\n# TYPE bridge_cache_size_bytes gauge\nbridge_cache_size_bytes ${cacheStats.sizeBytes}\n`;
+            }
+          }
+        } catch (err) {
+          // ignore cache stat errors
+        }
+
+        return new Response(metricsText, { status: 200, headers });
       }
 
       if (req.method === "GET" && pathname === "/") {

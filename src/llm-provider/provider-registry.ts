@@ -456,6 +456,13 @@ export class ProviderRegistry {
     this.configs.clear();
     this.defaultProviderId = null;
   }
+
+  async getCacheStats(): Promise<import("./types.js").CacheStats | null> {
+    if (this.storageBackend && this.storageBackend.getStats) {
+      return this.storageBackend.getStats();
+    }
+    return null;
+  }
 }
 
 export const providerRegistry = new ProviderRegistry();

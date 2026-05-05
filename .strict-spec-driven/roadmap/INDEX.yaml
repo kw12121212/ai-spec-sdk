@@ -58,7 +58,7 @@ milestones:
   0014-persistence-cache:
     title: Persistence and Cache Layer
     path: roadmap/milestones/0014-persistence-cache.yaml
-    status: proposed
+    status: complete
   0015-secret-vault:
     title: Secret Vault Integration
     path: roadmap/milestones/0015-secret-vault.yaml

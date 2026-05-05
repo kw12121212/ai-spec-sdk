@@ -34,5 +34,5 @@ risks:
   - Persistence format changes require migration strategy
   - Cache invalidation must be correct to avoid stale data
   - Storage backend failures need graceful degradation
-status: proposed
+status: complete
 notes: []

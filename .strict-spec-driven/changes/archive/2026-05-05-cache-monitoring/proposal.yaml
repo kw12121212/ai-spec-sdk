@@ -1,0 +1,25 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: cache-monitoring
+  status: proposed
+summary:
+  what:
+    - statistics and metrics for cache layers
+  why:
+    - >-
+      To provide observability into cache hit/miss rates, performance gains, and storage backend
+      health
+scope:
+  in:
+    - >-
+      Cache statistics gathering and reporting (hit rate, latencies, storage size, evictions).
+      Metrics exposed through existing metrics APIs.
+  out:
+    - Distributed cache coordination stats, real-time replication metrics
+unchanged_behavior: []
+roadmap:
+  milestone: 0014-persistence-cache
+  planned_change: cache-monitoring
