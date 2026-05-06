@@ -53,3 +53,11 @@ requirements:
         - GIVEN: a persistence policy that excludes ephemeral keys
         - WHEN: ephemeral data is passed to the storage backend
         - THEN: the data is not saved to the underlying durable storage
+  secret-encryption:
+    strength: MUST
+    statement: Secrets MUST be encrypted at rest.
+    scenarios:
+      encrypt-on-save:
+        - GIVEN: A plaintext secret
+        - WHEN: It is saved to the vault
+        - THEN: It is encrypted before persistence.

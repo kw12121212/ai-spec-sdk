@@ -1,0 +1,14 @@
+schema: strict-spec-driven/question-list/v1
+schema_version: 1
+artifact_type: question_list
+schema_file: templates/strict-spec-driven/schemas/question-list.yaml
+change: secret-storage
+open: []
+resolved:
+  - id: master-key-management
+    question: How is the master encryption key injected into the system?
+    context: >-
+      We need a master key to encrypt the vault. Should it be an environment variable
+      (AI_SPEC_MASTER_KEY) or a config file property?
+    answer: Inject via environment variable (AI_SPEC_MASTER_KEY).
+    status: resolved

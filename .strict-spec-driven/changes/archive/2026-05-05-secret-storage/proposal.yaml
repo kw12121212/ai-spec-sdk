@@ -1,0 +1,22 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: secret-storage
+  status: proposed
+summary:
+  what:
+    - Implement encrypted storage for secrets
+  why:
+    - To provide secure storage for API keys and credentials
+scope:
+  in:
+    - Encrypted secret persistence
+  out:
+    - Key rotation, access auditing, external adapters
+unchanged_behavior:
+  - Existing session persistence
+roadmap:
+  milestone: 0015-secret-vault
+  planned_change: secret-storage

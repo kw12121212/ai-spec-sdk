@@ -33,3 +33,17 @@ export interface StorageBackend<T = unknown> {
    */
   clear?(): Promise<void>;
 }
+
+export interface Secret {
+  key: string;
+  value: string;
+  metadata?: Record<string, string>;
+  createdAt: number;
+}
+
+export interface SecretVault {
+  getSecret(key: string): Promise<Secret | null>;
+  setSecret(secret: Secret): Promise<void>;
+  deleteSecret(key: string): Promise<boolean>;
+  listSecrets(): Promise<string[]>;
+}
