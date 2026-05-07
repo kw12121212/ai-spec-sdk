@@ -1,0 +1,22 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: external-vault-adapter
+  status: proposed
+summary:
+  what:
+    - Implement external secret vault adapters
+  why:
+    - To support secure secret management backed by enterprise providers
+scope:
+  in:
+    - Integration with external secret managers (e.g. AWS Secrets Manager, HashiCorp Vault)
+  out:
+    - Hardware security modules or biometric auth
+unchanged_behavior:
+  - Existing local memory/file storage adapters
+roadmap:
+  milestone: 0015-secret-vault
+  planned_change: external-vault-adapter

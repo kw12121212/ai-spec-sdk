@@ -61,3 +61,11 @@ requirements:
         - GIVEN: A plaintext secret
         - WHEN: It is saved to the vault
         - THEN: It is encrypted before persistence.
+  external-vault-1:
+    strength: MUST
+    statement: The system MUST support an external vault adapter for secrets management.
+    scenarios:
+      external-vault-integration:
+        - GIVEN: An external vault adapter configured for a specific provider
+        - WHEN: Storing or retrieving secrets
+        - THEN: It MUST correctly interface with the provider's API.

@@ -47,3 +47,14 @@ export interface SecretVault {
   deleteSecret(key: string): Promise<boolean>;
   listSecrets(): Promise<string[]>;
 }
+
+export interface VaultAdapter extends SecretVault {
+  /**
+   * Optional connection/initialization method for external vaults.
+   */
+  connect?(): Promise<void>;
+  /**
+   * Optional cleanup method for external vaults.
+   */
+  disconnect?(): Promise<void>;
+}

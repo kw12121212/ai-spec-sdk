@@ -1,0 +1,32 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: ../../templates/strict-spec-driven/schemas/task-list.yaml
+change: external-vault-adapter
+sections:
+  Implementation:
+    create-interface:
+      text: Define the VaultAdapter interface in src/storage/types.ts
+      status: complete
+    implement-adapter:
+      text: Implement ExternalVaultAdapter targeting AWS Secrets Manager / HashiCorp Vault.
+      status: complete
+  Testing:
+    write-tests:
+      text: Add tests in test/storage/external-vault-adapter.test.ts
+      status: complete
+    run-build:
+      text: Run build validation.
+      status: complete
+      command: bun run build
+    run-tests:
+      text: Run unit tests.
+      status: complete
+      command: bun test/run.ts
+  Verification:
+    verify-scope:
+      text: Verify implementation matches proposal scope.
+      status: complete
+testing_gates:
+  validation_task: run-build
+  unit_test_task: run-tests

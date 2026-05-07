@@ -1,0 +1,22 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: persistence-storage-backend
+mapping:
+  implementation:
+    - src/storage/hashicorp-vault-adapter.ts
+  tests:
+    - test/storage/external-vault-adapter.test.ts
+operations:
+  ADDED:
+    external-vault-1:
+      strength: MUST
+      statement: The system MUST support an external vault adapter for secrets management.
+      scenarios:
+        external-vault-integration:
+          - GIVEN: An external vault adapter configured for a specific provider
+          - WHEN: Storing or retrieving secrets
+          - THEN: It MUST correctly interface with the provider's API.
+  MODIFIED: {}
+  REMOVED: {}
