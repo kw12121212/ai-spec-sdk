@@ -41,11 +41,31 @@ export interface Secret {
   createdAt: number;
 }
 
+export interface SecretVersion {
+  version: number;
+  value: string;
+  metadata?: Record<string, string>;
+  createdAt: number;
+}
+
+export interface VersionedSecret {
+  key: string;
+  activeVersion: number;
+  versions: SecretVersion[];
+}
+
 export interface SecretVault {
   getSecret(key: string): Promise<Secret | null>;
   setSecret(secret: Secret): Promise<void>;
   deleteSecret(key: string): Promise<boolean>;
   listSecrets(): Promise<string[]>;
+}
+
+export interface VersionedSecretVault extends SecretVault {
+  getSecretVersion(key: string, version: number): Promise<Secret | null>;
+  rollbackSecret(key: string, version: number): Promise<boolean>;
+  getSecretHistory(key: string): Promise<SecretVersion[] | null>;
+  pruneSecretVersions(key: string, keepVersions: number): Promise<boolean>;
 }
 
 export interface VaultAdapter extends SecretVault {

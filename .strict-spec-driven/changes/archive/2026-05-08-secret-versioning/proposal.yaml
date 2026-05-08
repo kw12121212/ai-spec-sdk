@@ -1,0 +1,26 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: secret-versioning
+  status: proposed
+summary:
+  what:
+    - Implement version history and rollback capabilities for secrets stored in the secret vault.
+  why:
+    - >-
+      Provides safety against accidental secret overwrites and forms the foundation for key rotation
+      by allowing multiple versions of a secret to exist simultaneously.
+scope:
+  in:
+    - >-
+      Secret versioning, retrieving specific versions, rollback to previous versions, and pruning
+      old versions.
+  out:
+    - Key rotation scheduling, external vault adapter integration.
+unchanged_behavior:
+  - Existing single-version secret storage format.
+roadmap:
+  milestone: 0015-secret-vault
+  planned_change: secret-versioning

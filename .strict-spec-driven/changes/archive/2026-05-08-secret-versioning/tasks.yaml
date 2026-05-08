@@ -1,0 +1,38 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: secret-versioning
+sections:
+  Implementation:
+    version-models:
+      text: Add secret version metadata schema and models.
+      status: complete
+    version-history:
+      text: Implement get/set with version history in src/storage/secret-versioning.ts.
+      status: complete
+    rollback:
+      text: Add rollback capability to src/storage/secret-versioning.ts.
+      status: complete
+  Testing:
+    run-build:
+      text: Run build validation.
+      status: complete
+      command: bun run build
+    test-history:
+      text: Write unit tests for version history logic.
+      status: complete
+    test-rollback:
+      text: Write unit tests for rollback logic.
+      status: complete
+    run-tests:
+      text: Run all tests.
+      status: complete
+      command: bun test
+  Verification:
+    verify-scope:
+      text: Verify implementation matches proposal scope.
+      status: complete
+testing_gates:
+  validation_task: run-build
+  unit_test_task: run-tests
