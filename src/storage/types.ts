@@ -66,6 +66,7 @@ export interface VersionedSecretVault extends SecretVault {
   rollbackSecret(key: string, version: number): Promise<boolean>;
   getSecretHistory(key: string): Promise<SecretVersion[] | null>;
   pruneSecretVersions(key: string, keepVersions: number): Promise<boolean>;
+  getValidSecrets(key: string): Promise<Secret[] | null>;
 }
 
 export interface VaultAdapter extends SecretVault {

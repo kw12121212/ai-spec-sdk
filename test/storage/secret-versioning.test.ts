@@ -119,4 +119,55 @@ describe("VersionedFileSecretVault", () => {
     expect(versions).not.toContain(1);
     expect(versions).not.toContain(3);
   });
+
+  test("should return multiple valid secrets during grace period", async () => {
+    const key = "test-secret-grace";
+    
+    // v1 created in the past
+    await vault.setSecret({
+      key,
+      value: "v1",
+      createdAt: Date.now() - 10000,
+      metadata: { rotationIntervalMs: "3600000", gracePeriodMs: "5000" }
+    });
+
+    // v2 created now (rotation)
+    await vault.setSecret({
+      key,
+      value: "v2",
+      createdAt: Date.now(),
+      metadata: { rotationIntervalMs: "3600000", gracePeriodMs: "5000" }
+    });
+
+    const valid = await vault.getValidSecrets(key);
+    expect(valid).not.toBeNull();
+    expect(valid?.length).toBe(2);
+    const values = valid?.map(s => s.value);
+    expect(values).toContain("v1");
+    expect(values).toContain("v2");
+  });
+
+  test("should return only active secret if grace period expired", async () => {
+    const key = "test-secret-grace-expired";
+    
+    await vault.setSecret({
+      key,
+      value: "v1",
+      createdAt: Date.now() - 20000,
+      metadata: { rotationIntervalMs: "3600000", gracePeriodMs: "5000" }
+    });
+
+    // v2 created 6 seconds ago (grace period is 5 seconds)
+    await vault.setSecret({
+      key,
+      value: "v2",
+      createdAt: Date.now() - 6000,
+      metadata: { rotationIntervalMs: "3600000", gracePeriodMs: "5000" }
+    });
+
+    const valid = await vault.getValidSecrets(key);
+    expect(valid).not.toBeNull();
+    expect(valid?.length).toBe(1);
+    expect(valid?.[0].value).toBe("v2");
+  });
 });

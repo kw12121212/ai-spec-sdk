@@ -1,0 +1,17 @@
+schema: strict-spec-driven/question-list/v1
+schema_version: 1
+artifact_type: question_list
+schema_file: templates/strict-spec-driven/schemas/question-list.yaml
+change: key-rotation
+open: []
+resolved:
+  - id: rotation-trigger
+    status: resolved
+    question: How are the specific secrets marked for rotation identified (e.g., via a metadata flag)?
+    context: >-
+      The cron scheduler needs a way to discover which secrets are eligible for automatic rotation
+      and what their respective rotation intervals are.
+    answer: >-
+      We will use Metadata Flags: Add `rotationIntervalMs` and `gracePeriodMs` to secret metadata,
+      allowing the cron scheduler to filter by keys with an interval. This is simple and couples the
+      policy directly to the secret state.

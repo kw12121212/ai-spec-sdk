@@ -91,6 +91,47 @@ export class VersionedFileSecretVault implements VersionedSecretVault {
     };
   }
 
+  async getValidSecrets(key: string): Promise<Secret[] | null> {
+    const vs = await this.getVersionedSecret(key);
+    if (!vs) return null;
+
+    const active = vs.versions.find(v => v.version === vs.activeVersion);
+    if (!active) return null;
+
+    const valid: Secret[] = [{
+        key: vs.key,
+        value: active.value,
+        metadata: active.metadata,
+        createdAt: active.createdAt
+    }];
+
+    // Check for grace period
+    if (active.metadata && active.metadata.gracePeriodMs) {
+      const gracePeriodMs = parseInt(active.metadata.gracePeriodMs, 10);
+      if (!isNaN(gracePeriodMs)) {
+        const now = Date.now();
+        const graceEnd = active.createdAt + gracePeriodMs;
+        if (now <= graceEnd) {
+           // find the immediate previous version
+           const previous = vs.versions
+              .filter(v => v.version < active.version)
+              .sort((a, b) => b.version - a.version)[0];
+           
+           if (previous) {
+               valid.push({
+                  key: vs.key,
+                  value: previous.value,
+                  metadata: previous.metadata,
+                  createdAt: previous.createdAt
+               });
+           }
+        }
+      }
+    }
+    
+    return valid;
+  }
+
   async getSecretVersion(key: string, version: number): Promise<Secret | null> {
     const vs = await this.getVersionedSecret(key);
     if (!vs) return null;

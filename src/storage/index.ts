@@ -4,3 +4,4 @@ export * from "./file-adapter.js";
 export * from "./secret-vault.js";
 export * from "./hashicorp-vault-adapter.js";
 export * from "./secret-versioning.js";
+export * from "./rotation.js";

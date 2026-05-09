@@ -1,0 +1,34 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: key-rotation
+sections:
+  Implementation:
+    determine-rotation-metadata:
+      text: Decide how secrets are marked for rotation (e.g., rotation interval, grace period duration).
+      status: complete
+    implement-grace-period-validation:
+      text: Update secret retrieval logic to allow multiple active keys during the grace period.
+      status: complete
+    implement-rotation-cron-job:
+      text: >-
+        Create a CronScheduler job that automatically rotates eligible secrets and flags them for
+        grace period.
+      status: complete
+  Testing:
+    run-build:
+      text: Run build validation.
+      status: complete
+      command: bun run build
+    run-tests:
+      text: Run unit tests and new integration tests for key rotation and grace period.
+      status: complete
+      command: bun test
+  Verification:
+    verify-scope:
+      text: Verify implementation matches proposal scope.
+      status: complete
+testing_gates:
+  validation_task: run-build
+  unit_test_task: run-tests

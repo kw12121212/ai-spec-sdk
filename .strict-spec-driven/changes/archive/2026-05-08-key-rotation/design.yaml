@@ -1,0 +1,20 @@
+schema: strict-spec-driven/change-design/v1
+schema_version: 1
+artifact_type: change_design
+schema_file: templates/strict-spec-driven/schemas/change-design.yaml
+change: key-rotation
+approach:
+  - >-
+    Implement a background job via the CronScheduler that automatically rotates specified secrets at
+    a defined interval. During the grace period, both the old and new secret versions will be
+    considered active for validation.
+decisions:
+  rotation-strategy:
+    decision: >-
+      Use CronScheduler for periodic automated rotation and leverage secret versioning to maintain
+      both old and new keys during the grace period.
+    rationale: >-
+      Reusing the existing cron-scheduler and secret-versioning mechanisms allows for a robust
+      implementation without introducing new external dependencies.
+alternatives: []
+risks: []

@@ -1,0 +1,26 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: key-rotation
+  status: proposed
+summary:
+  what:
+    - Automated rotation of secrets with a grace period
+  why:
+    - >-
+      To meet security standards and reduce the risk of credential compromise by rotating keys
+      proactively while allowing active connections to use the old key temporarily
+scope:
+  in:
+    - Secret vault integration and secret versioning to handle multiple valid keys during rotation
+  out:
+    - >-
+      External rotation mechanisms (e.g. AWS Lambda that pushes to our vault) or complex key leasing
+      algorithms
+unchanged_behavior:
+  - The underlying storage backend mechanisms
+roadmap:
+  milestone: 0015-secret-vault
+  planned_change: key-rotation
