@@ -15,6 +15,9 @@ specs:
   - id: llm-response-cache
     title: LLM Response Cache
     path: .strict-spec-driven/specs/llm-provider/llm-response-cache.yaml
+  - id: persistence-secret-scoping
+    title: Secret Scoping
+    path: .strict-spec-driven/specs/persistence/persistence-secret-scoping.yaml
   - id: persistence-secret-versioning
     title: Secret Versioning
     path: .strict-spec-driven/specs/persistence/persistence-secret-versioning.yaml

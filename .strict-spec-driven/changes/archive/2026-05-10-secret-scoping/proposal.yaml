@@ -1,0 +1,24 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: secret-scoping
+  status: proposed
+summary:
+  what:
+    - add access control per scope for secrets
+  why:
+    - >-
+      to prevent unauthorized access and ensure secrets are only available to allowed sessions,
+      teams, or tools
+scope:
+  in:
+    - secret access control logic, scope validation
+  out:
+    - external vault provider integration
+unchanged_behavior:
+  - existing auth system
+roadmap:
+  milestone: 0015-secret-vault
+  planned_change: secret-scoping

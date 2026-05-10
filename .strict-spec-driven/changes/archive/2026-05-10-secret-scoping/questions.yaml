@@ -1,0 +1,12 @@
+schema: strict-spec-driven/question-list/v1
+schema_version: 1
+artifact_type: question_list
+schema_file: templates/strict-spec-driven/schemas/question-list.yaml
+change: secret-scoping
+open: []
+resolved:
+  - id: integrate-permission-scopes
+    question: Should we integrate secret scopes with the existing permission scopes?
+    context: We already have a permission scopes concept. Reusing it might simplify authorization.
+    status: resolved
+    answer: Keep them distinct. The SecretStore should use a simple string or dedicated SecretScope identifier, leaving authorization to a higher layer.

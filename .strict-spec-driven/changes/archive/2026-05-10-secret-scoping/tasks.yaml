@@ -1,0 +1,29 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: secret-scoping
+sections:
+  Implementation:
+    scaffold-secret-store:
+      text: Scaffold SecretStore interface and MemorySecretStore implementation
+      status: complete
+    implement-scope-validation:
+      text: Implement scope validation logic
+      status: complete
+  Testing:
+    run-build:
+      text: Run build validation.
+      status: complete
+      command: bun run build
+    run-tests:
+      text: Run unit tests for scope validation.
+      status: complete
+      command: bun test
+  Verification:
+    verify-scope:
+      text: Verify implementation matches proposal scope.
+      status: complete
+testing_gates:
+  validation_task: run-build
+  unit_test_task: run-tests
