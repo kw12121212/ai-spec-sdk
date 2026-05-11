@@ -1,0 +1,18 @@
+schema: strict-spec-driven/change-design/v1
+schema_version: 1
+artifact_type: change_design
+schema_file: templates/strict-spec-driven/schemas/change-design.yaml
+change: vault-audit
+approach:
+  - >-
+    Extend the existing secret vault access paths to emit audit events to the centralized AuditLog.
+    Define a specific audit event schema for secrets that includes caller context without exposing
+    the secrets themselves.
+decisions:
+  decision-vault-audit-store:
+    decision: Use the existing AuditLog system rather than creating a separate dedicated secret audit log
+    rationale: >-
+      Centralizes all auditing and simplifies the operational requirements, while still allowing
+      filtering by event type.
+alternatives: []
+risks: []

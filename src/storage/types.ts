@@ -79,3 +79,13 @@ export interface VaultAdapter extends SecretVault {
    */
   disconnect?(): Promise<void>;
 }
+
+export interface VaultAuditPayload {
+  secretId: string;
+  operation: "read" | "write" | "delete" | "list";
+  callerContext?: {
+    sessionId?: string;
+    teamId?: string;
+    [key: string]: unknown;
+  };
+}

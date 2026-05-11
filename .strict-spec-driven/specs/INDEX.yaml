@@ -24,6 +24,9 @@ specs:
   - id: persistence-storage-backend
     title: Storage Backend
     path: .strict-spec-driven/specs/persistence/storage-backend.yaml
+  - id: vault-audit
+    title: Vault Audit
+    path: .strict-spec-driven/specs/persistence/vault-audit.yaml
   - id: session-delivery-tracking
     title: Delivery Tracking
     path: .strict-spec-driven/specs/session/delivery-tracking.yaml

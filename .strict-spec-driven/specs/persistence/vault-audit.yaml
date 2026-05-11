@@ -1,0 +1,23 @@
+schema: strict-spec-driven/main-spec/v1
+schema_version: 1
+artifact_type: main_spec
+schema_file: templates/strict-spec-driven/schemas/main-spec.yaml
+spec:
+  id: vault-audit
+  title: Vault Audit
+mapping:
+  implementation:
+    - src/storage/audited-vault.ts
+  tests:
+    - test/storage/vault-audit.test.ts
+requirements:
+  vault-audit-001:
+    strength: MUST
+    statement: >-
+      All secret access operations MUST emit an audit event containing the caller context, operation
+      type, and secret identifier, but MUST NOT include the secret value.
+    scenarios:
+      vault-audit-logging:
+        - GIVEN: An authenticated session
+        - WHEN: The session accesses a secret
+        - THEN: An audit log entry is recorded with the secret ID and caller context, omitting the value

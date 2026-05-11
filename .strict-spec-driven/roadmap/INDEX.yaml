@@ -62,7 +62,7 @@ milestones:
   0015-secret-vault:
     title: Secret Vault Integration
     path: roadmap/milestones/0015-secret-vault.yaml
-    status: proposed
+    status: complete
   0016-autonomous-loop:
     title: Autonomous Loop Driver
     path: roadmap/milestones/0016-autonomous-loop.yaml

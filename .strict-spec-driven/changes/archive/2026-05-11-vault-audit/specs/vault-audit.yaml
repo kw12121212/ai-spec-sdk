@@ -1,0 +1,26 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: vault-audit
+mapping:
+  implementation:
+    - src/storage/audited-vault.ts
+  tests:
+    - test/storage/vault-audit.test.ts
+operations:
+  ADDED:
+    vault-audit-001:
+      strength: MUST
+      statement: >-
+        All secret access operations MUST emit an audit event containing the caller context,
+        operation type, and secret identifier, but MUST NOT include the secret value.
+      scenarios:
+        vault-audit-logging:
+          - GIVEN: An authenticated session
+          - WHEN: The session accesses a secret
+          - THEN: >-
+              An audit log entry is recorded with the secret ID and caller context, omitting the
+              value
+  MODIFIED: {}
+  REMOVED: {}

@@ -1,0 +1,23 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: vault-audit
+  status: proposed
+summary:
+  what:
+    - Implement access logging and monitoring for the secret vault
+  why:
+    - >-
+      To provide an audit trail of all secret access with caller context as required by the
+      milestone done criteria
+scope:
+  in:
+    - Secret access audit logging, audit event formatting, integration with existing audit system
+  out:
+    - Hardware security module (HSM) integration, biometric authentication
+unchanged_behavior: []
+roadmap:
+  milestone: 0015-secret-vault
+  planned_change: vault-audit

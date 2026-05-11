@@ -1,0 +1,25 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: ../../../templates/strict-spec-driven/schemas/task-list.yaml
+change: vault-audit
+sections:
+  Implementation:
+    impl-vault-audit-events:
+      text: Define audit event schemas for secret access (read, write, delete, list)
+      status: complete
+    impl-vault-audit-logging:
+      text: Instrument the vault adapters and interfaces to emit the audit events
+      status: complete
+  Testing:
+    run-build:
+      text: Run build validation
+      status: complete
+      command: bun run build
+    run-tests:
+      text: Run unit tests for audit logging
+      status: complete
+      command: bun test
+testing_gates:
+  validation_task: run-build
+  unit_test_task: run-tests

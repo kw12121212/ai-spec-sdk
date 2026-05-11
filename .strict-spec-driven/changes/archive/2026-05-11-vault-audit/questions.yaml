@@ -1,0 +1,19 @@
+schema: strict-spec-driven/question-list/v1
+schema_version: 1
+artifact_type: question_list
+schema_file: templates/strict-spec-driven/schemas/question-list.yaml
+change: vault-audit
+open: []
+resolved:
+  - id: question-audit-sensitive-metadata
+    question: >-
+      How do we ensure that audit logs do not inadvertently contain sensitive metadata or the
+      secrets themselves?
+    context: >-
+      The milestone risks explicitly mention that audit logs may contain sensitive metadata. We need
+      to define exactly what fields are logged.
+    status: resolved
+    answer: >-
+      We will log only the `secretId`, `operation` (read, write, list, delete), and
+      `callerContext` (session ID, team ID). The secret value itself will be entirely excluded
+      from the audit logs.
