@@ -1,0 +1,20 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: ../../templates/strict-spec-driven/schemas/task-list.yaml
+change: loop-scheduler
+sections:
+  Implementation:
+    task_1:
+      text: Implement the LoopScheduler class in src/workflow/loop-scheduler.ts
+      status: complete
+  Testing:
+    unit_tests:
+      text: Write unit tests for LoopScheduler in test/workflow/loop-scheduler.test.ts
+      status: complete
+    validation:
+      text: Validate the loop scheduler against roadmap state
+      status: complete
+testing_gates:
+  unit_test_task: unit_tests
+  validation_task: validation

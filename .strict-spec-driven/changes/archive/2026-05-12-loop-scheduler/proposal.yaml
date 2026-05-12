@@ -1,0 +1,26 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: loop-scheduler
+  status: proposed
+summary:
+  what:
+    - >-
+      A scheduler component that reads the strict roadmap state and selects the next missing planned
+      change to execute
+  why:
+    - >-
+      To serve as the entry point for the autonomous loop driver, determining what the agent should
+      work on next without human intervention
+scope:
+  in:
+    - Roadmap status reading, planned change selection, loop start triggering
+  out:
+    - Execution pipeline itself (handled by recommend-auto-pipeline), context lifecycle management
+unchanged_behavior:
+  - Existing roadmap schema and files
+roadmap:
+  milestone: 0016-autonomous-loop
+  planned_change: loop-scheduler

@@ -1,0 +1,24 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: workflow-loop-control
+mapping:
+  implementation:
+    - src/workflow/loop-scheduler.ts
+  tests:
+    - test/workflow/loop-scheduler.test.ts
+operations:
+  ADDED:
+    loop-control-read-roadmap:
+      strength: MUST
+      statement: >-
+        The LoopScheduler MUST read the current roadmap state to identify the next missing planned
+        change
+      scenarios:
+        select-next-change:
+          - GIVEN: A roadmap with a missing planned change whose dependencies are met
+          - WHEN: The loop scheduler is asked for the next candidate
+          - THEN: It returns the missing planned change identifier and path
+  MODIFIED: {}
+  REMOVED: {}

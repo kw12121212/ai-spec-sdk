@@ -1,0 +1,16 @@
+schema: strict-spec-driven/question-list/v1
+schema_version: 1
+artifact_type: question_list
+schema_file: templates/strict-spec-driven/schemas/question-list.yaml
+change: loop-scheduler
+open: []
+resolved:
+  - id: scheduler-api
+    question: >-
+      Should the LoopScheduler shell out to the 'node scripts/strict-spec-driven.js roadmap-status'
+      command or parse the YAML directly?
+    context: >-
+      Shelling out provides an already-computed derivedStatus and list of planned changes with
+      mismatches, saving reimplementation of complex roadmap state derivation logic.
+    status: resolved
+    answer: Shell out to roadmap-status
