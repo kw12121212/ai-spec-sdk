@@ -48,6 +48,11 @@ export const METHOD_SCOPES: Record<string, string | null> = {
   "session.search": "session:read",
   // Workflow
   "workflow.run": "workflow:run",
+  // Loop control
+  "loop.start": "loop:control",
+  "loop.pause": "loop:control",
+  "loop.resume": "loop:control",
+  "loop.stop": "loop:control",
   // Config read
   "config.get": "config:read",
   "config.list": "config:read",

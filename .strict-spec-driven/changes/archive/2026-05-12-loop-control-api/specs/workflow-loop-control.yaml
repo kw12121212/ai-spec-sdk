@@ -1,0 +1,22 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: workflow-loop-control
+mapping:
+  implementation:
+    - src/workflow/loop-controller.ts
+  tests:
+    - test/workflow/loop-controller.test.ts
+operations:
+  ADDED:
+    '1':
+      strength: MUST
+      statement: The bridge MUST provide RPC endpoints to start, pause, resume, and stop the autonomous loop
+      scenarios:
+        '1':
+          - GIVEN: An authenticated request to start the loop
+          - WHEN: The loop is currently inactive
+          - THEN: The loop state transitions to active and execution begins
+  MODIFIED: {}
+  REMOVED: {}

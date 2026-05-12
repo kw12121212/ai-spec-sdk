@@ -79,9 +79,9 @@ describe("resolveScopes", () => {
 // ---- getAllScopes / getToolMapping Tests ----
 
 describe("getAllScopes", () => {
-  test("returns all 7 scope names", () => {
+  test("returns all 8 scope names", () => {
     const scopes = getAllScopes();
-    expect(scopes).toHaveLength(7);
+    expect(scopes).toHaveLength(8);
     expect(scopes).toContain("file:read");
     expect(scopes).toContain("file:write");
     expect(scopes).toContain("network");
@@ -89,13 +89,14 @@ describe("getAllScopes", () => {
     expect(scopes).toContain("task");
     expect(scopes).toContain("notebook:read");
     expect(scopes).toContain("notebook:write");
+    expect(scopes).toContain("loop:control");
   });
 });
 
 describe("getToolMapping", () => {
-  test("returns mapping for all 14 built-in tools", () => {
-    const mapping = getToolMapping();
-    expect(mapping.size).toBe(14);
+  test("returns mapping for all 18 built-in tools", () => {
+    const map = getToolMapping();
+    expect(map.size).toBe(18);
   });
 });
 
@@ -199,12 +200,12 @@ describe("Bridge: permissions.scopes", () => {
     expect(resp.error).toBeUndefined();
     expect(resp.result).toBeDefined();
     const result = resp.result as { scopes: string[]; toolMapping: Record<string, string[]> };
-    expect(result.scopes).toHaveLength(7);
+    expect(result.scopes).toHaveLength(8);
     expect(result.scopes).toContain("file:read");
     expect(result.scopes).toContain("system");
     expect(result.toolMapping["Bash"]).toEqual(["system"]);
     expect(result.toolMapping["Read"]).toEqual(["file:read"]);
-    expect(Object.keys(result.toolMapping)).toHaveLength(14);
+    expect(Object.keys(result.toolMapping)).toHaveLength(18);
   });
 });
 

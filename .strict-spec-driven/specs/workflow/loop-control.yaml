@@ -1,0 +1,19 @@
+schema: strict-spec-driven/main-spec/v1
+schema_version: 1
+artifact_type: main_spec
+schema_file: templates/strict-spec-driven/schemas/main-spec.yaml
+spec:
+  id: workflow-loop-control
+  title: Loop Control API
+mapping:
+  implementation: []
+  tests: []
+requirements:
+  '1':
+    strength: MUST
+    statement: The bridge MUST provide RPC endpoints to start, pause, resume, and stop the autonomous loop
+    scenarios:
+      '1':
+        - GIVEN: An authenticated request to start the loop
+        - WHEN: The loop is currently inactive
+        - THEN: The loop state transitions to active and execution begins

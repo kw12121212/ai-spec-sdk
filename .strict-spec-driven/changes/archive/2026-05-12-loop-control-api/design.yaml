@@ -1,0 +1,15 @@
+schema: strict-spec-driven/change-design/v1
+schema_version: 1
+artifact_type: change_design
+schema_file: templates/strict-spec-driven/schemas/change-design.yaml
+change: loop-control-api
+approach:
+  - >-
+    Introduce a LoopController service acting as a singleton that manages loop lifecycle state and
+    provides RPC endpoints
+decisions:
+  '1':
+    decision: Use standard JSON-RPC endpoints for loop control operations
+    rationale: Aligns with the existing AI Spec SDK bridge architecture for clean client integrations
+alternatives: []
+risks: []

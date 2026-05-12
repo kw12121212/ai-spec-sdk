@@ -1,0 +1,23 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: ../../templates/strict-spec-driven/schemas/task-list.yaml
+change: loop-control-api
+sections:
+  Implementation:
+    task_1:
+      text: Implement LoopController service with start, pause, resume, and stop methods
+      status: complete
+    task_2:
+      text: Add loop control RPC endpoints via the standard JSON-RPC bridge
+      status: complete
+  Testing:
+    unit_tests:
+      text: Add unit tests verifying state transitions for the autonomous loop
+      status: complete
+    validation:
+      text: Validate the loop control API endpoints
+      status: complete
+testing_gates:
+  unit_test_task: unit_tests
+  validation_task: validation

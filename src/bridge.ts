@@ -6,6 +6,7 @@ import type { PermissionResult } from "@anthropic-ai/claude-agent-sdk";
 import { BridgeError, isJsonRpcRequest } from "./errors.js";
 import { getCapabilities, BUILTIN_SPEC_SKILLS, SUPPORTED_MODELS, BUILTIN_TOOLS, API_VERSION } from "./capabilities.js";
 import { runWorkflow } from "./workflow.js";
+import { loopController } from "./workflow/loop-controller.js";
 import { SessionStore, type EscalationPolicy } from "./session-store.js";
 import { WorkspaceStore, type CustomTool } from "./workspace-store.js";
 import { toolRegistry } from "./unified-tool-registry.js";
@@ -670,6 +671,18 @@ export class BridgeServer {
             this.emit(event, payload, requestId);
           },
         );
+      case "loop.start":
+        loopController.start();
+        return { success: true, state: loopController.getState() };
+      case "loop.pause":
+        loopController.pause();
+        return { success: true, state: loopController.getState() };
+      case "loop.resume":
+        loopController.resume();
+        return { success: true, state: loopController.getState() };
+      case "loop.stop":
+        loopController.stop();
+        return { success: true, state: loopController.getState() };
       case "session.start":
         return this.startSession(params, requestId);
       case "session.spawn":

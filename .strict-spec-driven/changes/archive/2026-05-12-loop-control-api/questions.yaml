@@ -1,0 +1,14 @@
+schema: strict-spec-driven/question-list/v1
+schema_version: 1
+artifact_type: question_list
+schema_file: templates/strict-spec-driven/schemas/question-list.yaml
+change: loop-control-api
+open: []
+resolved:
+  - id: '1'
+    question: What specific API key scopes or permissions are required to call loop control endpoints?
+    context: >-
+      Since the loop executes arbitrary roadmap changes autonomously, we must secure these endpoints
+      against unauthorized execution.
+    answer: Create a new 'loop:control' scope specifically for loop execution RPC methods.
+    status: resolved

@@ -7,7 +7,8 @@ export type ToolScope =
   | "system"
   | "task"
   | "notebook:read"
-  | "notebook:write";
+  | "notebook:write"
+  | "loop:control";
 
 export const VALID_SCOPES: ReadonlySet<string> = new Set<string>([
   "file:read",
@@ -17,6 +18,7 @@ export const VALID_SCOPES: ReadonlySet<string> = new Set<string>([
   "task",
   "notebook:read",
   "notebook:write",
+  "loop:control",
 ]);
 
 export const TOOL_SCOPE_MAP: ReadonlyMap<string, readonly ToolScope[]> = new Map<
@@ -37,6 +39,10 @@ export const TOOL_SCOPE_MAP: ReadonlyMap<string, readonly ToolScope[]> = new Map
   ["TodoWrite", ["task"]],
   ["NotebookRead", ["notebook:read"]],
   ["NotebookEdit", ["notebook:write"]],
+  ["LoopStart", ["loop:control"]],
+  ["LoopPause", ["loop:control"]],
+  ["LoopResume", ["loop:control"]],
+  ["LoopStop", ["loop:control"]],
 ]);
 
 export function resolveScopes(toolName: string): readonly ToolScope[] {

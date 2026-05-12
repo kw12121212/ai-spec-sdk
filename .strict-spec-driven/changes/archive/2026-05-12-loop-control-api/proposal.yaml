@@ -1,0 +1,24 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: loop-control-api
+  status: proposed
+summary:
+  what:
+    - Implement the runtime control interface for the autonomous loop
+  why:
+    - >-
+      To allow system components and external triggers to control the start, pause, resume, and stop
+      lifecycle of the autonomous development loop
+scope:
+  in:
+    - Loop controller service with RPC/HTTP endpoints for start, pause, resume, and stop operations
+  out:
+    - Multi-loop coordination across distributed nodes
+unchanged_behavior:
+  - Existing single-agent lifecycle mechanisms
+roadmap:
+  milestone: 0016-autonomous-loop
+  planned_change: loop-control-api
