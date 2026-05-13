@@ -1,0 +1,25 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: workflow-loop-control
+mapping:
+  implementation:
+    - src/workflow/loop-controller.ts
+    - src/workflow/answer-agent-client.ts
+  tests:
+    - test/workflow/loop-controller.test.ts
+operations:
+  ADDED: {}
+  MODIFIED:
+    loop-auto-answer:
+      strength: MUST
+      statement: >-
+        The loop control execution MUST attempt to answer questions using the Answer Agent before
+        escalating to a human.
+      scenarios:
+        auto-answer:
+          - GIVEN: An autonomous loop is running and encounters a question
+          - WHEN: The question is raised
+          - THEN: The loop delegates it to the Answer Agent and proceeds if resolved
+  REMOVED: {}

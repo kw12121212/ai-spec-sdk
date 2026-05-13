@@ -37,3 +37,13 @@ requirements:
         - THEN: >-
             The pipeline MUST propose, implement, verify, review, and archive the change
             successfully.
+  loop-auto-answer:
+    strength: MUST
+    statement: >-
+      The loop control execution MUST attempt to answer questions using the Answer Agent before
+      escalating to a human.
+    scenarios:
+      auto-answer:
+        - GIVEN: An autonomous loop is running and encounters a question
+        - WHEN: The question is raised
+        - THEN: The loop delegates it to the Answer Agent and proceeds if resolved

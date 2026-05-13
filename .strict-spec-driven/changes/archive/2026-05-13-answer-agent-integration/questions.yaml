@@ -1,0 +1,14 @@
+schema: strict-spec-driven/question-list/v1
+schema_version: 1
+artifact_type: question_list
+schema_file: templates/strict-spec-driven/schemas/question-list.yaml
+change: answer-agent-integration
+open: []
+resolved:
+  - id: answer-agent-interface
+    question: What is the specific interface for the Answer Agent that we need to integrate with?
+    context: The planned change mentions 'Answer Agent' but doesn't define its exact API or SDK module.
+    answer: >-
+      We will define a TypeScript interface like IAnswerAgent { answer(question: string):
+      Promise<string | null> } and integrate it directly.
+    status: resolved

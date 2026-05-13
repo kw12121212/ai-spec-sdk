@@ -1,0 +1,26 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: answer-agent-integration
+  status: proposed
+summary:
+  what:
+    - Integration with Answer Agent for automatic question resolution
+  why:
+    - >-
+      To allow the autonomous loop to answer questions automatically without human intervention when
+      possible.
+scope:
+  in:
+    - Integration with Answer Agent for automatic question resolution
+  out:
+    - AI-driven roadmap planning or standalone answer agent execution outside the loop
+unchanged_behavior:
+  - >-
+    Existing question resolution protocol endpoints and escalation policies (they just get a new
+    client)
+roadmap:
+  milestone: 0016-autonomous-loop
+  planned_change: answer-agent-integration
