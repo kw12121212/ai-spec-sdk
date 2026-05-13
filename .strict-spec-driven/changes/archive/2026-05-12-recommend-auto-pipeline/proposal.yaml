@@ -1,0 +1,24 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: recommend-auto-pipeline
+  status: proposed
+summary:
+  what:
+    - automated change execution
+  why:
+    - >-
+      To enable a self-driving development loop that automatically executes roadmap changes through
+      a recommend -> auto workflow.
+scope:
+  in:
+    - Recommend -> Auto execution pipeline (propose -> implement -> verify -> review -> archive)
+  out:
+    - Multi-loop coordination across distributed systems
+unchanged_behavior:
+  - Existing agent execution logic
+roadmap:
+  milestone: 0016-autonomous-loop
+  planned_change: recommend-auto-pipeline

@@ -1,0 +1,24 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: workflow-loop-control
+mapping:
+  implementation:
+    - src/workflow/recommend-auto.ts
+  tests:
+    - test/workflow/recommend-auto.test.ts
+operations:
+  ADDED:
+    REQ-1:
+      strength: MUST
+      statement: The recommend-auto pipeline MUST orchestrate the strict change lifecycle steps in order.
+      scenarios:
+        Successful autonomous execution:
+          - GIVEN: A valid planned change candidate exists
+          - WHEN: The recommend-auto pipeline is triggered
+          - THEN: >-
+              The pipeline MUST propose, implement, verify, review, and archive the change
+              successfully.
+  MODIFIED: {}
+  REMOVED: {}
