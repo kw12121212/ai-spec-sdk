@@ -1,0 +1,21 @@
+schema: strict-spec-driven/main-spec/v1
+schema_version: 1
+artifact_type: main_spec
+schema_file: templates/strict-spec-driven/schemas/main-spec.yaml
+spec:
+  id: workflow-escalation-gate
+  title: Escalation Gate
+mapping:
+  implementation:
+    - src/workflow/escalation-gate.ts
+  tests:
+    - test/workflow/escalation-gate.test.ts
+requirements:
+  req-escalation-pause:
+    strength: MUST
+    statement: The autonomous loop must pause execution when an escalation is triggered.
+    scenarios:
+      scenario-escalation-pause:
+        - GIVEN: an active autonomous loop
+        - WHEN: an escalation is triggered for an unsolvable issue
+        - THEN: the loop pauses and waits for human input

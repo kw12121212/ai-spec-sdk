@@ -1,0 +1,14 @@
+schema: strict-spec-driven/question-list/v1
+schema_version: 1
+artifact_type: question_list
+schema_file: templates/strict-spec-driven/schemas/question-list.yaml
+change: escalation-gate
+open: []
+resolved:
+  - id: question-unsolvable-threshold
+    question: How do we automatically identify an issue as unsolvable?
+    context: We need a mechanism to transition into the escalated state.
+    answer: >-
+      Trigger escalation if a task exceeds a maximum retry count or if specific unrecoverable errors
+      (like AgentEscalationError) occur.
+    status: resolved

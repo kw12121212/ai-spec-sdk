@@ -1,0 +1,22 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: escalation-gate
+  status: proposed
+summary:
+  what:
+    - Implement human escalation gate
+  why:
+    - To allow the autonomous loop to pause and request human intervention for unsolvable issues
+scope:
+  in:
+    - Escalation API, Loop control state transitions
+  out:
+    - Multi-loop coordination
+unchanged_behavior:
+  - Existing question resolution protocols
+roadmap:
+  milestone: 0016-autonomous-loop
+  planned_change: escalation-gate

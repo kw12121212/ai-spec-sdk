@@ -1,12 +1,17 @@
-import { LoopScheduler } from './src/workflow/loop-scheduler.js';
+import { test, expect } from "bun:test";
+import { LoopController } from "./src/workflow/loop-controller.js";
+import { EscalationGate } from "./src/workflow/escalation-gate.js";
 
-async function main() {
-  const scheduler = new LoopScheduler({
-    roadmapStatusCommand: 'node /home/code/.agents/skills/strict-spec-auto/scripts/strict-spec-driven.js roadmap-status'
-  });
+test("EscalationGate integration validation", () => {
+  const controller = new LoopController();
+  controller.start();
+  const gate = new EscalationGate(controller, { maxRetries: 1 });
   
-  const next = await scheduler.getNextChange();
-  console.log('Next change:', next);
-}
-
-main().catch(console.error);
+  gate.reportTaskError("validation-task", new Error("first error"));
+  expect(controller.getState()).toBe("active");
+  
+  expect(() => gate.reportTaskError("validation-task", new Error("second error")))
+    .toThrow(/Escalation triggered/);
+    
+  expect(controller.getState()).toBe("paused");
+});

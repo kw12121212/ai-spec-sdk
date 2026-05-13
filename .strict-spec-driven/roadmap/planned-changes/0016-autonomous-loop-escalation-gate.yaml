@@ -5,7 +5,7 @@ schema_file: ../../templates/strict-spec-driven/schemas/planned-change.yaml
 planned_change:
   id: escalation-gate
   milestone: 0016-autonomous-loop
-status: planned
+status: complete
 summary: human escalation for unsolvable issues
 details: 'Migration placeholder: add technical and design context for this planned change.'
 depends_on: []

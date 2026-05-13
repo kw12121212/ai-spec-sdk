@@ -1,0 +1,22 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: workflow-escalation-gate
+mapping:
+  implementation:
+    - src/workflow/escalation-gate.ts
+  tests:
+    - test/workflow/escalation-gate.test.ts
+operations:
+  ADDED:
+    req-escalation-pause:
+      strength: MUST
+      statement: The autonomous loop must pause execution when an escalation is triggered.
+      scenarios:
+        scenario-escalation-pause:
+          - GIVEN: an active autonomous loop
+          - WHEN: an escalation is triggered for an unsolvable issue
+          - THEN: the loop pauses and waits for human input
+  MODIFIED: {}
+  REMOVED: {}
