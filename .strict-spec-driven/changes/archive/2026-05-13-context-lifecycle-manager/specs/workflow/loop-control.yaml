@@ -1,0 +1,24 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: workflow-loop-control
+mapping:
+  implementation:
+    - src/workflow/loop-control.ts
+  tests:
+    - test/workflow/loop-control.test.ts
+operations:
+  ADDED:
+    restart-on-limit:
+      strength: MUST
+      statement: >-
+        The loop controller MUST automatically initiate a graceful session restart when token usage
+        exceeds the configured threshold.
+      scenarios:
+        token-limit-reached:
+          - GIVEN: An autonomous loop is running and token usage exceeds the configured limit threshold
+          - WHEN: The next loop iteration begins
+          - THEN: The system MUST pause execution, persist state, and restart the loop in a new session
+  MODIFIED: {}
+  REMOVED: {}

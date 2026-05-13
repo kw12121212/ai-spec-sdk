@@ -1,5 +1,6 @@
 import { test, expect, describe, beforeEach } from "bun:test";
 import { LoopController } from "../../src/workflow/loop-controller.js";
+import type { ITokenTracker, ISessionRestarter } from "../../src/workflow/loop-controller.js";
 import type { IAnswerAgent } from "../../src/workflow/answer-agent-client.js";
 
 class MockAnswerAgent implements IAnswerAgent {
@@ -12,13 +13,29 @@ class MockAnswerAgent implements IAnswerAgent {
   }
 }
 
+class MockTokenTracker implements ITokenTracker {
+  public usage = 0;
+  public getUsage(): number {
+    return this.usage;
+  }
+}
+
+class MockSessionRestarter implements ISessionRestarter {
+  public restartedState: any = null;
+  public called = false;
+  public async restartSession(state: any): Promise<void> {
+    this.called = true;
+    this.restartedState = state;
+  }
+}
+
 describe("LoopController", () => {
   let controller: LoopController;
   let mockAgent: MockAnswerAgent;
 
   beforeEach(() => {
     mockAgent = new MockAnswerAgent();
-    controller = new LoopController(mockAgent);
+    controller = new LoopController({ answerAgent: mockAgent });
   });
 
   test("initial state is inactive", () => {
@@ -69,6 +86,38 @@ describe("LoopController", () => {
 
   test("cannot stop from inactive", () => {
     expect(() => controller.stop()).toThrow("Cannot stop loop from state: inactive");
+  });
+
+  describe("beginIteration", () => {
+    test("cannot begin iteration if not active", async () => {
+      await expect(controller.beginIteration()).rejects.toThrow("Cannot begin iteration in state: inactive");
+    });
+
+    test("does nothing if token usage is below threshold", async () => {
+      const tracker = new MockTokenTracker();
+      tracker.usage = 50;
+      const restarter = new MockSessionRestarter();
+      const c = new LoopController({ tokenTracker: tracker, sessionRestarter: restarter, tokenWarningThreshold: 100 });
+      c.start();
+      await c.beginIteration();
+      expect(c.getState()).toBe("active");
+      expect(restarter.called).toBe(false);
+    });
+
+    test("pauses and restarts session if token usage exceeds threshold", async () => {
+      const tracker = new MockTokenTracker();
+      tracker.usage = 105;
+      const restarter = new MockSessionRestarter();
+      const c = new LoopController({ tokenTracker: tracker, sessionRestarter: restarter, tokenWarningThreshold: 100 });
+      c.start();
+      
+      const executionState = { step: 5 };
+      await expect(c.beginIteration(executionState)).rejects.toThrow("Session restart initiated due to token limit.");
+      
+      expect(c.getState()).toBe("paused");
+      expect(restarter.called).toBe(true);
+      expect(restarter.restartedState).toEqual({ step: 5 });
+    });
   });
 
   describe("handleQuestion", () => {

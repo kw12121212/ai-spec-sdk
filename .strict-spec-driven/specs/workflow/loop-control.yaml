@@ -47,3 +47,13 @@ requirements:
         - GIVEN: An autonomous loop is running and encounters a question
         - WHEN: The question is raised
         - THEN: The loop delegates it to the Answer Agent and proceeds if resolved
+  restart-on-limit:
+    strength: MUST
+    statement: >-
+      The loop controller MUST automatically initiate a graceful session restart when token usage
+      exceeds the configured threshold.
+    scenarios:
+      token-limit-reached:
+        - GIVEN: An autonomous loop is running and token usage exceeds the configured limit threshold
+        - WHEN: The next loop iteration begins
+        - THEN: The system MUST pause execution, persist state, and restart the loop in a new session

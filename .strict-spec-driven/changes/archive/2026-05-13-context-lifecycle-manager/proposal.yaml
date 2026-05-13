@@ -1,0 +1,24 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: context-lifecycle-manager
+  status: proposed
+summary:
+  what:
+    - Context lifecycle management with automatic session restart on token limit
+  why:
+    - To prevent context window exhaustion and enable long-running autonomous agent loops
+scope:
+  in:
+    - >-
+      Context window token tracking, Graceful session restart with state preservation, Configuration
+      for token limits
+  out:
+    - Multi-loop coordination, Answer Agent integration
+unchanged_behavior:
+  - Existing bridge and LSP tool behaviors
+roadmap:
+  milestone: 0016-autonomous-loop
+  planned_change: context-lifecycle-manager

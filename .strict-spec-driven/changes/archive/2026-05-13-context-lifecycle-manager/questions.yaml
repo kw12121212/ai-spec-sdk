@@ -1,0 +1,17 @@
+schema: strict-spec-driven/question-list/v1
+schema_version: 1
+artifact_type: question_list
+schema_file: templates/strict-spec-driven/schemas/question-list.yaml
+change: context-lifecycle-manager
+open: []
+resolved:
+  - id: restart-state
+    question: Where is the exact execution state stored during the restart?
+    context: >-
+      The session resumption spec may dictate how state is restored, but the autonomous loop may
+      have additional intermediate state.
+    answer: >-
+      The execution state will be serialized to the configured durable persistence layer using the
+      existing session storage adapters, and the new session will be initialized using this stored
+      checkpoint.
+    status: resolved
