@@ -1,0 +1,16 @@
+schema: strict-spec-driven/question-list/v1
+schema_version: 1
+artifact_type: question_list
+schema_file: templates/strict-spec-driven/schemas/question-list.yaml
+change: loop-persistence
+open: []
+resolved:
+  - id: persisted-state-details
+    question: What specific fields need to be included in the loop state for reliable crash recovery?
+    context: >-
+      We need to ensure we save enough context to resume cleanly, such as current task, milestone,
+      and active tokens.
+    answer: >-
+      Detailed State: current change, task, tokens, retry counts, open question IDs, last known
+      error.
+    status: resolved

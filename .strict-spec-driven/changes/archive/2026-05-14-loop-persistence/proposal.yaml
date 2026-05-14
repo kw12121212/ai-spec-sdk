@@ -1,0 +1,24 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: loop-persistence
+  status: proposed
+summary:
+  what:
+    - Implement progress tracking and crash recovery for the autonomous development loop
+  why:
+    - >-
+      To ensure the loop can recover from unexpected crashes and maintain a durable record of its
+      execution progress
+scope:
+  in:
+    - Loop state persistence, crash recovery routines, execution progress tracking
+  out:
+    - Multi-node loop state synchronization
+unchanged_behavior:
+  - Existing session persistence mechanisms not related to the loop driver
+roadmap:
+  milestone: 0016-autonomous-loop
+  planned_change: loop-persistence

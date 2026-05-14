@@ -1,0 +1,17 @@
+schema: strict-spec-driven/change-design/v1
+schema_version: 1
+artifact_type: change_design
+schema_file: templates/strict-spec-driven/schemas/change-design.yaml
+change: loop-persistence
+approach:
+  - >-
+    Use the existing storage backend to persist loop execution state at key transition points. Add a
+    recovery mechanism to resume loop execution from the last persisted state on startup.
+decisions:
+  use-storage-backend:
+    decision: Use existing storage backend for loop state
+    rationale: >-
+      Avoids introducing new persistence dependencies and aligns with the existing session
+      persistence pattern.
+alternatives: []
+risks: []

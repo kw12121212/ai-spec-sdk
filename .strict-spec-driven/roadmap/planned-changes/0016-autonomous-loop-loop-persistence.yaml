@@ -5,7 +5,7 @@ schema_file: ../../templates/strict-spec-driven/schemas/planned-change.yaml
 planned_change:
   id: loop-persistence
   milestone: 0016-autonomous-loop
-status: planned
+status: complete
 summary: progress tracking and crash recovery
 details: 'Migration placeholder: add technical and design context for this planned change.'
 depends_on: []

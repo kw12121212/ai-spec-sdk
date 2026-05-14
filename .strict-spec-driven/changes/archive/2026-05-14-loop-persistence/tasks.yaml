@@ -1,0 +1,27 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/tasks.yaml
+change: loop-persistence
+sections:
+  Implementation:
+    task-implement-persistence:
+      text: Implement loop persistence and crash recovery
+      status: complete
+  Testing:
+    task-unit-tests:
+      text: Unit test the persistence logic
+      status: complete
+      command: bun test
+    task-validation:
+      text: Validate persistence and crash recovery behavior
+      status: complete
+      command: bun test test-validation.ts
+  Verification:
+    task-verify:
+      text: Verify the strict change
+      status: complete
+      command: node scripts/strict-spec-driven.js verify loop-persistence
+testing_gates:
+  validation_task: task-validation
+  unit_test_task: task-unit-tests

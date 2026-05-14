@@ -672,16 +672,16 @@ export class BridgeServer {
           },
         );
       case "loop.start":
-        loopController.start();
+        await loopController.start();
         return { success: true, state: loopController.getState() };
       case "loop.pause":
-        loopController.pause();
+        await loopController.pause();
         return { success: true, state: loopController.getState() };
       case "loop.resume":
-        loopController.resume();
+        await loopController.resume();
         return { success: true, state: loopController.getState() };
       case "loop.stop":
-        loopController.stop();
+        await loopController.stop();
         return { success: true, state: loopController.getState() };
       case "session.start":
         return this.startSession(params, requestId);

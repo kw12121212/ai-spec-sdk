@@ -66,4 +66,4 @@ milestones:
   0016-autonomous-loop:
     title: Autonomous Loop Driver
     path: roadmap/milestones/0016-autonomous-loop.yaml
-    status: proposed
+    status: complete
