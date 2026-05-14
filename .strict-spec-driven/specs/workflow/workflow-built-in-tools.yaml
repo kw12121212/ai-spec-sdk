@@ -1,0 +1,21 @@
+schema: strict-spec-driven/main-spec/v1
+schema_version: 1
+artifact_type: main_spec
+schema_file: templates/strict-spec-driven/schemas/main-spec.yaml
+spec:
+  id: workflow-built-in-tools
+  title: Built-in Tools
+mapping:
+  implementation: []
+  tests: []
+requirements:
+  built-in-tools:
+    strength: MUST
+    statement: >-
+      The bridge MUST provide built-in file and shell tools (read_file, write_file, replace,
+      list_directory, run_shell_command).
+    scenarios:
+      built-in-tools-execution:
+        - GIVEN: A session with built-in tools enabled
+        - WHEN: The agent invokes run_shell_command
+        - THEN: The command executes safely using the tool approval flow

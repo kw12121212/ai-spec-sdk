@@ -1,0 +1,16 @@
+schema: strict-spec-driven/question-list/v1
+schema_version: 1
+artifact_type: question_list
+schema_file: templates/strict-spec-driven/schemas/question-list.yaml
+change: default-tools
+open: []
+resolved:
+  - id: auto-enable-go
+    question: >-
+      How exactly should the Go CLI request to automatically enable these tools, or are they
+      implicitly available?
+    context: The details mention 'The Go CLI should automatically enable these built-in tools by default'.
+    answer: >-
+      Implicitly available: The bridge registers them by default for all sessions. The Go CLI
+      doesn't need to do anything special to enable them.
+    status: resolved

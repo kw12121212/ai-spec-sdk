@@ -1,0 +1,24 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: workflow-built-in-tools
+mapping:
+  implementation:
+    - src/built-in-tools.ts
+  tests:
+    - test/built-in-tools.test.ts
+operations:
+  ADDED:
+    built-in-tools:
+      strength: MUST
+      statement: >-
+        The bridge MUST provide built-in file and shell tools (read_file, write_file, replace,
+        list_directory, run_shell_command).
+      scenarios:
+        built-in-tools-execution:
+          - GIVEN: A session with built-in tools enabled
+          - WHEN: The agent invokes run_shell_command
+          - THEN: The command executes safely using the tool approval flow
+  MODIFIED: {}
+  REMOVED: {}

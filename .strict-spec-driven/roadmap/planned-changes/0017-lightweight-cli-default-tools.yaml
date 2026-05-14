@@ -5,7 +5,7 @@ schema_file: ../../templates/strict-spec-driven/schemas/planned-change.yaml
 planned_change:
   id: default-tools
   milestone: 0017-lightweight-cli
-status: planned
+status: complete
 summary: Built-in file read/write and shell execution tools
 details: >-
   Provide an out-of-the-box experience by bundling core code-editing tools directly. 1. Create a

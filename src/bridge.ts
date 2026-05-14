@@ -5,6 +5,7 @@ import { spawn } from "node:child_process";
 import type { PermissionResult } from "@anthropic-ai/claude-agent-sdk";
 import { BridgeError, isJsonRpcRequest } from "./errors.js";
 import { getCapabilities, BUILTIN_SPEC_SKILLS, SUPPORTED_MODELS, BUILTIN_TOOLS, API_VERSION } from "./capabilities.js";
+import { getBuiltInTools } from "./built-in-tools.js";
 import { runWorkflow } from "./workflow.js";
 import { loopController } from "./workflow/loop-controller.js";
 import { SessionStore, type EscalationPolicy } from "./session-store.js";
@@ -1537,12 +1538,15 @@ export class BridgeServer {
       }
     };
 
+    const builtInSdkTools = getBuiltInTools(context.cwd);
+
     if (mcpSdkTools.length > 0 || true) {
       resolvedOptions = {
         ...resolvedOptions,
         tools: [
           ...(Array.isArray(resolvedOptions.tools) ? resolvedOptions.tools : []),
           ...mcpSdkTools,
+          ...builtInSdkTools,
           askQuestionTool
         ]
       };

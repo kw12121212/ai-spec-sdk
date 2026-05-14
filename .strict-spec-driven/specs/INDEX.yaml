@@ -48,6 +48,9 @@ specs:
   - id: workflow-loop-control
     title: Loop Control API
     path: .strict-spec-driven/specs/workflow/loop-control.yaml
+  - id: workflow-built-in-tools
+    title: Built-in Tools
+    path: .strict-spec-driven/specs/workflow/workflow-built-in-tools.yaml
   - id: workflow-tool-cache
     title: Tool Cache
     path: .strict-spec-driven/specs/workflow/workflow-tool-cache.yaml

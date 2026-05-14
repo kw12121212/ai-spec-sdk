@@ -1,0 +1,18 @@
+schema: strict-spec-driven/change-design/v1
+schema_version: 1
+artifact_type: change_design
+schema_file: templates/strict-spec-driven/schemas/change-design.yaml
+change: default-tools
+approach:
+  - >-
+    Implement a BuiltInToolRegistry in the TS bridge providing read_file, write_file, replace,
+    list_directory, and run_shell_command. The Go CLI requests these tools upon connection or they
+    are enabled by default. Mutations must enforce the existing permissionMode tool approval flow.
+decisions:
+  built-in-registry:
+    decision: Implement built-in tools directly in the TS bridge.
+    rationale: >-
+      Avoids external dependencies and ensures seamless integration with the bridge's permission and
+      execution models.,wait_for_previous:true
+alternatives: []
+risks: []

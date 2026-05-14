@@ -1,0 +1,31 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: default-tools
+sections:
+  Implementation:
+    implement-tools:
+      text: >-
+        Implement built-in tools provider (read_file, write_file, replace, list_directory,
+        run_shell_command) in TS bridge.
+      status: complete
+    update-go-cli:
+      text: Update Go CLI to implicitly or explicitly request built-in tools.
+      status: complete
+  Testing:
+    run-build:
+      text: Run build validation.
+      status: complete
+      command: bun run build
+    run-tests:
+      text: Run unit tests.
+      status: complete
+      command: bun test/run.ts
+  Verification:
+    verify-scope:
+      text: Verify implementation matches proposal scope.
+      status: complete
+testing_gates:
+  validation_task: run-build
+  unit_test_task: run-tests
