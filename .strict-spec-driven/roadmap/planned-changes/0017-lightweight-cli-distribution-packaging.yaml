@@ -1,0 +1,17 @@
+schema: strict-spec-driven/planned-change/v1
+schema_version: 1
+artifact_type: planned_change
+schema_file: ../../templates/strict-spec-driven/schemas/planned-change.yaml
+planned_change:
+  id: distribution-packaging
+  milestone: 0017-lightweight-cli
+status: planned
+summary: Cross-platform distribution (install scripts, Homebrew)
+details: >-
+  Simplify the installation process so users do not need Node.js installed to run the CLI. 1.
+  Leverage the existing `bun build --compile` scripts to generate native, standalone binaries for
+  the TS bridge. 2. Modify the Go CLI to either embed the native bridge binary or automatically
+  download the correct version on first run. 3. Create an installation script (`install.sh`) that
+  fetches the CLI binaries for the user's OS/Arch. 4. Scaffold a basic Homebrew Formula template for
+  macOS/Linux distribution.
+depends_on: []

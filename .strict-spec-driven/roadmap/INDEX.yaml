@@ -67,3 +67,7 @@ milestones:
     title: Autonomous Loop Driver
     path: roadmap/milestones/0016-autonomous-loop.yaml
     status: complete
+  0017-lightweight-cli:
+    title: Lightweight Coding Agent CLI
+    path: roadmap/milestones/0017-lightweight-cli.yaml
+    status: proposed

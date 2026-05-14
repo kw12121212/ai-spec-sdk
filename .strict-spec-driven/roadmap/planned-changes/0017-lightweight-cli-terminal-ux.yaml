@@ -1,0 +1,17 @@
+schema: strict-spec-driven/planned-change/v1
+schema_version: 1
+artifact_type: planned_change
+schema_file: ../../templates/strict-spec-driven/schemas/planned-change.yaml
+planned_change:
+  id: terminal-ux
+  milestone: 0017-lightweight-cli
+status: planned
+summary: Markdown rendering, syntax highlighting, spinners, and diff views
+details: >-
+  Enhance the Go CLI terminal UX (`demo/go-cli/ui/renderer.go`) to be product-grade. 1. Integrate a
+  library like `charmbracelet/glamour` for rich Markdown rendering and ANSI syntax highlighting. 2.
+  Add loading spinners for network requests and model inference. 3. Parse and render
+  `reasoning_content` chunks (for thinking models) in a dimmed or distinct block. 4. Format tool
+  execution prompts (`permissionMode="approve"`) with clear colored diffs and distinct accept/reject
+  keys.
+depends_on: []

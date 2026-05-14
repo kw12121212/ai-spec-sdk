@@ -1,0 +1,17 @@
+schema: strict-spec-driven/planned-change/v1
+schema_version: 1
+artifact_type: planned_change
+schema_file: ../../templates/strict-spec-driven/schemas/planned-change.yaml
+planned_change:
+  id: provider-config
+  milestone: 0017-lightweight-cli
+status: planned
+summary: Simplified third-party LLM provider configuration
+details: >-
+  Expose the existing LLM provider registry through the CLI to support models beyond Anthropic. 1.
+  The Go CLI will read `~/.ai-cli/config.json` to load provider profiles (API keys, base URLs). 2.
+  Support dynamic configuration of OpenAI-compatible endpoints (vital for DeepSeek, vLLM, Ollama).
+  3. Pass these configurations from the Go CLI to the bridge via env vars or a `config.set` RPC call
+  at startup. 4. Update `demo/go-cli/main.go` to support fast CLI flags like `--provider openai` and
+  `--base-url <url>`.
+depends_on: []

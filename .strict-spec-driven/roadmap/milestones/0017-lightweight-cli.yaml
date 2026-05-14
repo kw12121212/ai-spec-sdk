@@ -1,0 +1,38 @@
+schema: strict-spec-driven/roadmap-milestone/v2
+schema_version: 2
+artifact_type: roadmap_milestone
+schema_file: templates/strict-spec-driven/schemas/roadmap-milestone.yaml
+milestone:
+  0017-lightweight-cli:
+    title: Lightweight Coding Agent CLI
+goal: >-
+  Productize the Go CLI into a fully-featured, lightweight "Claude Code" alternative with excellent
+  terminal UX, out-of-the-box tools, easy third-party provider configuration, and frictionless
+  distribution.
+scope:
+  in:
+    - Terminal UX enhancements (Markdown rendering, syntax highlighting, spinners, diff views)
+    - Built-in file and shell execution tools out-of-the-box (no manual MCP setup required)
+    - >-
+      Simplified third-party LLM provider configuration (OpenAI, Anthropic, DeepSeek, etc.) via CLI
+      and config files
+    - Cross-platform distribution packaging (Homebrew, install scripts, standalone binaries)
+  out:
+    - Re-implementing the core Bridge server in Go
+    - GUI/Web application interfaces
+    - Heavy IDE plugins (VSCode, JetBrains)
+done_criteria:
+  - Users can download and run a single binary or install via script/brew without manual Node setup
+  - The CLI natively renders Markdown and shows loading spinners during AI generation
+  - The CLI provides out-of-the-box file reading/writing and shell execution capabilities
+  - Users can easily switch between multiple third-party LLM providers
+planned_changes: {}
+dependencies:
+  - 0003-platform-reach — builds on cross-platform native binaries
+  - 0008-llm-provider — builds on the LLM provider abstraction layer
+  - 0011-lsp-mcp-tools — leverages the unified tool interface
+risks:
+  - Bundling Node.js runtime and Go binary might increase installation complexity
+  - Complex terminal UX might introduce cross-platform compatibility issues
+status: proposed
+notes: []
