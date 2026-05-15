@@ -1,0 +1,23 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: cli-provider-config
+mapping:
+  implementation:
+    - demo/go-cli/main.go
+  tests: []
+operations:
+  ADDED:
+    CLI_PROVIDER_CONFIG:
+      strength: MUST
+      statement: >-
+        The Go CLI MUST read provider configuration from ~/.ai-cli/config.json and command-line
+        flags.
+      scenarios:
+        User provides CLI flags for provider:
+          - GIVEN: The user runs the CLI with --provider openai and --base-url http://localhost:11434/v1
+          - WHEN: The CLI initializes the bridge
+          - THEN: The CLI MUST send a config.set RPC request configuring the LLM provider registry.
+  MODIFIED: {}
+  REMOVED: {}

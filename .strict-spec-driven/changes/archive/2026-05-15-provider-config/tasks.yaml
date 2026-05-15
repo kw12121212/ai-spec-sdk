@@ -1,0 +1,32 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: provider-config
+sections:
+  Implementation:
+    update-go-cli-flags:
+      text: Update demo/go-cli/main.go to accept --provider and --base-url flags.
+      status: complete
+    read-config-file:
+      text: Implement logic in Go CLI to read ~/.ai-cli/config.json.
+      status: complete
+    send-config-rpc:
+      text: Update Go CLI bridge initialization to send config.set RPC for LLM provider registry.
+      status: complete
+  Testing:
+    run-build:
+      text: Run build validation.
+      status: complete
+      command: bun run build
+    run-tests:
+      text: Run unit tests.
+      status: complete
+      command: bun test/run.ts
+  Verification:
+    verify-scope:
+      text: Verify implementation matches proposal scope.
+      status: complete
+testing_gates:
+  validation_task: run-build
+  unit_test_task: run-tests

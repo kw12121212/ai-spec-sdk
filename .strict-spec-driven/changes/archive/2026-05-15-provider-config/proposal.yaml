@@ -1,0 +1,27 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: provider-config
+  status: proposed
+summary:
+  what:
+    - Simplified third-party LLM provider configuration via CLI.
+  why:
+    - >-
+      To support models beyond Anthropic and expose the existing LLM provider registry through the
+      CLI.
+scope:
+  in:
+    - >-
+      Reading config profiles from ~/.ai-cli/config.json, dynamic configuration of OpenAI-compatible
+      endpoints, passing config from Go CLI to bridge via config.set RPC, and adding CLI flags like
+      --provider and --base-url to demo/go-cli/main.go.
+  out:
+    - Re-implementing the core Bridge server in Go.
+unchanged_behavior:
+  - Existing provider logic in TS.
+roadmap:
+  milestone: 0017-lightweight-cli
+  planned_change: provider-config

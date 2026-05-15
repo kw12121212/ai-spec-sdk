@@ -39,6 +39,8 @@ func main() {
 	workspace := flag.String("workspace", ".", "Workspace directory for agent sessions")
 	model := flag.String("model", "claude-sonnet-4-6", "Claude model to use")
 	permMode := flag.String("permission-mode", "approve", "Tool permission mode (default, acceptEdits, bypassPermissions, approve)")
+	providerFlag := flag.String("provider", "", "LLM provider type (e.g., openai, anthropic)")
+	baseUrlFlag := flag.String("base-url", "", "LLM provider base URL")
 	flag.Parse()
 
 	// Resolve bridge path: flag > adjacent native binary > development cli.js
@@ -91,6 +93,48 @@ func main() {
 		os.Exit(1)
 	}
 	defer client.Close()
+
+	// Read ~/.ai-cli/config.json
+	providers := []map[string]any{}
+	if homeDir, err := os.UserHomeDir(); err == nil {
+		configPath := filepath.Join(homeDir, ".ai-cli", "config.json")
+		if data, err := os.ReadFile(configPath); err == nil {
+			var config struct {
+				Providers []map[string]any `json:"providers"`
+			}
+			if err := json.Unmarshal(data, &config); err == nil {
+				providers = config.Providers
+			}
+		}
+	}
+
+	// Add provider from CLI flags if specified
+	if *providerFlag != "" {
+		p := map[string]any{
+			"id":   "cli-provider",
+			"type": *providerFlag,
+		}
+		if *baseUrlFlag != "" {
+			p["baseUrl"] = *baseUrlFlag
+		}
+		envKey := strings.ToUpper(*providerFlag) + "_API_KEY"
+		if val := os.Getenv(envKey); val != "" {
+			p["apiKey"] = val
+		}
+		providers = append(providers, p)
+	}
+
+	// Send config.set RPC for LLM provider registry.
+	if len(providers) > 0 {
+		_, err := client.Call("config.set", map[string]any{
+			"key":   "llmProviders",
+			"value": providers,
+			"scope": "user",
+		})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: Failed to set LLM providers configuration: %v\n", err)
+		}
+	}
 
 	// Verify bridge is responsive by calling bridge.ping.
 	pingResult, err := client.Call("bridge.ping", nil)

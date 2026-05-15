@@ -12,6 +12,9 @@ specs:
   - id: build-sdk-packaging
     title: SDK Packaging
     path: .strict-spec-driven/specs/build/sdk-packaging.yaml
+  - id: cli-provider-config
+    title: CLI Provider Configuration
+    path: .strict-spec-driven/specs/cli-provider-config.yaml
   - id: llm-response-cache
     title: LLM Response Cache
     path: .strict-spec-driven/specs/llm-provider/llm-response-cache.yaml

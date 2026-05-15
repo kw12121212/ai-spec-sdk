@@ -5,7 +5,7 @@ schema_file: ../../templates/strict-spec-driven/schemas/planned-change.yaml
 planned_change:
   id: provider-config
   milestone: 0017-lightweight-cli
-status: planned
+status: complete
 summary: Simplified third-party LLM provider configuration
 details: >-
   Expose the existing LLM provider registry through the CLI to support models beyond Anthropic. 1.
