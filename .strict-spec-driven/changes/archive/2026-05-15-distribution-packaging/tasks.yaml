@@ -1,0 +1,30 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: distribution-packaging
+sections:
+  Implementation:
+    impl-1:
+      text: Create an install.sh script that fetches the CLI binaries for the user's OS/Arch.
+      status: complete
+    impl-2:
+      text: Scaffold a basic Homebrew Formula template for macOS/Linux distribution.
+      status: complete
+    impl-3:
+      text: >-
+        Modify the Go CLI to locate or download the correct version of the TS bridge binary on first
+        run.
+      status: complete
+  Testing:
+    testing-1:
+      text: Run bun run lint and confirm no TypeScript errors
+      status: complete
+      command: bun run lint
+    testing-2:
+      text: Run bun test and confirm all existing tests still pass
+      status: complete
+      command: bun test
+testing_gates:
+  validation_task: testing-1
+  unit_test_task: testing-2

@@ -58,3 +58,11 @@ requirements:
       Running `build:native:all` MUST produce one `.sha256` file per binary, named
       `<binary-filename>.sha256`, containing the hex digest of that binary.
     scenarios: {}
+  install-script:
+    strength: MUST
+    statement: An install.sh script MUST be provided that fetches the CLI binaries for the user's OS/Arch.
+    scenarios:
+      install-script:
+        - GIVEN: A curl or wget command
+        - WHEN: running the install.sh script
+        - THEN: the appropriate Go CLI binary and native TS bridge binary are installed

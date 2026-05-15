@@ -5,7 +5,7 @@ schema_file: ../../templates/strict-spec-driven/schemas/planned-change.yaml
 planned_change:
   id: distribution-packaging
   milestone: 0017-lightweight-cli
-status: planned
+status: complete
 summary: Cross-platform distribution (install scripts, Homebrew)
 details: >-
   Simplify the installation process so users do not need Node.js installed to run the CLI. 1.

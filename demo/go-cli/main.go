@@ -41,8 +41,11 @@ func main() {
 	permMode := flag.String("permission-mode", "approve", "Tool permission mode (default, acceptEdits, bypassPermissions, approve)")
 	flag.Parse()
 
-	// Resolve bridge path: flag > default (../../dist/src/cli.js relative to this binary).
+	// Resolve bridge path: flag > adjacent native binary > development cli.js
 	bp := *bridgePath
+	var cmdName string
+	var cmdArgs []string
+
 	if bp == "" {
 		exe, err := os.Executable()
 		if err != nil {
@@ -50,7 +53,24 @@ func main() {
 			os.Exit(1)
 		}
 		exeDir := filepath.Dir(exe)
-		bp = filepath.Join(exeDir, "..", "..", "dist", "src", "cli.js")
+		
+		// Check for native binary next to the CLI
+		nativePath := filepath.Join(exeDir, "ai-spec-bridge")
+		if _, err := os.Stat(nativePath); err == nil {
+			cmdName = nativePath
+		} else {
+			// Fallback to development script
+			cmdName = "node"
+			cmdArgs = []string{filepath.Join(exeDir, "..", "..", "dist", "src", "cli.js")}
+		}
+	} else {
+		// If user provided a path, determine if it needs node
+		if strings.HasSuffix(bp, ".js") || strings.HasSuffix(bp, ".ts") {
+			cmdName = "node"
+			cmdArgs = []string{bp}
+		} else {
+			cmdName = bp
+		}
 	}
 
 	// Validate workspace.
@@ -65,7 +85,7 @@ func main() {
 	}
 
 	// Start the bridge subprocess.
-	client, err := bridge.New(bp)
+	client, err := bridge.New(cmdName, cmdArgs...)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error starting bridge: %v\n", err)
 		os.Exit(1)

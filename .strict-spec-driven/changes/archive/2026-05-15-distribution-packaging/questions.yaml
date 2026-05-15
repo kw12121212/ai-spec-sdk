@@ -1,0 +1,17 @@
+schema: strict-spec-driven/question-list/v1
+schema_version: 1
+artifact_type: question_list
+schema_file: templates/strict-spec-driven/schemas/question-list.yaml
+change: distribution-packaging
+open: []
+resolved:
+  - id: go-cli-bridge-packaging
+    question: How exactly should the Go CLI package or locate the native TS bridge binary?
+    context: >-
+      The milestone mentions either embedding the native bridge binary or automatically downloading
+      it on first run.
+    answer: >-
+      The install.sh script will download both the Go CLI and the native TS bridge binary and place
+      them in the PATH. The Go CLI will assume the bridge binary is available in the PATH or
+      alongside the CLI binary.
+    status: resolved

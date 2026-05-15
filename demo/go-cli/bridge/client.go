@@ -59,9 +59,10 @@ type Client struct {
 }
 
 // New spawns the ai-spec-bridge subprocess and starts reading its output.
-// bridgePath is the path to the bridge binary (e.g. "node dist/src/cli.js").
-func New(bridgePath string) (*Client, error) {
-	cmd := exec.Command("node", bridgePath)
+// bridgeCmd is the command to run (e.g., "node" or path to native binary).
+// args are the arguments to pass to the command.
+func New(bridgeCmd string, args ...string) (*Client, error) {
+	cmd := exec.Command(bridgeCmd, args...)
 	cmd.Stderr = os.Stderr
 
 	stdin, err := cmd.StdinPipe()
