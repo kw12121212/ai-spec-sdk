@@ -1456,17 +1456,65 @@ export class BridgeServer {
       resolvedOptions = { ...resolvedOptions, includePartialMessages: true };
     }
 
-    // Inject custom tools into system prompt if available
-    if (customTools.length > 0) {
-      const customToolInstructions = this._buildCustomToolInstructions(customTools);
-      const existingSystemPrompt = resolvedOptions["systemPrompt"] as string | undefined;
-      resolvedOptions = {
-        ...resolvedOptions,
-        systemPrompt: existingSystemPrompt
-          ? `${existingSystemPrompt}\n\n${customToolInstructions}`
-          : customToolInstructions,
-      };
-    }
+    const customSdkTools = customTools.map((tool) => ({
+      name: tool.name,
+      description: tool.description,
+      inputSchema: {
+        type: "object",
+        additionalProperties: true,
+      },
+      call: async (input: Record<string, unknown>) => {
+        return new Promise((resolve, reject) => {
+          const timeout = tool.timeout || 60000;
+          const maxBuffer = tool.maxBuffer || 1024 * 1024 * 5;
+
+          let stdoutData = "";
+          let stderrData = "";
+          const child = spawn(tool.command, tool.args, {
+            cwd: tool.workspace,
+            shell: true,
+          });
+
+          let timeoutId: ReturnType<typeof setTimeout> | undefined;
+          if (timeout > 0) {
+            timeoutId = setTimeout(() => {
+              child.kill("SIGTERM");
+            }, timeout);
+          }
+
+          if (Object.keys(input).length > 0) {
+            child.stdin.write(JSON.stringify(input));
+          }
+          child.stdin.end();
+
+          child.stdout.on("data", (chunk: Buffer) => {
+            stdoutData += chunk.toString();
+            if (stdoutData.length > maxBuffer) {
+              child.kill("SIGTERM");
+              reject(new Error(`Max buffer size exceeded (${maxBuffer} bytes)`));
+            }
+          });
+
+          child.stderr.on("data", (chunk: Buffer) => {
+            stderrData += chunk.toString();
+          });
+
+          child.on("close", (code) => {
+            if (timeoutId) clearTimeout(timeoutId);
+            if (code !== 0) {
+              reject(new Error(`Command failed with code ${code}\nStderr: ${stderrData}`));
+            } else {
+              resolve(stdoutData.trim() || { success: true });
+            }
+          });
+          
+          child.on("error", (err) => {
+            if (timeoutId) clearTimeout(timeoutId);
+            reject(err);
+          });
+        });
+      }
+    }));
 
     // Expose MCP tools to the agent SDK so they can be invoked natively
     const mcpServers = this.mcpStore.list(context.cwd);
@@ -1547,6 +1595,7 @@ export class BridgeServer {
           ...(Array.isArray(resolvedOptions.tools) ? resolvedOptions.tools : []),
           ...mcpSdkTools,
           ...builtInSdkTools,
+          ...customSdkTools,
           askQuestionTool
         ]
       };

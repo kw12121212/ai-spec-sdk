@@ -1,0 +1,25 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: workflow-built-in-tools
+mapping:
+  implementation:
+    - src/workspace-store.ts
+    - src/bridge.ts
+  tests:
+    - test/workspace-store.test.ts
+operations:
+  ADDED:
+    custom-tool-registration:
+      strength: MUST
+      statement: >-
+        The system MUST support registering and executing custom shell-command tools defined in a
+        workspace configuration file.
+      scenarios:
+        execute-custom-tool:
+          - GIVEN: A custom tool is registered in .claude/custom-tools.json
+          - WHEN: The tool is executed via the bridge
+          - THEN: It spawns a shell process, passes input via stdin, and reads output from stdout
+  MODIFIED: {}
+  REMOVED: {}

@@ -14,6 +14,8 @@ export interface CustomTool {
   args: string[];
   workspace: string;
   registeredAt: string;
+  timeout?: number;
+  maxBuffer?: number;
 }
 
 function nowIso(): string {
@@ -51,6 +53,7 @@ export class WorkspaceStore {
         ) {
           const entry = item as WorkspaceEntry;
           this.entries.set(entry.path, entry);
+          this._loadWorkspaceCustomTools(entry.path);
         }
       }
     } catch {
@@ -64,6 +67,52 @@ export class WorkspaceStore {
     const tmpPath = this.filePath + ".tmp";
     fs.writeFileSync(tmpPath, JSON.stringify(list), "utf8");
     fs.renameSync(tmpPath, this.filePath);
+  }
+
+  private _getCustomToolsPath(workspace: string): string {
+    return path.join(workspace, ".claude", "custom-tools.json");
+  }
+
+  private _loadWorkspaceCustomTools(workspace: string): void {
+    const toolsPath = this._getCustomToolsPath(workspace);
+    try {
+      if (fs.existsSync(toolsPath)) {
+        const raw = fs.readFileSync(toolsPath, "utf8");
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          const workspaceTools = new Map<string, CustomTool>();
+          for (const item of parsed) {
+            if (item && item.name && typeof item.name === "string") {
+              workspaceTools.set(item.name, {
+                ...item,
+                workspace,
+                registeredAt: item.registeredAt || nowIso()
+              } as CustomTool);
+            }
+          }
+          this.customTools.set(workspace, workspaceTools);
+        }
+      }
+    } catch {
+      // skip if missing or corrupt
+    }
+  }
+
+  private _persistWorkspaceCustomTools(workspace: string): void {
+    const workspaceTools = this.customTools.get(workspace);
+    if (!workspaceTools) return;
+    
+    const toolsPath = this._getCustomToolsPath(workspace);
+    const dir = path.dirname(toolsPath);
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      const list = Array.from(workspaceTools.values());
+      const tmpPath = toolsPath + ".tmp";
+      fs.writeFileSync(tmpPath, JSON.stringify(list, null, 2), "utf8");
+      fs.renameSync(tmpPath, toolsPath);
+    } catch {
+      // Ignore write errors
+    }
   }
 
   register(workspacePath: string): WorkspaceEntry {
@@ -85,6 +134,9 @@ export class WorkspaceStore {
     }
 
     this._persist();
+    if (!existing) {
+      this._loadWorkspaceCustomTools(workspacePath);
+    }
     return entry;
   }
 
@@ -110,29 +162,51 @@ export class WorkspaceStore {
 
     let workspaceTools = this.customTools.get(workspace);
     if (!workspaceTools) {
-      workspaceTools = new Map();
-      this.customTools.set(workspace, workspaceTools);
+      this._loadWorkspaceCustomTools(workspace);
+      workspaceTools = this.customTools.get(workspace);
+      if (!workspaceTools) {
+        workspaceTools = new Map();
+        this.customTools.set(workspace, workspaceTools);
+      }
     }
     workspaceTools.set(tool.name, fullTool);
+    this._persistWorkspaceCustomTools(workspace);
     return fullTool;
   }
 
   unregisterTool(workspace: string, name: string): boolean {
-    const workspaceTools = this.customTools.get(workspace);
-    if (!workspaceTools) return false;
-    return workspaceTools.delete(name);
+    let workspaceTools = this.customTools.get(workspace);
+    if (!workspaceTools) {
+      this._loadWorkspaceCustomTools(workspace);
+      workspaceTools = this.customTools.get(workspace);
+      if (!workspaceTools) return false;
+    }
+    const result = workspaceTools.delete(name);
+    if (result) {
+      this._persistWorkspaceCustomTools(workspace);
+    }
+    return result;
   }
 
   listTools(workspace: string): CustomTool[] {
-    const workspaceTools = this.customTools.get(workspace);
-    if (!workspaceTools) return [];
+    let workspaceTools = this.customTools.get(workspace);
+    if (!workspaceTools) {
+      this._loadWorkspaceCustomTools(workspace);
+      workspaceTools = this.customTools.get(workspace);
+      if (!workspaceTools) return [];
+    }
     return Array.from(workspaceTools.values()).sort((a, b) =>
       a.registeredAt.localeCompare(b.registeredAt),
     );
   }
 
   getTool(workspace: string, name: string): CustomTool | undefined {
-    const workspaceTools = this.customTools.get(workspace);
-    return workspaceTools?.get(name);
+    let workspaceTools = this.customTools.get(workspace);
+    if (!workspaceTools) {
+      this._loadWorkspaceCustomTools(workspace);
+      workspaceTools = this.customTools.get(workspace);
+      if (!workspaceTools) return undefined;
+    }
+    return workspaceTools.get(name);
   }
 }

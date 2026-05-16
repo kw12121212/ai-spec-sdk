@@ -1,0 +1,15 @@
+schema: strict-spec-driven/planned-change/v1
+schema_version: 1
+artifact_type: planned_change
+schema_file: templates/strict-spec-driven/schemas/planned-change.yaml
+planned_change:
+  id: custom-tools
+  milestone: 0018-cli-ux-and-ecosystem
+status: complete
+summary: Enable workspace-scoped custom shell-command tools
+details: >-
+  Implement `tools.register` and `tools.unregister` methods. Store registered custom tools in 
+  `<workspace>/.claude/custom-tools.json`. Update the bridge to merge these with built-in tools. 
+  Execute these custom tools by spawning a shell process, passing input via stdin (JSON), and 
+  reading output from stdout.
+depends_on: []

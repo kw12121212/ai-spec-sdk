@@ -1,0 +1,33 @@
+schema: strict-spec-driven/roadmap-milestone/v2
+schema_version: 2
+artifact_type: roadmap_milestone
+schema_file: templates/strict-spec-driven/schemas/roadmap-milestone.yaml
+milestone:
+  0018-cli-ux-and-ecosystem:
+    title: CLI UX and Developer Ecosystem Completion
+goal: >-
+  Complete the missing aspects of the lightweight Coding Agent CLI (milestone 17) and extend
+  developer reach. This includes adding the missing LLM adapters (OpenAI, DeepSeek), implementing
+  streaming token output for a smooth terminal UX, providing a Python Client SDK, and enabling
+  custom shell-command tool registration.
+scope:
+  in:
+    - Implementation of OpenAI and DeepSeek adapters under src/llm-provider/adapters/
+    - Streaming token output logic in the bridge and CLI renderer
+    - Python Client SDK (clients/python) with stdio and HTTP/SSE transport
+    - Custom tool registration via .claude/custom-tools.json
+  out:
+    - WebSocket transport
+    - Multi-Agent Orchestration
+done_criteria:
+  - Users can switch the bridge to use OpenAI or DeepSeek backend smoothly
+  - The Go CLI and web UI render text progressively as it streams
+  - Developers can install ai-spec-sdk via PyPI and use it in Python
+  - Users can define external shell commands as tools in workspace config
+planned_changes: {}
+dependencies:
+  - 0017-lightweight-cli
+risks:
+  - Managing streaming chunks might require complex state tracking in the Go CLI renderer
+status: proposed
+notes: []

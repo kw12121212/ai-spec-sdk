@@ -1,0 +1,12 @@
+schema: strict-spec-driven/question-list/v1
+schema_version: 1
+artifact_type: question_list
+schema_file: templates/strict-spec-driven/schemas/question-list.yaml
+change: custom-tools
+open: []
+resolved:
+  - id: shell-execution
+    question: How should we handle timeout and security for shell execution?
+    context: Running arbitrary shell commands poses security risks and potential hangs.
+    answer: Configurable timeout per tool in custom-tools.json, with maximum stdout buffer limits.
+    status: resolved

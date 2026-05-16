@@ -1,0 +1,32 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: custom-tools
+sections:
+  Implementation:
+    update-registry:
+      text: Implement `tools.register` and `tools.unregister` in src/unified-tool-registry.ts
+      status: complete
+    load-custom-tools:
+      text: Load and store registered custom tools in <workspace>/.claude/custom-tools.json
+      status: complete
+    execute-shell:
+      text: Implement shell execution for custom tools with stdin/stdout piping
+      status: complete
+  Testing:
+    run-build:
+      text: Run build validation.
+      status: complete
+      command: bun run build
+    run-tests:
+      text: Run unit tests.
+      status: complete
+      command: bun test
+  Verification:
+    verify-scope:
+      text: Verify implementation matches proposal scope.
+      status: complete
+testing_gates:
+  validation_task: run-build
+  unit_test_task: run-tests

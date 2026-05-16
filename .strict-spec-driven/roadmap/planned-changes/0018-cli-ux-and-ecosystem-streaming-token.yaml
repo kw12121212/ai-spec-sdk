@@ -1,0 +1,16 @@
+schema: strict-spec-driven/planned-change/v1
+schema_version: 1
+artifact_type: planned_change
+schema_file: templates/strict-spec-driven/schemas/planned-change.yaml
+planned_change:
+  id: streaming-token
+  milestone: 0018-cli-ux-and-ecosystem
+status: planned
+summary: Implement real-time streaming token output
+details: >-
+  Add a `stream: true` option to session start/resume. Update `claude-agent-runner.ts` to emit 
+  per-chunk events instead of aggregating the full message. Introduce a `bridge/stream_chunk` 
+  notification for HTTP/SSE and stdio transports. Update the Go CLI renderer to handle these chunks 
+  for a smooth, progressive text typing effect.
+depends_on:
+  - llm-adapters

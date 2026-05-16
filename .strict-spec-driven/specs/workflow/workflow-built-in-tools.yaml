@@ -19,3 +19,13 @@ requirements:
         - GIVEN: A session with built-in tools enabled
         - WHEN: The agent invokes run_shell_command
         - THEN: The command executes safely using the tool approval flow
+  custom-tool-registration:
+    strength: MUST
+    statement: >-
+      The system MUST support registering and executing custom shell-command tools defined in a
+      workspace configuration file.
+    scenarios:
+      execute-custom-tool:
+        - GIVEN: A custom tool is registered in .claude/custom-tools.json
+        - WHEN: The tool is executed via the bridge
+        - THEN: It spawns a shell process, passes input via stdin, and reads output from stdout

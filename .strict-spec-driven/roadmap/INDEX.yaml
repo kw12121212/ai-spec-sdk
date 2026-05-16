@@ -71,3 +71,7 @@ milestones:
     title: Lightweight Coding Agent CLI
     path: roadmap/milestones/0017-lightweight-cli.yaml
     status: complete
+  0018-cli-ux-and-ecosystem:
+    title: CLI UX and Developer Ecosystem Completion
+    path: roadmap/milestones/0018-cli-ux-and-ecosystem.yaml
+    status: proposed

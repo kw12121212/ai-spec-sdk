@@ -1,0 +1,21 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: custom-tools
+  status: proposed
+summary:
+  what:
+    - Enable workspace-scoped custom shell-command tools
+  why:
+    - To allow users to define external shell commands as tools in workspace config.
+scope:
+  in:
+    - Custom tool registration via .claude/custom-tools.json and bridge execution.
+  out:
+    - WebSocket transport, Multi-Agent Orchestration
+unchanged_behavior: []
+roadmap:
+  milestone: 0018-cli-ux-and-ecosystem
+  planned_change: custom-tools
