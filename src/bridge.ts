@@ -1672,6 +1672,15 @@ export class BridgeServer {
                 type: kind,
                 message: { content: chunk, index: i },
               });
+              
+              if (kind === "stream_chunk") {
+                this.emit("bridge/stream_chunk", {
+                  sessionId: session.id,
+                  content: chunk,
+                  index: i
+                }, requestId);
+              }
+              
               this.emit(
                 "bridge/session_event",
                 {

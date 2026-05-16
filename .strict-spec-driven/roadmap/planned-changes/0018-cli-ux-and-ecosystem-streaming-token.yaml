@@ -5,7 +5,7 @@ schema_file: templates/strict-spec-driven/schemas/planned-change.yaml
 planned_change:
   id: streaming-token
   milestone: 0018-cli-ux-and-ecosystem
-status: planned
+status: complete
 summary: Implement real-time streaming token output
 details: >-
   Add a `stream: true` option to session start/resume. Update `claude-agent-runner.ts` to emit 

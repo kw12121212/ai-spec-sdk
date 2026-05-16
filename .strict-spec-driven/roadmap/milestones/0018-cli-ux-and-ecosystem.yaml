@@ -29,5 +29,5 @@ dependencies:
   - 0017-lightweight-cli
 risks:
   - Managing streaming chunks might require complex state tracking in the Go CLI renderer
-status: proposed
+status: complete
 notes: []

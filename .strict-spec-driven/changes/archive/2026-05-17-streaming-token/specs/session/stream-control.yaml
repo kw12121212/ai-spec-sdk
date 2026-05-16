@@ -1,0 +1,22 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: session-stream-control
+mapping:
+  implementation:
+    - src/claude-agent-runner.ts
+  tests:
+    - test/session.test.ts
+operations:
+  ADDED:
+    stream-chunk-event:
+      strength: MUST
+      statement: The agent runner MUST emit bridge/stream_chunk events when stream is enabled
+      scenarios:
+        stream-enabled:
+          - GIVEN: 'session start with stream: true'
+          - WHEN: the LLM provider streams a response
+          - THEN: a stream_chunk notification is emitted
+  MODIFIED: {}
+  REMOVED: {}

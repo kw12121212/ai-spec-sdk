@@ -97,6 +97,13 @@ func (m *Manager) Start(prompt string) (*StartResult, error) {
 		ui.RenderEvent(n.Params)
 	})
 
+	m.client.OnNotification("bridge/stream_chunk", func(n bridge.Notification) {
+		// Just render the chunk directly.
+		if content, ok := n.Params["content"].(string); ok {
+			fmt.Print(content)
+		}
+	})
+
 	// Set up notification handler for tool approval requests.
 	m.client.OnNotification("bridge/tool_approval_requested", func(n bridge.Notification) {
 		params := n.Params
@@ -175,6 +182,11 @@ func (m *Manager) Resume(sessionID, prompt string) (*StartResult, error) {
 	// Re-register notification handlers (same as Start).
 	m.client.OnNotification("bridge/session_event", func(n bridge.Notification) {
 		ui.RenderEvent(n.Params)
+	})
+	m.client.OnNotification("bridge/stream_chunk", func(n bridge.Notification) {
+		if content, ok := n.Params["content"].(string); ok {
+			fmt.Print(content)
+		}
 	})
 	m.client.OnNotification("bridge/tool_approval_requested", func(n bridge.Notification) {
 		params := n.Params

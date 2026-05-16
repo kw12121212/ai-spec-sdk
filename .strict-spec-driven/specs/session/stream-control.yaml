@@ -81,3 +81,11 @@ requirements:
             threshold
         - THEN: the system MUST forcefully close the transport connection
         - AND: the system MUST terminate the underlying LLM provider stream to release resources
+  stream-chunk-event:
+    strength: MUST
+    statement: The agent runner MUST emit bridge/stream_chunk events when stream is enabled
+    scenarios:
+      stream-enabled:
+        - GIVEN: 'session start with stream: true'
+        - WHEN: the LLM provider streams a response
+        - THEN: a stream_chunk notification is emitted

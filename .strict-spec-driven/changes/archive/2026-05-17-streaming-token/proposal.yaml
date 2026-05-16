@@ -1,0 +1,24 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: streaming-token
+  status: proposed
+summary:
+  what:
+    - Implement real-time streaming token output
+  why:
+    - To provide a smooth, progressive text typing effect in the CLI
+scope:
+  in:
+    - >-
+      claude-agent-runner.ts to emit chunks, bridge for HTTP/SSE and stdio transports, Go CLI
+      renderer
+  out:
+    - WebSocket transport streaming (handled later or separately)
+unchanged_behavior:
+  - Existing non-streaming logic for legacy clients
+roadmap:
+  milestone: 0018-cli-ux-and-ecosystem
+  planned_change: streaming-token

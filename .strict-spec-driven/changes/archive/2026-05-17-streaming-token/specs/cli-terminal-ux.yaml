@@ -1,0 +1,24 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: cli-terminal-ux
+mapping:
+  implementation:
+    - demo/go-cli/ui/renderer.go
+  tests:
+    - demo/go-cli/ui/renderer_test.go
+operations:
+  ADDED: {}
+  MODIFIED:
+    stream-render:
+      strength: MUST
+      statement: >-
+        The CLI renderer MUST progressively render text chunks as they arrive via
+        bridge/stream_chunk notifications
+      scenarios:
+        stream-arrival:
+          - GIVEN: a streaming session
+          - WHEN: bridge/stream_chunk is received
+          - THEN: the text is rendered immediately
+  REMOVED: {}

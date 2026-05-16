@@ -81,6 +81,9 @@ func renderAgentMessage(params map[string]any) {
 			}
 		}
 
+	case "stream_chunk":
+		// Ignored here; handled directly by bridge/stream_chunk notification listener in session manager.
+
 	case "tool_use":
 		// Claude wants to call a tool. Show tool name and input summary.
 		name, input := extractToolUse(msg)

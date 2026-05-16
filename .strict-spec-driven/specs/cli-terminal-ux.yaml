@@ -19,3 +19,13 @@ requirements:
         - GIVEN: The CLI receives markdown text
         - WHEN: It outputs the text to the terminal
         - THEN: It is formatted with ANSI colors and markdown styles
+  stream-render:
+    strength: MUST
+    statement: >-
+      The CLI renderer MUST progressively render text chunks as they arrive via bridge/stream_chunk
+      notifications
+    scenarios:
+      stream-arrival:
+        - GIVEN: a streaming session
+        - WHEN: bridge/stream_chunk is received
+        - THEN: the text is rendered immediately
