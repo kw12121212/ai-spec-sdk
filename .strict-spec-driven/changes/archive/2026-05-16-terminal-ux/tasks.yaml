@@ -1,0 +1,35 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: terminal-ux
+sections:
+  Implementation:
+    integrate-glamour:
+      text: Integrate charmbracelet/glamour for rich Markdown rendering.
+      status: complete
+    add-spinners:
+      text: Add loading spinners for network requests and inference.
+      status: complete
+    render-reasoning:
+      text: Parse and render reasoning_content chunks in a distinct block.
+      status: complete
+    format-prompts:
+      text: Format tool execution prompts with colored diffs and distinct accept/reject keys.
+      status: complete
+  Testing:
+    run-build:
+      text: Run build validation.
+      status: complete
+      command: bun run build
+    run-tests:
+      text: Run unit tests.
+      status: complete
+      command: bun test
+  Verification:
+    verify-scope:
+      text: Verify implementation matches proposal scope.
+      status: complete
+testing_gates:
+  validation_task: run-build
+  unit_test_task: run-tests

@@ -34,5 +34,5 @@ dependencies:
 risks:
   - Bundling Node.js runtime and Go binary might increase installation complexity
   - Complex terminal UX might introduce cross-platform compatibility issues
-status: proposed
+status: complete
 notes: []

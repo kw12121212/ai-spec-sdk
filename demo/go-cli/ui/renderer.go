@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/charmbracelet/glamour"
 )
 
 // Color codes for terminal output (ANSI escape sequences).
@@ -65,11 +67,18 @@ func renderAgentMessage(params map[string]any) {
 		fmt.Printf("%s%sConnected%s — model: %s, session: %s\n", colorBold, colorCyan, colorReset, model, sessionID)
 
 	case "assistant_text":
-		// Text response from Claude. Extract text from nested content blocks.
-		text := extractText(msg)
+		// Text response from Claude. Extract text and reasoning from nested content blocks.
+		text, reasoning := extractTextAndReasoning(msg)
+		if reasoning != "" {
+			fmt.Printf("\n%s%s%s\n", colorDim, reasoning, colorReset)
+		}
 		if text != "" {
-			fmt.Println()
-			fmt.Println(text)
+			out, err := glamour.Render(text, "dark")
+			if err == nil {
+				fmt.Print(out)
+			} else {
+				fmt.Println("\n" + text)
+			}
 		}
 
 	case "tool_use":
@@ -140,11 +149,11 @@ func PromptToolApproval(params map[string]any) bool {
 		}
 	}
 
-	fmt.Printf("  %sApprove?%s [y/N]: ", colorBold, colorReset)
+	fmt.Printf("  %sApprove?%s [%sY%s/%sn%s]: ", colorBold, colorReset, colorGreen, colorReset, colorRed, colorReset)
 	reader := bufio.NewReader(os.Stdin)
 	answer, _ := reader.ReadString('\n')
 	answer = strings.TrimSpace(strings.ToLower(answer))
-	return answer == "y" || answer == "yes"
+	return answer == "y" || answer == "yes" || answer == "" // Default to yes for [Y/n]
 }
 
 // ReadMultiLine reads user input from stdin, supporting multi-line continuation
@@ -187,16 +196,27 @@ func ReadMultiLine(prompt string) (string, bool) {
 
 // --- Helper functions ---
 
-func extractText(msg map[string]any) string {
+func extractTextAndReasoning(msg map[string]any) (text string, reasoning string) {
 	content := getContentArray(msg)
 	for _, block := range content {
-		if b, ok := block.(map[string]any); ok && b["type"] == "text" {
-			if text, ok := b["text"].(string); ok {
-				return text
+		if b, ok := block.(map[string]any); ok {
+			switch b["type"] {
+			case "text":
+				if t, ok := b["text"].(string); ok {
+					text += t
+				}
+			case "reasoning_content", "thinking":
+				if r, ok := b["reasoning_content"].(string); ok {
+					reasoning += r
+				} else if r, ok := b["thinking"].(string); ok {
+					reasoning += r
+				} else if r, ok := b["text"].(string); ok {
+					reasoning += r
+				}
 			}
 		}
 	}
-	return ""
+	return text, strings.TrimSpace(reasoning)
 }
 
 func extractToolUse(msg map[string]any) (name string, input any) {

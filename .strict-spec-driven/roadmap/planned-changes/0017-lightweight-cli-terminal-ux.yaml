@@ -5,7 +5,7 @@ schema_file: ../../templates/strict-spec-driven/schemas/planned-change.yaml
 planned_change:
   id: terminal-ux
   milestone: 0017-lightweight-cli
-status: planned
+status: complete
 summary: Markdown rendering, syntax highlighting, spinners, and diff views
 details: >-
   Enhance the Go CLI terminal UX (`demo/go-cli/ui/renderer.go`) to be product-grade. 1. Integrate a

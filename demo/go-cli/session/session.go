@@ -8,6 +8,8 @@ import (
 
 	"go-cli/bridge"
 	"go-cli/ui"
+
+	"github.com/charmbracelet/huh/spinner"
 )
 
 // Manager manages agent sessions via the bridge.
@@ -132,7 +134,16 @@ func (m *Manager) Start(prompt string) (*StartResult, error) {
 		params["model"] = m.CurrentModel
 	}
 
-	result, err := m.client.Call("session.start", params)
+	var result any
+	var err error
+
+	_ = spinner.New().
+		Title("Thinking...").
+		Action(func() {
+			result, err = m.client.Call("session.start", params)
+		}).
+		Run()
+
 	if err != nil {
 		return nil, fmt.Errorf("session.start: %w", err)
 	}
@@ -193,7 +204,16 @@ func (m *Manager) Resume(sessionID, prompt string) (*StartResult, error) {
 		params["model"] = m.CurrentModel
 	}
 
-	result, err := m.client.Call("session.resume", params)
+	var result any
+	var err error
+
+	_ = spinner.New().
+		Title("Thinking...").
+		Action(func() {
+			result, err = m.client.Call("session.resume", params)
+		}).
+		Run()
+
 	if err != nil {
 		return nil, fmt.Errorf("session.resume: %w", err)
 	}

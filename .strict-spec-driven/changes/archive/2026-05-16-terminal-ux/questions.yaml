@@ -1,0 +1,14 @@
+schema: strict-spec-driven/question-list/v1
+schema_version: 1
+artifact_type: question_list
+schema_file: templates/strict-spec-driven/schemas/question-list.yaml
+change: terminal-ux
+open: []
+resolved:
+  - id: q-1
+    question: >-
+      Are there any specific terminal constraints or fallback behaviors required if charmbracelet
+      libraries fail to render?
+    context: Terminal emulators vary in their support for advanced ANSI features.
+    answer: No specific constraints. Use charmbracelet defaults.
+    status: resolved

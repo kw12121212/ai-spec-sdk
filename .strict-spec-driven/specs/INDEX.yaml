@@ -15,6 +15,9 @@ specs:
   - id: cli-provider-config
     title: CLI Provider Configuration
     path: .strict-spec-driven/specs/cli-provider-config.yaml
+  - id: cli-terminal-ux
+    title: CLI Terminal UX
+    path: .strict-spec-driven/specs/cli-terminal-ux.yaml
   - id: llm-response-cache
     title: LLM Response Cache
     path: .strict-spec-driven/specs/llm-provider/llm-response-cache.yaml

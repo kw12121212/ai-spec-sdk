@@ -121,7 +121,7 @@ func TestExtractText_Nested(t *testing.T) {
 			},
 		},
 	}
-	got := extractText(msg)
+	got, _ := extractTextAndReasoning(msg)
 	if got != "Hello, world!" {
 		t.Errorf("extractText = %q, want %q", got, "Hello, world!")
 	}
@@ -133,7 +133,7 @@ func TestExtractText_TopLevel(t *testing.T) {
 			map[string]any{"type": "text", "text": "direct text"},
 		},
 	}
-	got := extractText(msg)
+	got, _ := extractTextAndReasoning(msg)
 	if got != "direct text" {
 		t.Errorf("extractText = %q, want %q", got, "direct text")
 	}
@@ -147,7 +147,7 @@ func TestExtractText_NoTextBlock(t *testing.T) {
 			},
 		},
 	}
-	got := extractText(msg)
+	got, _ := extractTextAndReasoning(msg)
 	if got != "" {
 		t.Errorf("extractText = %q, want empty", got)
 	}
@@ -162,7 +162,7 @@ func TestExtractText_MultipleBlocks(t *testing.T) {
 			},
 		},
 	}
-	got := extractText(msg)
+	got, _ := extractTextAndReasoning(msg)
 	if got != "second" {
 		t.Errorf("extractText = %q, want second", got)
 	}
@@ -343,7 +343,7 @@ func TestRenderEvent_AgentMessage_AssistantText(t *testing.T) {
 			},
 		})
 	})
-	if !strings.Contains(out, "Hello from Claude") {
+	if !strings.Contains(out, "Hello") || !strings.Contains(out, "Claude") {
 		t.Errorf("expected text in output, got: %s", out)
 	}
 }

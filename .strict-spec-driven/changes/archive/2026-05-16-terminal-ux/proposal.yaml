@@ -1,0 +1,26 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: terminal-ux
+  status: proposed
+summary:
+  what:
+    - >-
+      Enhance the Go CLI terminal UX (Markdown rendering, syntax highlighting, spinners, and diff
+      views)
+  why:
+    - >-
+      To provide a product-grade terminal UX for the lightweight CLI, improving usability and
+      feedback during AI generation.
+scope:
+  in:
+    - demo/go-cli/ui/renderer.go, demo/go-cli/main.go
+  out:
+    - Re-implementing the core Bridge server in Go, GUI/Web application interfaces
+unchanged_behavior:
+  - Existing bridge communication protocol and core Bridge behavior
+roadmap:
+  milestone: 0017-lightweight-cli
+  planned_change: terminal-ux

@@ -1,0 +1,24 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: cli-terminal-ux
+mapping:
+  implementation:
+    - demo/go-cli/ui/renderer.go
+  tests:
+    - demo/go-cli/ui/renderer_test.go
+operations:
+  ADDED:
+    req-1:
+      strength: MUST
+      statement: >-
+        The Go CLI must render markdown content using rich terminal formatting with
+        charmbracelet/glamour.
+      scenarios:
+        sc-1:
+          - GIVEN: The CLI receives markdown text
+          - WHEN: It outputs the text to the terminal
+          - THEN: It is formatted with ANSI colors and markdown styles
+  MODIFIED: {}
+  REMOVED: {}

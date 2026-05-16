@@ -1,0 +1,21 @@
+schema: strict-spec-driven/main-spec/v1
+schema_version: 1
+artifact_type: main_spec
+schema_file: templates/strict-spec-driven/schemas/main-spec.yaml
+spec:
+  id: cli-terminal-ux
+  title: CLI Terminal UX
+mapping:
+  implementation: []
+  tests: []
+requirements:
+  req-1:
+    strength: MUST
+    statement: >-
+      The Go CLI must render markdown content using rich terminal formatting with
+      charmbracelet/glamour.
+    scenarios:
+      sc-1:
+        - GIVEN: The CLI receives markdown text
+        - WHEN: It outputs the text to the terminal
+        - THEN: It is formatted with ANSI colors and markdown styles

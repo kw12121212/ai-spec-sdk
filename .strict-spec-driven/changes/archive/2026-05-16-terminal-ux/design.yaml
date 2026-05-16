@@ -1,0 +1,17 @@
+schema: strict-spec-driven/change-design/v1
+schema_version: 1
+artifact_type: change_design
+schema_file: templates/strict-spec-driven/schemas/change-design.yaml
+change: terminal-ux
+approach:
+  - >-
+    Integrate charmbracelet/glamour for rich Markdown rendering and ANSI syntax highlighting. Add
+    loading spinners for network requests and model inference. Parse and render reasoning_content
+    chunks in a distinct block. Format tool execution prompts with colored diffs and distinct
+    accept/reject keys.
+decisions:
+  d-1:
+    decision: Use charmbracelet/glamour for Markdown
+    rationale: Standard for rich terminal Markdown in Go applications.
+alternatives: []
+risks: []

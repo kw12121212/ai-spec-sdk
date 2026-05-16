@@ -70,4 +70,4 @@ milestones:
   0017-lightweight-cli:
     title: Lightweight Coding Agent CLI
     path: roadmap/milestones/0017-lightweight-cli.yaml
-    status: proposed
+    status: complete
