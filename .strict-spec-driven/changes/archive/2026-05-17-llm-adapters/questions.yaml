@@ -1,0 +1,12 @@
+schema: strict-spec-driven/question-list/v1
+schema_version: 1
+artifact_type: question_list
+schema_file: templates/strict-spec-driven/schemas/question-list.yaml
+change: llm-adapters
+open: []
+resolved:
+  - id: DEEPSEEK_URL
+    question: What is the exact base URL and model name convention for DeepSeek?
+    context: DeepSeek API may differ from OpenAI standard slightly.
+    answer: Use https://api.deepseek.com as base URL and deepseek-chat/coder for models
+    status: resolved

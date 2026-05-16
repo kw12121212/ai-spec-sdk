@@ -5,7 +5,7 @@ schema_file: templates/strict-spec-driven/schemas/planned-change.yaml
 planned_change:
   id: llm-adapters
   milestone: 0018-cli-ux-and-ecosystem
-status: planned
+status: complete
 summary: Implement OpenAI and DeepSeek provider adapters
 details: >-
   Implement fully functional adapters for OpenAI and DeepSeek under `src/llm-provider/adapters/`. 

@@ -1,0 +1,24 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: llm-adapters
+  status: proposed
+summary:
+  what:
+    - Implement OpenAI and DeepSeek provider adapters
+  why:
+    - >-
+      To allow users to switch models via the CLI and map internal tool-calling to different
+      provider APIs.
+scope:
+  in:
+    - Implementation of OpenAI and DeepSeek adapters under src/llm-provider/adapters/
+  out:
+    - WebSocket transport, Multi-Agent Orchestration
+unchanged_behavior:
+  - Existing built-in tools and SDK architecture
+roadmap:
+  milestone: 0018-cli-ux-and-ecosystem
+  planned_change: llm-adapters

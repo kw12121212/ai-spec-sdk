@@ -1,6 +1,8 @@
 import { ConfigStore } from "../config-store.js";
 import type { LLMProvider, ProviderConfig, StorageBackend } from "./types.js";
 import { AnthropicAdapter } from "./adapters/anthropic.js";
+import { OpenAIAdapter } from "./adapters/openai.js";
+import { DeepSeekAdapter } from "./adapters/deepseek.js";
 import type { Session } from "../session-store.js";
 import { CachingProviderWrapper } from "./cache-interceptor.js";
 import { MemoryStorageBackend } from "./memory-cache.js";
@@ -8,7 +10,7 @@ import { FileStorageBackend } from "./file-cache.js";
 
 type ProviderAdapterFactory = (config: ProviderConfig) => LLMProvider;
 
-const SUPPORTED_TYPES = ["anthropic", "openai", "local"] as const;
+const SUPPORTED_TYPES = ["anthropic", "openai", "deepseek", "local"] as const;
 
 type SupportedType = (typeof SUPPORTED_TYPES)[number];
 
@@ -57,6 +59,8 @@ export class ProviderRegistry {
 
   private registerDefaultAdapters(): void {
     this.adapterFactories["anthropic"] = (config) => new AnthropicAdapter(config);
+    this.adapterFactories["openai"] = (config) => new OpenAIAdapter(config);
+    this.adapterFactories["deepseek"] = (config) => new DeepSeekAdapter(config);
   }
 
   validateConfig(config: unknown): ValidationError[] {
@@ -90,9 +94,9 @@ export class ProviderRegistry {
       }
     }
 
-    if (cfg.type === "anthropic" || cfg.type === "openai") {
+    if (cfg.type === "anthropic" || cfg.type === "openai" || cfg.type === "deepseek") {
       const hasApiKey = cfg.apiKey && typeof cfg.apiKey === "string" && cfg.apiKey.trim() !== "";
-      const envVarName = cfg.type === "anthropic" ? "ANTHROPIC_API_KEY" : "OPENAI_API_KEY";
+      const envVarName = cfg.type === "anthropic" ? "ANTHROPIC_API_KEY" : cfg.type === "openai" ? "OPENAI_API_KEY" : "DEEPSEEK_API_KEY";
       const hasEnvKey = typeof process.env[envVarName] === "string" && process.env[envVarName]!.trim() !== "";
 
       if (!hasApiKey && !hasEnvKey) {

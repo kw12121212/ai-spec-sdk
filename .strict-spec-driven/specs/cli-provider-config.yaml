@@ -17,3 +17,13 @@ requirements:
         - GIVEN: The user runs the CLI with --provider openai and --base-url http://localhost:11434/v1
         - WHEN: The CLI initializes the bridge
         - THEN: The CLI MUST send a config.set RPC request configuring the LLM provider registry.
+  LLM_ADAPTERS:
+    strength: MUST
+    statement: The system MUST support OpenAI and DeepSeek as LLM providers.
+    scenarios:
+      OpenAI Adapter Mapping:
+        - GIVEN: A user configures the OpenAI provider
+        - WHEN: A completion request is made
+        - THEN: >-
+            The adapter MUST correctly map internal tool calling format to OpenAI's function calling
+            API.

@@ -1,6 +1,6 @@
 export interface ProviderConfig {
   id: string;
-  type: "anthropic" | "openai" | "local";
+  type: "anthropic" | "openai" | "deepseek" | "local";
   apiKey?: string;
   model?: string;
   temperature?: number;

@@ -1,0 +1,24 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: cli-provider-config
+mapping:
+  implementation:
+    - src/llm-provider/adapters/openai.ts
+  tests:
+    - test/llm-provider/adapters/openai.test.ts
+operations:
+  ADDED:
+    LLM_ADAPTERS:
+      strength: MUST
+      statement: The system MUST support OpenAI and DeepSeek as LLM providers.
+      scenarios:
+        OpenAI Adapter Mapping:
+          - GIVEN: A user configures the OpenAI provider
+          - WHEN: A completion request is made
+          - THEN: >-
+              The adapter MUST correctly map internal tool calling format to OpenAI's function
+              calling API.
+  MODIFIED: {}
+  REMOVED: {}
