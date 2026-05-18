@@ -1,0 +1,33 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: enhance-e2e-testing
+sections:
+  Implementation:
+    create-e2e-config-loader:
+      text: Create a utility to load local E2E configuration files (e.g. for real LLM credentials).
+      status: complete
+    create-e2e-tests:
+      text: Write E2E test cases simulating real end-user interactions with the SDK/CLI.
+      status: complete
+  Testing:
+    run-build:
+      text: Run build validation.
+      status: complete
+      command: bun run build
+    run-unit-tests:
+      text: Run unit tests.
+      status: complete
+      command: bun test
+    run-e2e-tests:
+      text: Run the new E2E tests.
+      status: complete
+      command: bun test e2e
+  Verification:
+    verify-scope:
+      text: Verify implementation matches proposal scope.
+      status: complete
+testing_gates:
+  validation_task: run-build
+  unit_test_task: run-unit-tests

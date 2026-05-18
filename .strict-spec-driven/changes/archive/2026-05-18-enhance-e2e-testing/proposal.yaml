@@ -1,0 +1,23 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: enhance-e2e-testing
+  status: proposed
+summary:
+  what:
+    - Enhance E2E testing to simulate end-user scenarios using a real LLM provider.
+  why:
+    - >-
+      Current tests rely on stubs. To ensure true reliability, we must validate real-world scenarios
+      with actual LLM integrations, managed via local configuration files.
+scope:
+  in:
+    - >-
+      Writing new E2E tests that simulate user flows. Reading local config files to initialize real
+      LLM providers for these tests.
+  out:
+    - Changing SDK business logic. Modifying existing unit tests that use stubs.
+unchanged_behavior:
+  - Unit testing methodology; existing LLM provider adapters.

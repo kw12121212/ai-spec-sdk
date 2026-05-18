@@ -23,6 +23,7 @@ logs/
 .env
 .env.*
 !.env.example
+e2e-config.json
 
 # OS/editor noise
 .DS_Store

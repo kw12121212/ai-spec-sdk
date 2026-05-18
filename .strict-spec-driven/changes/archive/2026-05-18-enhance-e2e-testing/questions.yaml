@@ -1,0 +1,16 @@
+schema: strict-spec-driven/question-list/v1
+schema_version: 1
+artifact_type: question_list
+schema_file: templates/strict-spec-driven/schemas/question-list.yaml
+change: enhance-e2e-testing
+open: []
+resolved:
+  - id: e2e-in-ci
+    question: >-
+      Should these E2E tests run in CI, and if so, how will we securely provide credentials without
+      causing rate-limit issues?
+    context: >-
+      E2E tests using real LLM APIs can be flaky and expensive in continuous integration
+      environments.
+    answer: Do not run in CI. Only run manually locally with .env.e2e credentials.
+    status: resolved
