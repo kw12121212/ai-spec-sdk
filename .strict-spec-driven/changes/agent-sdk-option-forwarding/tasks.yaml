@@ -1,0 +1,45 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: agent-sdk-option-forwarding
+sections:
+  Implementation:
+    inspect-provider-routing:
+      text: Inspect current Anthropic provider routing and SDK option construction.
+      status: complete
+    preserve-sdk-options:
+      text: >-
+        Preserve workspace, permission, tool, resume, turn, system prompt, stream, model, and env
+        controls on Anthropic provider-routed SDK sessions.
+      status: complete
+    map-provider-env:
+      text: >-
+        Map Anthropic provider API key, auth token, base URL aliases, and provider env values into
+        Claude Agent SDK env options.
+      status: complete
+  Testing:
+    add-regression-tests:
+      text: >-
+        Add deterministic regression tests for Anthropic provider-routed SDK option forwarding and
+        env mapping.
+      status: complete
+    run-lint:
+      text: Run lint checks.
+      status: complete
+      command: bun run lint
+    run-tests:
+      text: Run unit tests.
+      status: complete
+      command: bun run test
+    run-build:
+      text: Run build validation.
+      status: complete
+      command: bun run build
+  Verification:
+    verify-scope:
+      text: Verify implementation matches proposal scope.
+      status: complete
+testing_gates:
+  validation_task: run-build
+  unit_test_task: run-tests

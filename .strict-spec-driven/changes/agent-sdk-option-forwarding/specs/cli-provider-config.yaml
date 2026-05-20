@@ -1,0 +1,32 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: cli-provider-config
+mapping:
+  implementation:
+    - src/llm-provider/anthropic-env.ts
+    - src/llm-provider/provider-registry.ts
+    - src/claude-agent-runner.ts
+  tests:
+    - test/provider-registry.test.ts
+    - test/claude-agent-runner.test.ts
+operations:
+  ADDED:
+    anthropic-compatible-sdk-env:
+      strength: MUST
+      statement: >-
+        Anthropic provider configuration MUST map API key, auth token, base URL aliases, and
+        provider SDK environment entries into Claude Agent SDK environment options for
+        Anthropic-compatible endpoints.
+      scenarios:
+        provider-config-maps-sdk-env:
+          - GIVEN: >-
+              an Anthropic-compatible provider is configured with base URL, API key or auth token,
+              and SDK environment values
+          - WHEN: a provider-routed Claude Agent SDK query is started
+          - THEN: >-
+              the SDK query environment contains ANTHROPIC_BASE_URL, ANTHROPIC_API_KEY or
+              ANTHROPIC_AUTH_TOKEN, and the configured SDK environment values
+  MODIFIED: {}
+  REMOVED: {}

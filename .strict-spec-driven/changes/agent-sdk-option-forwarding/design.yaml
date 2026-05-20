@@ -1,0 +1,31 @@
+schema: strict-spec-driven/change-design/v1
+schema_version: 1
+artifact_type: change_design
+schema_file: templates/strict-spec-driven/schemas/change-design.yaml
+change: agent-sdk-option-forwarding
+approach:
+  - >-
+    Keep Anthropic provider-routed sessions on the Claude Agent SDK query path and build the SDK
+    options from the existing session options plus workspace cwd/env and provider configuration.
+    Merge provider-derived Anthropic SDK environment variables with caller-provided env so explicit
+    provider credentials and endpoint settings are available to the SDK process while preserving
+    non-Anthropic adapter behavior.
+decisions:
+  provider-routed-sdk-path:
+    decision: >-
+      Anthropic providers use the Claude Agent SDK query stream directly instead of the generic chat
+      adapter path.
+    rationale: >-
+      The Anthropic provider is the only configured provider type backed by the Claude Agent SDK
+      coding-agent runtime, so using the SDK path preserves tool, permission, workspace, resume,
+      max-turn, system prompt, and streaming controls.
+  provider-env-forwarding:
+    decision: >-
+      Anthropic provider apiKey, authToken, baseUrl/baseURL/apiBaseUrl, and provider env values are
+      forwarded through SDK env options.
+    rationale: >-
+      Anthropic-compatible third-party endpoints are configured through the SDK process environment,
+      and tests can verify the exact environment sent to the injected query function without network
+      calls.
+alternatives: []
+risks: []

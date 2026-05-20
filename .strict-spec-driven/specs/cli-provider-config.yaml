@@ -6,8 +6,13 @@ spec:
   id: cli-provider-config
   title: CLI Provider Configuration
 mapping:
-  implementation: []
-  tests: []
+  implementation:
+    - src/llm-provider/anthropic-env.ts
+    - src/llm-provider/provider-registry.ts
+    - src/claude-agent-runner.ts
+  tests:
+    - test/provider-registry.test.ts
+    - test/claude-agent-runner.test.ts
 requirements:
   CLI_PROVIDER_CONFIG:
     strength: MUST

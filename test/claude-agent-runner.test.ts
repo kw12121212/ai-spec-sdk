@@ -1,5 +1,6 @@
 import { test, expect } from "bun:test";
 import { runClaudeQuery } from "../src/claude-agent-runner.js";
+import { buildAnthropicSdkEnv } from "../src/llm-provider/anthropic-env.js";
 import type { LLMProvider, ProviderCapabilities, ProviderConfig, QueryOptions, QueryResult, StreamEvent } from "../src/llm-provider/types.js";
 
 class AnthropicProviderStub implements LLMProvider {
@@ -60,6 +61,11 @@ test("runClaudeQuery preserves Agent SDK options when an Anthropic provider is a
         sessionId: "session-1",
         permissionMode: "bypassPermissions",
         allowedTools: ["Read"],
+        disallowedTools: ["Bash"],
+        maxTurns: 4,
+        systemPrompt: "Stay within the workspace.",
+        stream: true,
+        resume: "sdk-session-1",
         tools,
       },
       cwd: "/tmp/workspace",
@@ -79,6 +85,11 @@ test("runClaudeQuery preserves Agent SDK options when an Anthropic provider is a
     expect((captured?.options["env"] as Record<string, unknown>)["CLAUDE_CODE_USE_BEDROCK"]).toBe("0");
     expect(captured?.options["permissionMode"]).toBe("bypassPermissions");
     expect(captured?.options["allowedTools"]).toEqual(["Read"]);
+    expect(captured?.options["disallowedTools"]).toEqual(["Bash"]);
+    expect(captured?.options["maxTurns"]).toBe(4);
+    expect(captured?.options["systemPrompt"]).toBe("Stay within the workspace.");
+    expect(captured?.options["stream"]).toBe(true);
+    expect(captured?.options["resume"]).toBe("sdk-session-1");
     expect(captured?.options["tools"]).toBe(tools);
     expect(captured?.options["model"]).toBe("claude-sonnet-4-6");
   } finally {
@@ -88,4 +99,32 @@ test("runClaudeQuery preserves Agent SDK options when an Anthropic provider is a
       delete globalThis.__AI_SPEC_SDK_QUERY__;
     }
   }
+});
+
+test("buildAnthropicSdkEnv maps Anthropic-compatible endpoint aliases", () => {
+  expect(
+    buildAnthropicSdkEnv({
+      id: "base-url-provider",
+      type: "anthropic",
+      apiKey: "api-key",
+      baseURL: "https://base-url.example/v1",
+      env: { CLAUDE_CODE_USE_VERTEX: "0" },
+    }),
+  ).toEqual({
+    ANTHROPIC_API_KEY: "api-key",
+    ANTHROPIC_BASE_URL: "https://base-url.example/v1",
+    CLAUDE_CODE_USE_VERTEX: "0",
+  });
+
+  expect(
+    buildAnthropicSdkEnv({
+      id: "api-base-url-provider",
+      type: "anthropic",
+      authToken: "auth-token",
+      apiBaseUrl: "https://api-base-url.example/v1",
+    }),
+  ).toEqual({
+    ANTHROPIC_AUTH_TOKEN: "auth-token",
+    ANTHROPIC_BASE_URL: "https://api-base-url.example/v1",
+  });
 });

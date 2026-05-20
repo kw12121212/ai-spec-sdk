@@ -1,0 +1,35 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: agent-sdk-option-forwarding
+  status: proposed
+summary:
+  what:
+    - Preserve Claude Agent SDK runtime controls when sessions route through an Anthropic provider.
+  why:
+    - >-
+      Provider-routed Anthropic sessions must behave like coding-agent sessions instead of
+      collapsing into plain chat completion, so workspace-scoped controls and third-party
+      Anthropic-compatible endpoints keep working.
+scope:
+  in:
+    - >-
+      Forward cwd, env, tools, permissionMode, allowedTools, disallowedTools, resume, maxTurns,
+      systemPrompt, streaming controls, model, and Anthropic-compatible endpoint credentials into
+      the Claude Agent SDK query path for Anthropic providers.
+    - >-
+      Add deterministic regression coverage for provider-routed Agent SDK option forwarding and
+      Anthropic SDK environment mapping.
+  out:
+    - Changing OpenAI or DeepSeek adapters into tool-using coding-agent runtimes.
+    - Adding the direct terminal agent command.
+unchanged_behavior:
+  - >-
+    Direct Claude Agent SDK sessions without a selected provider continue to use their existing
+    option path.
+  - Non-Anthropic providers continue to use the existing provider adapter queryStream path.
+roadmap:
+  milestone: 0019-coding-agent-cli-hardening
+  planned_change: agent-sdk-option-forwarding
