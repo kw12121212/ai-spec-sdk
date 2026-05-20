@@ -1,0 +1,52 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: cli-real-process-e2e-harness
+sections:
+  Implementation:
+    read-existing-cli-and-e2e-surfaces:
+      text: >-
+        Read src/cli.ts, current CLI tests, and test/e2e/config-loader.ts to confirm the compiled
+        entrypoint, current live-provider config contract, and the command surfaces the reusable
+        harness must support.
+      status: complete
+    add-real-process-harness:
+      text: >-
+        Add reusable E2E helpers that locate or build the compiled CLI entrypoint, provision
+        isolated HOME/session/key/workspace roots and free ports, launch the CLI via PTY or pipes,
+        capture stdout/stderr/exit results, enforce hard timeouts, redact secret-bearing logs, and
+        clean up all temporary artifacts.
+      status: complete
+    document-e2e-workflows:
+      text: >-
+        Document the deterministic real-process CLI E2E command plus the opt-in live-provider
+        command and local-only configuration expectations, keeping live credentials out of the
+        repository and out of the default bun run test flow.
+      status: complete
+  Testing:
+    add-deterministic-harness-tests:
+      text: >-
+        Add deterministic tests that run the compiled CLI through the reusable harness and verify
+        isolated stdio/HTTP execution, machine-readable output capture, bounded shutdown, and no
+        writes outside the disposable test root.
+      status: complete
+    run-build:
+      text: Run build validation.
+      status: complete
+      command: bun run build
+    run-lint:
+      text: Run lint checks.
+      status: complete
+      command: bun run lint
+    run-tests:
+      text: Run unit tests.
+      status: complete
+      command: bun run test
+  Verification:
+    verify-scope:
+      text: Verify implementation matches proposal scope.
+      status: complete
+testing_gates:
+  validation_task: run-build
+  unit_test_task: run-tests

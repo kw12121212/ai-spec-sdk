@@ -112,10 +112,42 @@ node dist/src/cli.js --help
 bun run lint    # tsc --noEmit (type-check)
 bun run test    # run test suite
 bun run build   # compile to dist/
+bun run test:e2e:cli   # deterministic compiled CLI E2E harness
+bun run test:e2e:live  # opt-in live provider E2E (requires local config)
 bun run release:check
 ```
 
 `bun run release:check` is the deterministic release-readiness gate. It checks package, source, and contract version alignment, then runs lint, tests, build, TypeScript client build, and native build smoke coverage. It does not require live LLM provider credentials or Python packaging tools.
+
+### Real-process CLI E2E
+
+Run the compiled CLI E2E harness with:
+
+```bash
+bun run test:e2e:cli
+```
+
+The harness locates or builds `dist/src/cli.js`, launches the compiled CLI entrypoint as a child process under Bun, provisions a temporary `HOME` plus disposable workspace roots, and validates pipe-backed and PTY-backed CLI flows without requiring live provider credentials.
+
+### Opt-in live provider E2E
+
+Run the live provider E2E checks with:
+
+```bash
+bun run test:e2e:live
+```
+
+These tests are local-only and do not block the default deterministic `bun run test` flow because they require real provider credentials. Keep configuration in a local `e2e-config.json` file at the repository root or set `E2E_PROVIDER`, `E2E_API_KEY`, `E2E_BASE_URL`, and `E2E_MODEL` in your shell environment. `e2e-config.json` is already ignored by git.
+
+Example `e2e-config.json`:
+
+```json
+{
+  "provider": "openai",
+  "apiKey": "sk-...",
+  "model": "gpt-4o-mini"
+}
+```
 
 ## JSON-RPC methods
 

@@ -8,8 +8,11 @@ spec:
 mapping:
   implementation:
     - src/bridge.ts
+    - src/agent-state-machine.ts
   tests:
     - test/session-resumption.test.ts
+    - test/agent-state-machine.test.ts
+    - test/session-question.test.ts
 requirements:
   req-pause-session:
     strength: MUST

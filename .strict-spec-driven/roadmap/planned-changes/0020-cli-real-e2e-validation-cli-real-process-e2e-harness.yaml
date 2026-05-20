@@ -1,0 +1,19 @@
+schema: strict-spec-driven/planned-change/v1
+schema_version: 1
+artifact_type: planned_change
+schema_file: ../../templates/strict-spec-driven/schemas/planned-change.yaml
+planned_change:
+  id: cli-real-process-e2e-harness
+  milestone: 0020-cli-real-e2e-validation
+status: complete
+summary: Build the real-process CLI E2E harness, fixtures, config, and docs
+details: >-
+  Add reusable E2E helpers that build or locate `dist/src/cli.js`, launch the CLI as a child
+  process, capture stdout/stderr/exit codes, allocate temporary HOME/session/key/workspace
+  directories, allocate free local ports, enforce hard timeouts, redact secrets from logs, and clean
+  up all test artifacts. Provide a PTY-backed launcher for human terminal rendering checks and a
+  pipe-backed launcher for JSON-RPC, JSON-lines, and HTTP transport checks. Document local config
+  files or environment variables for live LLM tests, skip behavior when credentials are absent,
+  expected runtime/cost, troubleshooting, and the exact commands for deterministic real-process
+  tests versus opt-in live-provider tests.
+depends_on: []

@@ -15,6 +15,7 @@ mapping:
     - test/session.test.ts
     - test/anthropic-adapter.test.ts
     - test/bridge.test.ts
+    - test/session-store.test.ts
 requirements:
   stream-pause-resume:
     strength: MUST

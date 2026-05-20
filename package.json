@@ -14,6 +14,8 @@
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "lint": "tsc --project tsconfig.json --noEmit",
     "test": "bun test",
+    "test:e2e:cli": "bun run build && bun test test/e2e/cli-real-process.e2e.test.ts",
+    "test:e2e:live": "bun test test/e2e/llm-provider.e2e.test.ts",
     "start": "node dist/src/cli.js",
     "release:check": "bash scripts/release-check.sh",
     "generate:types": "bun run scripts/generate-types.ts",

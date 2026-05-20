@@ -10,6 +10,29 @@ mapping:
     - src/bridge.ts
     - src/capabilities.ts
     - src/auth.ts
+    - src/index.ts
+    - src/errors.ts
+    - src/logger.ts
+    - src/rate-limiter.ts
+    - src/metrics.ts
+    - src/audit-log.ts
+    - src/config-store.ts
+    - src/context-store.ts
+    - src/key-store.ts
+    - src/role-store.ts
+    - src/team-store.ts
+    - src/team-types.ts
+    - src/webhooks.ts
+    - src/budget/enforcer.ts
+    - src/budget/registry.ts
+    - src/budget/types.ts
+    - src/quota/enforcer.ts
+    - src/quota/registry.ts
+    - src/quota/types.ts
+    - src/token-tracking/counters/anthropic.ts
+    - src/token-tracking/counters/index.ts
+    - src/token-tracking/store.ts
+    - src/token-tracking/types.ts
     - docs/bridge-contract.yaml
     - README.md
     - docs/roadmap.md
@@ -17,6 +40,30 @@ mapping:
     - test/bridge.test.ts
     - test/auth.test.ts
     - test/contract-drift.test.ts
+    - test/audit-log.test.ts
+    - test/bridge-audit.test.ts
+    - test/config-store.test.ts
+    - test/context-store.test.ts
+    - test/http-server.test.ts
+    - test/key-store.test.ts
+    - test/logger.test.ts
+    - test/rate-limiter.test.ts
+    - test/role-store.test.ts
+    - test/session-store-audit.test.ts
+    - test/team-bridge.test.ts
+    - test/team-store.test.ts
+    - test/webhooks.test.ts
+    - test/budget/bridge-methods.test.ts
+    - test/budget/enforcer.test.ts
+    - test/budget/registry.test.ts
+    - test/quota/bridge-methods.test.ts
+    - test/quota/enforcer.test.ts
+    - test/quota/integration.test.ts
+    - test/quota/registry.test.ts
+    - test/token-tracking/bridge-methods.test.ts
+    - test/token-tracking/counters.test.ts
+    - test/token-tracking/integration.test.ts
+    - test/token-tracking/store.test.ts
 requirements:
   capabilities-cover-dispatch-methods:
     strength: MUST

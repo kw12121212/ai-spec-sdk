@@ -79,3 +79,7 @@ milestones:
     title: Coding Agent CLI Hardening
     path: roadmap/milestones/0019-coding-agent-cli-hardening.yaml
     status: complete
+  0020-cli-real-e2e-validation:
+    title: CLI Real E2E Validation
+    path: roadmap/milestones/0020-cli-real-e2e-validation.yaml
+    status: proposed

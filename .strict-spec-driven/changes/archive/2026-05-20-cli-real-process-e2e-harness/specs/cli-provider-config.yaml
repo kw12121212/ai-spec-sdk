@@ -1,0 +1,29 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: cli-provider-config
+mapping:
+  implementation:
+    - README.md
+  tests:
+    - test/e2e/config-loader.ts
+    - test/e2e/llm-provider.e2e.test.ts
+operations:
+  ADDED:
+    local-live-e2e-provider-config:
+      strength: MUST
+      statement: >-
+        Opt-in live CLI E2E tests MUST read provider credentials from a local-only configuration
+        contract that is ignored by default and skipped with a clear reason when it is absent.
+      scenarios:
+        missing-live-config-skip:
+          - GIVEN: >-
+              A developer runs the documented live CLI E2E command without local provider
+              configuration.
+          - WHEN: The E2E config loader checks for live-provider settings.
+          - THEN: >-
+              The live suite skips with a clear reason instead of failing the default deterministic
+              test flow.
+  MODIFIED: {}
+  REMOVED: {}

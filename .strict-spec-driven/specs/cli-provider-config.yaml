@@ -10,9 +10,27 @@ mapping:
     - src/llm-provider/anthropic-env.ts
     - src/llm-provider/provider-registry.ts
     - src/claude-agent-runner.ts
+    - src/llm-provider/index.ts
+    - src/llm-provider/types.ts
+    - src/llm-provider/adapters/openai.ts
+    - src/llm-provider/adapters/deepseek.ts
+    - src/llm-provider/balancer-registry.ts
+    - src/llm-provider/load-balancer.ts
   tests:
     - test/provider-registry.test.ts
     - test/claude-agent-runner.test.ts
+    - test/balancer-registry.test.ts
+    - test/llm-provider.test.ts
+    - test/load-balancer.test.ts
+    - test/load-balancer-bridge.test.ts
+    - test/provider-fallback.test.ts
+    - test/provider-registry-bridge.test.ts
+    - test/provider-switching.test.ts
+    - test/provider-switching-bridge.test.ts
+    - test/llm-provider/adapters/deepseek.test.ts
+    - test/llm-provider/adapters/openai.test.ts
+    - test/e2e/config-loader.ts
+    - test/e2e/llm-provider.e2e.test.ts
 requirements:
   CLI_PROVIDER_CONFIG:
     strength: MUST
@@ -62,3 +80,17 @@ requirements:
         - THEN: >-
             the SDK query environment contains ANTHROPIC_BASE_URL, ANTHROPIC_API_KEY or
             ANTHROPIC_AUTH_TOKEN, and the configured SDK environment values
+  local-live-e2e-provider-config:
+    strength: MUST
+    statement: >-
+      Opt-in live CLI E2E tests MUST read provider credentials from a local-only configuration
+      contract that is ignored by default and skipped with a clear reason when it is absent.
+    scenarios:
+      missing-live-config-skip:
+        - GIVEN: >-
+            A developer runs the documented live CLI E2E command without local provider
+            configuration.
+        - WHEN: The E2E config loader checks for live-provider settings.
+        - THEN: >-
+            The live suite skips with a clear reason instead of failing the default deterministic
+            test flow.

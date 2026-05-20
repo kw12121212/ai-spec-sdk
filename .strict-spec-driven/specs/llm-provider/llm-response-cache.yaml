@@ -14,6 +14,7 @@ mapping:
   tests:
     - test/llm-provider/cache.test.ts
     - test/llm-provider/cache-interceptor.test.ts
+    - test/llm-provider/cache-monitoring.test.ts
 requirements:
   cache-exact-match:
     strength: MUST

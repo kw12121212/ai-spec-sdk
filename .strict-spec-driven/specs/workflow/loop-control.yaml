@@ -8,8 +8,15 @@ spec:
 mapping:
   implementation:
     - src/workflow/loop-controller.ts
+    - src/workflow.ts
+    - src/workflow/answer-agent-client.ts
+    - src/workflow/loop-scheduler.ts
+    - src/workflow/recommend-auto.ts
   tests:
     - test/workflow/loop-controller.test.ts
+    - test/workflow.test.ts
+    - test/workflow/loop-scheduler.test.ts
+    - test/workflow/recommend-auto.test.ts
 requirements:
   '1':
     strength: MUST

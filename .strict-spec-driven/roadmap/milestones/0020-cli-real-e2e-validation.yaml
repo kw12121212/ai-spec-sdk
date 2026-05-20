@@ -1,0 +1,89 @@
+schema: strict-spec-driven/roadmap-milestone/v2
+schema_version: 2
+artifact_type: roadmap_milestone
+schema_file: templates/strict-spec-driven/schemas/roadmap-milestone.yaml
+milestone:
+  0020-cli-real-e2e-validation:
+    title: CLI Real E2E Validation
+goal: >-
+  Add a real end-to-end confidence suite for the CLI that launches the built executable through
+  realistic process and terminal harnesses, covers every command surface exposed by `src/cli.ts`,
+  and adds opt-in live LLM coding-agent scenarios against a disposable small project without
+  depending on exact model prose.
+scope:
+  in:
+    - >-
+      Provide a local-only E2E configuration path for live LLM credentials and model settings that
+      is ignored by default and never required for normal `bun run test`.
+    - >-
+      Build or locate the actual CLI entrypoint and run it as a child process, using a pseudo
+      terminal for human terminal scenarios and plain stdio pipes for protocol and JSON scenarios.
+    - >-
+      Isolate each run with a temporary HOME, sessions directory, key store, network port, and
+      workspace so key management, transport startup, and agent sessions cannot mutate developer
+      state.
+    - >-
+      Exercise every CLI command surface exposed by `src/cli.ts`: help aliases, doctor text/JSON,
+      keygen, keys list/revoke, stdio JSON-RPC bridge mode, HTTP/SSE and WebSocket transport
+      startup, invalid argument/error paths, and the `agent`/`run` coding-agent commands.
+    - >-
+      Create an isolated temporary fixture project for live agent scenarios, with simple source
+      files and expected edits or command outputs that the agent can complete with built-in tools.
+    - >-
+      Assert resilient outcomes such as valid JSON-lines shape, expected notification/event order,
+      terminal rendering presence, observed tool-use markers, expected file mutations or
+      shell-command side effects, bounded completion status, clean process exit, and absence of raw
+      protocol leakage in human output.
+  out:
+    - Running live LLM tests in the default deterministic unit test suite.
+    - Storing API keys, auth tokens, model secrets, or provider-specific private config in the repo.
+    - >-
+      Requiring exact natural-language model responses beyond stable sentinel strings or file/tool
+      side effects.
+    - Replacing deterministic mocked tests for bridge, session, provider, or CLI parsing behavior.
+done_criteria:
+  - >-
+    A documented command runs the real-process CLI E2E suite without live credentials and covers
+    help, diagnostics, key management, stdio JSON-RPC, HTTP/WebSocket transport startup, and error
+    paths.
+  - >-
+    A documented opt-in command runs live LLM coding-agent E2E scenarios only when local
+    live-provider configuration is present, and otherwise skips with a clear reason.
+  - >-
+    The suite launches the compiled CLI in a realistic terminal harness instead of calling
+    `runAgentCli` directly.
+  - >-
+    The suite creates and cleans up a disposable small project and verifies at least one real
+    workspace-scoped file or shell-tool side effect.
+  - >-
+    The suite validates both human terminal rendering and JSON-lines mode with tolerant assertions
+    that survive reasonable LLM wording variation and strict schema checks where output is
+    machine-readable.
+  - >-
+    The suite documents provider setup, expected cost/time characteristics, timeout behavior, and
+    troubleshooting for local developers and release operators.
+planned_changes: {}
+dependencies:
+  - 0017-lightweight-cli
+  - 0018-cli-ux-and-ecosystem
+  - 0019-coding-agent-cli-hardening
+risks:
+  - >-
+    Live LLM behavior is nondeterministic, so prompts and assertions must be task-oriented and
+    should prefer sentinel file contents, JSON schema checks, and tool side effects over exact
+    prose.
+  - >-
+    Real terminal harnesses can be platform-sensitive; the test should isolate PTY concerns behind a
+    small helper and provide a fallback skip when the local platform cannot support it.
+  - >-
+    Live-provider tests can be slow or costly; they must remain opt-in, bounded by explicit
+    timeouts, and excluded from default CI unless credentials and budget are intentionally supplied.
+  - >-
+    Some CLI state currently derives from `os.homedir()` at module load, so real-process tests must
+    set HOME or the platform equivalent before launching the CLI and verify no files are written
+    outside the temporary test root.
+status: proposed
+notes:
+  - >-
+    This milestone follows the completed direct CLI command work and focuses on production-like
+    validation rather than adding new user-facing CLI capabilities.

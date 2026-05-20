@@ -1,0 +1,30 @@
+schema: strict-spec-driven/main-spec/v1
+schema_version: 1
+artifact_type: main_spec
+schema_file: templates/strict-spec-driven/schemas/main-spec.yaml
+spec:
+  id: cli-real-e2e-validation
+  title: CLI Real E2E Validation
+mapping:
+  implementation:
+    - package.json
+    - README.md
+  tests:
+    - test/e2e/cli-harness.ts
+    - test/e2e/cli-real-process.e2e.test.ts
+requirements:
+  compiled-cli-harness:
+    strength: MUST
+    statement: >-
+      The project MUST provide a reusable real-process CLI E2E harness that launches the compiled
+      ai-spec-bridge entrypoint through pipes for machine-readable assertions and through a pseudo
+      terminal for human-output assertions without calling runAgentCli directly.
+    scenarios:
+      compiled-cli-launch:
+        - GIVEN: >-
+            A deterministic CLI E2E suite needs to exercise compiled help, diagnostics, JSON-RPC, or
+            transport behavior.
+        - WHEN: The suite launches the compiled CLI through the shared harness.
+        - THEN: >-
+            It captures output, exit status, and cleanup results from real child processes and can
+            choose pipe-backed or PTY-backed execution according to the assertion surface.

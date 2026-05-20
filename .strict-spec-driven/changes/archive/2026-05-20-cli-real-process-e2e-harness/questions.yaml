@@ -1,0 +1,19 @@
+schema: strict-spec-driven/question-list/v1
+schema_version: 1
+artifact_type: question_list
+schema_file: templates/strict-spec-driven/schemas/question-list.yaml
+change: cli-real-process-e2e-harness
+open: []
+resolved:
+  - id: live-provider-config-shape
+    question: >-
+      Should the CLI real-process E2E harness keep using the existing root-level e2e-config.json
+      contract for live-provider credentials, or move to a different local-only config path?
+    context: >-
+      The roadmap requires a local-only ignored configuration path for opt-in live LLM CLI tests,
+      and the repo already contains test/e2e/config-loader.ts that reads e2e-config.json or E2E_*
+      environment variables.
+    answer: >-
+      Keep the existing root-level e2e-config.json contract with E2E_* environment-variable fallback
+      for local-only live E2E runs.
+    status: resolved

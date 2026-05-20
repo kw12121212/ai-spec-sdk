@@ -9,7 +9,7 @@ export interface E2EConfig {
 }
 
 export function loadE2EConfig(): E2EConfig {
-  // Check for e2e-config.json in project root
+  // Check for the local-only, gitignored e2e-config.json in the project root.
   const configPath = join(process.cwd(), 'e2e-config.json');
   
   if (existsSync(configPath)) {
@@ -32,7 +32,7 @@ export function loadE2EConfig(): E2EConfig {
   }
 
   throw new Error(
-    'E2E tests require local configuration. Please create e2e-config.json or set E2E_PROVIDER and E2E_API_KEY env vars. ' +
+    'E2E tests require local-only configuration. Please create the gitignored e2e-config.json file or set E2E_PROVIDER and E2E_API_KEY env vars. ' +
     'Example e2e-config.json: { "provider": "openai", "apiKey": "sk-...", "model": "gpt-4o" }'
   );
 }

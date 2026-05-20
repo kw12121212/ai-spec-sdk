@@ -8,8 +8,28 @@ spec:
 mapping:
   implementation:
     - src/built-in-tools.ts
+    - src/approval-store.ts
+    - src/hooks-store.ts
+    - src/lsp-client.ts
+    - src/lsp-tools.ts
+    - src/lsp-types.ts
+    - src/mcp-store.ts
+    - src/permission-policy.ts
+    - src/permission-scopes.ts
+    - src/workspace-store.ts
   tests:
     - test/built-in-tools.test.ts
+    - test/approval-store.test.ts
+    - test/bridge-tools.test.ts
+    - test/hook-audit.test.ts
+    - test/hook-execution.test.ts
+    - test/hooks-store.test.ts
+    - test/lsp-client.test.ts
+    - test/lsp-tools.test.ts
+    - test/mcp-store.test.ts
+    - test/permission-policy.test.ts
+    - test/permission-scopes.test.ts
+    - test/workspace-store.test.ts
 requirements:
   built-in-tools:
     strength: MUST

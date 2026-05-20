@@ -18,6 +18,9 @@ specs:
   - id: cli-provider-config
     title: CLI Provider Configuration
     path: .strict-spec-driven/specs/cli-provider-config.yaml
+  - id: cli-real-e2e-validation
+    title: CLI Real E2E Validation
+    path: .strict-spec-driven/specs/cli-real-e2e-validation.yaml
   - id: cli-terminal-ux
     title: CLI Terminal UX
     path: .strict-spec-driven/specs/cli-terminal-ux.yaml

@@ -10,7 +10,10 @@ mapping:
     - src/cli.ts
     - src/agent-cli.ts
   tests:
+    - test/cli.test.ts
     - test/agent-cli.test.ts
+    - test/e2e/cli-harness.ts
+    - test/e2e/cli-real-process.e2e.test.ts
 requirements:
   req-1:
     strength: MUST

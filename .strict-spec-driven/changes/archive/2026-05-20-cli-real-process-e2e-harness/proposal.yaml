@@ -1,0 +1,33 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: cli-real-process-e2e-harness
+  status: proposed
+summary:
+  what:
+    - >-
+      Add a reusable real-process E2E harness for the compiled CLI plus isolated fixtures,
+      timeout/cleanup helpers, and developer docs for deterministic and opt-in live CLI E2E runs.
+  why:
+    - >-
+      The remaining CLI roadmap work depends on a compiled-process harness that validates real
+      terminal and pipe behavior without mutating developer state.
+scope:
+  in:
+    - >-
+      Reusable helpers to locate or build dist/src/cli.js; PTY-backed and pipe-backed launch modes;
+      isolated HOME/session/key/workspace/port provisioning; bounded timeouts, redacted logs, and
+      cleanup; developer docs for deterministic and opt-in live E2E commands.
+  out:
+    - >-
+      Full non-LLM command-matrix assertions; live agent CLI scenarios; changes to bridge or agent
+      runtime behavior.
+unchanged_behavior:
+  - >-
+    Existing CLI command behavior, provider forwarding semantics, default bun run test coverage, and
+    unit-test stubbing patterns remain unchanged.
+roadmap:
+  milestone: 0020-cli-real-e2e-validation
+  planned_change: cli-real-process-e2e-harness

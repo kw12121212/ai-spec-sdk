@@ -8,6 +8,7 @@ spec:
 mapping:
   implementation:
     - package.json
+    - tsconfig.json
     - scripts/release-check.sh
     - scripts/check.sh
     - scripts/build.sh

@@ -10,9 +10,15 @@ mapping:
     - src/cron-scheduler.ts
     - src/bridge.ts
     - src/task-template-types.ts
+    - src/task-template-store.ts
+    - src/task-queue-store.ts
+    - src/task-queue-worker.ts
     - package.json
   tests:
     - test/cron-scheduler.test.ts
+    - test/task-queue-store.test.ts
+    - test/task-template-bridge.test.ts
+    - test/task-template-store.test.ts
 requirements:
   schedule-task-templates:
     strength: MUST

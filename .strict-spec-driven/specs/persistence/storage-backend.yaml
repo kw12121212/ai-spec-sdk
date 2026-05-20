@@ -11,9 +11,13 @@ mapping:
     - src/storage/types.ts
     - src/storage/memory-adapter.ts
     - src/storage/file-adapter.ts
+    - src/storage/secret-vault.ts
+    - src/storage/hashicorp-vault-adapter.ts
   tests:
     - test/storage/memory-adapter.test.ts
     - test/storage/file-adapter.test.ts
+    - test/storage/external-vault-adapter.test.ts
+    - test/storage/secret-vault.test.ts
 requirements:
   storage-backend-1:
     strength: MUST

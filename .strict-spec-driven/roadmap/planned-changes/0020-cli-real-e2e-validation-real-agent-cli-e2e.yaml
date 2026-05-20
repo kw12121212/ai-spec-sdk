@@ -1,0 +1,27 @@
+schema: strict-spec-driven/planned-change/v1
+schema_version: 1
+artifact_type: planned_change
+schema_file: ../../templates/strict-spec-driven/schemas/planned-change.yaml
+planned_change:
+  id: real-agent-cli-e2e
+  milestone: 0020-cli-real-e2e-validation
+status: planned
+summary: Add opt-in real LLM terminal E2E coverage for the coding-agent CLI
+details: >-
+  Implement a live, local-only E2E test suite for `ai-spec-bridge agent` and `ai-spec-bridge run`.
+  The suite should read local provider configuration, build or use the real compiled CLI, launch it
+  through a pseudo terminal for human output and through stdio pipes for JSON-lines output, create a
+  disposable small project, and ask the live agent to perform narrowly-scoped tasks that require
+  built-in file and shell tools. Cover both `agent` and `run`, `--workspace`/`-C`, `--model`,
+  `--permission-mode`, `--allowed-tools`, `--disallowed-tools`, `--max-turns`, `--system-prompt`,
+  `--template`, `--timeout-ms`, Anthropic-compatible endpoint/env flags, `--stream`, and `--json`.
+  Assertions should verify stable observable behavior: JSON-lines parseability and event shape,
+  stream/render output, tool-use reporting, workspace-scoped file mutations or command output,
+  provider env forwarding, final completion/error status, timeout handling, process exit codes, and
+  cleanup. The tests must tolerate natural-language variation by checking sentinels, schemas, side
+  effects, and bounded event sequences instead of exact prose.
+depends_on:
+  - cli-real-process-e2e-harness
+  - cli-command-matrix-e2e
+  - direct-agent-command
+  - agent-sdk-option-forwarding
