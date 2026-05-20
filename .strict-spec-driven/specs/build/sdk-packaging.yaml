@@ -8,7 +8,14 @@ spec:
 mapping:
   implementation:
     - package.json
-  tests: []
+    - scripts/release-check.sh
+    - scripts/check.sh
+    - scripts/build.sh
+    - packages/client/package.json
+  tests:
+    - test/cli.test.ts
+    - test/native-build.test.ts
+    - packages/client/test/integration.test.ts
 requirements:
   build:pack script exists:
     strength: MUST
@@ -34,3 +41,48 @@ requirements:
       artifact MUST be installable with `pip install ./path/to/artifact.whl`. No registry access is
       required.
     scenarios: {}
+  release-readiness-checks-are-runnable:
+    strength: MUST
+    statement: >-
+      The project MUST provide deterministic release-readiness checks that can be run locally before
+      publishing without requiring live LLM provider credentials.
+    scenarios:
+      release-check-command:
+        - GIVEN: a developer is preparing a release
+        - WHEN: the documented release-readiness checks are run
+        - THEN: >-
+            lint, tests, build, TypeScript client build, and native build smoke coverage are
+            executed or explicitly reported as unavailable
+  package-versions-are-consistent:
+    strength: SHOULD
+    statement: >-
+      Release-readiness validation SHOULD check that documented package versions and exported
+      bridge/API versions are consistent across root, TypeScript client, and contract metadata where
+      those versions are intended to match.
+    scenarios:
+      version-drift:
+        - GIVEN: a package or public API version changes
+        - WHEN: release-readiness validation runs
+        - THEN: unexpected version drift is reported before publishing
+  real-provider-smoke-is-optional:
+    strength: SHOULD
+    statement: >-
+      Live LLM provider smoke tests SHOULD remain optional and must not be required for the default
+      deterministic release check.
+    scenarios:
+      no-credentials:
+        - GIVEN: no real provider API keys are present
+        - WHEN: default release-readiness validation runs
+        - THEN: >-
+            the validation can still complete using stubs or by skipping only explicitly optional
+            live-provider smoke tests
+  python-release-checks-out-of-scope:
+    strength: MUST
+    statement: >-
+      Default release-readiness validation for this change MUST NOT require Python client tests,
+      Python wheel builds, or Python platform publishing tools.
+    scenarios:
+      no-python-tooling:
+        - GIVEN: Python packaging tools are not installed locally
+        - WHEN: default release-readiness validation runs
+        - THEN: the validation does not fail because Python package checks were omitted

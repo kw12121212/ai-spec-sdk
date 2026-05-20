@@ -112,20 +112,19 @@ node dist/src/cli.js --help
 bun run lint    # tsc --noEmit (type-check)
 bun run test    # run test suite
 bun run build   # compile to dist/
+bun run release:check
 ```
+
+`bun run release:check` is the deterministic release-readiness gate. It checks package, source, and contract version alignment, then runs lint, tests, build, TypeScript client build, and native build smoke coverage. It does not require live LLM provider credentials or Python packaging tools.
 
 ## JSON-RPC methods
 
-See `docs/bridge-contract.yaml` for the full integration contract — all 39 methods, params, result shapes, error codes, notifications, auth scopes, and environment variables.
+See `docs/bridge-contract.yaml` for the full integration contract: transports, callable methods, auth scopes, notifications, error codes, and environment variables. The `bridge.capabilities` response is the runtime discovery surface and currently advertises 111 callable JSON-RPC methods.
 
-Key methods:
+Method groups:
 
-- `bridge.capabilities` — list all methods, models, tools, workflows (no auth required)
-- `bridge.ping` — liveness check (no auth required)
-- `bridge.info` — runtime metadata snapshot (requires `admin` scope)
-- `workflow.run` — execute a spec-driven workflow
-- `session.start` / `session.resume` / `session.stop` — manage agent sessions
-- `session.status` / `session.list` / `session.history` — query session state
-- `session.export` — export session transcript
-- `session.delete` / `session.cleanup` — remove sessions
-- `models.list` / `tools.list` / `skills.list` — enumerate available resources
+- Bridge discovery and diagnostics: `bridge.capabilities`, `bridge.negotiateVersion`, `bridge.ping`, `bridge.info`
+- Workflow and loop control: `workflow.run`, `loop.start`, `loop.pause`, `loop.resume`, `loop.stop`
+- Sessions and streaming: `session.start`, `session.spawn`, `session.resume`, `session.pause`, `session.stop`, `stream.pause`, `stream.resume`, `stream.throttle`, `stream.backpressure`
+- Resources and configuration: `models.list`, `tools.*`, `workspace.*`, `mcp.*`, `config.*`, `hooks.*`, `context.*`
+- Higher-level runtime features: `template.*`, `taskTemplate.*`, `team.*`, `audit.query`, `provider.*`, `token.*`, `quota.*`, `budget.*`, `balancer.*`, `permissions.*`

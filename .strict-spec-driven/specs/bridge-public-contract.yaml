@@ -1,0 +1,62 @@
+schema: strict-spec-driven/main-spec/v1
+schema_version: 1
+artifact_type: main_spec
+schema_file: templates/strict-spec-driven/schemas/main-spec.yaml
+spec:
+  id: bridge-public-contract
+  title: Bridge Public Contract
+mapping:
+  implementation:
+    - src/bridge.ts
+    - src/capabilities.ts
+    - src/auth.ts
+    - docs/bridge-contract.yaml
+    - README.md
+    - docs/roadmap.md
+  tests:
+    - test/bridge.test.ts
+    - test/auth.test.ts
+    - test/contract-drift.test.ts
+requirements:
+  capabilities-cover-dispatch-methods:
+    strength: MUST
+    statement: >-
+      The bridge capabilities response MUST advertise every JSON-RPC method that the bridge dispatch
+      path accepts as callable.
+    scenarios:
+      dispatch-methods-discovered:
+        - GIVEN: a bridge build with callable JSON-RPC dispatch methods
+        - WHEN: a client calls bridge.capabilities
+        - THEN: the returned methods list contains every callable dispatch method exactly once
+  auth-scopes-cover-dispatch-methods:
+    strength: MUST
+    statement: >-
+      HTTP authentication scope mapping MUST explicitly classify every callable JSON-RPC method as
+      public, scoped, or admin-only.
+    scenarios:
+      scope-coverage:
+        - GIVEN: a callable JSON-RPC method exists in bridge dispatch
+        - WHEN: HTTP authentication is enabled
+        - THEN: the method has deterministic authentication and authorization behavior
+  bridge-contract-covers-capabilities:
+    strength: MUST
+    statement: >-
+      docs/bridge-contract.yaml MUST document every method advertised by bridge.capabilities,
+      including transport behavior, auth requirement, and error behavior where applicable.
+    scenarios:
+      contract-coverage:
+        - GIVEN: the bridge capabilities method list
+        - WHEN: the public bridge contract is checked
+        - THEN: each advertised method has a corresponding contract entry
+  public-docs-match-implemented-status:
+    strength: SHOULD
+    statement: >-
+      README.md and docs/roadmap.md SHOULD distinguish implemented capabilities from planned
+      hardening so users do not see stale Planned status for completed features.
+    scenarios:
+      docs-status-check:
+        - GIVEN: a capability implemented in source and covered by tests
+        - WHEN: the README or roadmap mentions that capability
+        - THEN: >-
+            the document describes the capability as implemented or explains the remaining work
+            precisely

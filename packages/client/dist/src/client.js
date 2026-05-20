@@ -73,6 +73,9 @@ export class BridgeClient {
     async sessionStart(params) {
         return this.transport.request("session.start", params);
     }
+    async sessionSpawn(params) {
+        return this.transport.request("session.spawn", params);
+    }
     async sessionResume(params) {
         return this.transport.request("session.resume", params);
     }

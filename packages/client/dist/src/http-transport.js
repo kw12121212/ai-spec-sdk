@@ -68,62 +68,30 @@ export class HttpTransport {
         const url = this.buildUrl(`/events?sessionId=${encodeURIComponent(sessionId)}`);
         const es = new EventSource(url);
         this.eventSource = es;
-        es.addEventListener("session_event", (event) => {
-            this.reconnectDelay = 1000; // reset on successful message
-            try {
-                const notification = JSON.parse(event.data);
-                for (const handler of this.notificationHandlers) {
-                    handler(notification);
+        const eventTypes = [
+            "session_event",
+            "subagent_event",
+            "progress",
+            "tool_approval_requested",
+            "hook_triggered",
+            "file_changed",
+        ];
+        for (const eventType of eventTypes) {
+            es.addEventListener(eventType, (event) => {
+                if (eventType === "session_event") {
+                    this.reconnectDelay = 1000; // reset on successful message
                 }
-            }
-            catch {
-                // ignore parse errors
-            }
-        });
-        es.addEventListener("progress", (event) => {
-            try {
-                const notification = JSON.parse(event.data);
-                for (const handler of this.notificationHandlers) {
-                    handler(notification);
+                try {
+                    const notification = JSON.parse(event.data);
+                    for (const handler of this.notificationHandlers) {
+                        handler(notification);
+                    }
                 }
-            }
-            catch {
-                // ignore
-            }
-        });
-        es.addEventListener("tool_approval_requested", (event) => {
-            try {
-                const notification = JSON.parse(event.data);
-                for (const handler of this.notificationHandlers) {
-                    handler(notification);
+                catch {
+                    // ignore parse errors
                 }
-            }
-            catch {
-                // ignore
-            }
-        });
-        es.addEventListener("hook_triggered", (event) => {
-            try {
-                const notification = JSON.parse(event.data);
-                for (const handler of this.notificationHandlers) {
-                    handler(notification);
-                }
-            }
-            catch {
-                // ignore
-            }
-        });
-        es.addEventListener("file_changed", (event) => {
-            try {
-                const notification = JSON.parse(event.data);
-                for (const handler of this.notificationHandlers) {
-                    handler(notification);
-                }
-            }
-            catch {
-                // ignore
-            }
-        });
+            });
+        }
         es.onerror = () => {
             es.close();
             this.eventSource = null;

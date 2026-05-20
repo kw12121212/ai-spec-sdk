@@ -28,14 +28,20 @@ export interface JsonRpcNotification {
 
 export interface BridgeCapabilitiesResult {
   protocol: string;
-  transport: "stdio" | "http";
+  transport: "stdio" | "http" | "ws";
   bridgeVersion: string;
   apiVersion: string;
+  streaming: boolean;
   notifications: { progress: boolean; sessionEvent: boolean };
-  workflows: "init" | "propose" | "modify" | "apply" | "verify" | "archive" | "cancel" | "list";
-  skills: "spec-driven-brainstorm" | "spec-driven-init" | "spec-driven-propose" | "spec-driven-modify" | "spec-driven-spec-content" | "spec-driven-apply" | "spec-driven-verify" | "spec-driven-review" | "spec-driven-archive" | "spec-driven-cancel" | "spec-driven-auto";
+  workflows: string[];
+  skills: unknown[];
   workflowSkillMap: Record<string, unknown>;
-  methods: unknown[];
+  methods: string[];
+  agentControlParams: string[];
+  models: Array<Record<string, unknown>>;
+  tools: Array<Record<string, unknown>>;
+  hookEvents: string[];
+  ui: { enabled: boolean; path: string };
 }
 
 export interface BridgeNegotiateVersionParams {
@@ -155,4 +161,125 @@ export interface VersionMismatchErrorData {
 // ── Notification Types ───────────────────────────────────────────────────────
 
 export type NotificationMethod =
-  ;
+  | "bridge/progress"
+  | "bridge/session_event"
+  | "bridge/subagent_event"
+  | "bridge/hook_triggered"
+  | "bridge/file_changed"
+  | "bridge/tool_approval_requested";
+
+export type CapabilitiesResult = BridgeCapabilitiesResult;
+export type PingResult = { pong: boolean; ts: string };
+export type NegotiateVersionParams = BridgeNegotiateVersionParams;
+export type NegotiateVersionResult = BridgeNegotiateVersionResult;
+export type LogLevel = "trace" | "debug" | "info" | "warn" | "error" | "silent";
+export type SetLogLevelParams = { level: LogLevel };
+export type SetLogLevelResult = { level: LogLevel };
+
+export interface RuntimeInfo {
+  bridgeVersion: string;
+  apiVersion: string;
+  transport: string;
+  authMode: string;
+  logLevel: string;
+  sessionsPath: string;
+  keysPath: string;
+  specDrivenScriptPath: string;
+  http: Record<string, unknown> | null;
+  nodeVersion: string;
+}
+
+export interface SkillInfo {
+  name: string;
+  description: string;
+  hasScript: boolean;
+  parameters: string[];
+}
+
+export interface ModelInfo {
+  id: string;
+  displayName: string;
+}
+
+export interface ToolInfo {
+  name: string;
+  description: string;
+}
+
+export type PermissionMode = "default" | "acceptEdits" | "bypassPermissions" | "approve";
+export type ProxyParams = { http?: string; https?: string; noProxy?: string };
+export type SessionResult = SessionStartResult;
+export interface SessionSpawnParams extends SessionStartParams {
+  parentSessionId?: string;
+}
+export type SessionListParams = Record<string, unknown>;
+export type SessionListItem = Record<string, unknown>;
+export type SessionListResult = { sessions: SessionListItem[] };
+export type SessionHistoryParams = { sessionId: string; offset?: number; limit?: number };
+export type SessionHistoryEntry = Record<string, unknown>;
+export type SessionHistoryResult = { sessionId: string; total: number; entries: SessionHistoryEntry[] };
+export type BufferedEvent = Record<string, unknown>;
+export type SessionEventsParams = { sessionId: string; since?: number; limit?: number };
+export type SessionEventsResult = { events: BufferedEvent[]; nextSeq: number };
+export type SessionExportParams = { sessionId: string };
+export type SessionExportResult = Record<string, unknown>;
+export type SessionDeleteParams = { sessionId: string };
+export type SessionDeleteResult = { sessionId: string; deleted: boolean };
+export type SessionCleanupParams = { olderThanDays?: number };
+export type SessionCleanupResult = { deleted: number };
+export type SessionApproveToolParams = { sessionId?: string; requestId: string };
+export type SessionRejectToolParams = { sessionId?: string; requestId: string; message?: string };
+export type ApprovalResult = Record<string, unknown>;
+export type SessionBranchParams = { sessionId: string; prompt?: string; fromIndex?: number };
+export type SessionSearchParams = { query: string; workspace?: string; limit?: number };
+export type SearchResult = Record<string, unknown>;
+export type SessionSearchResult = { sessions: SearchResult[] };
+
+export type WorkflowName =
+  | "init"
+  | "propose"
+  | "modify"
+  | "apply"
+  | "verify"
+  | "archive"
+  | "cancel"
+  | "list"
+  | "maintenance"
+  | "migrate";
+export type ModelsListResult = { models: ModelInfo[] };
+export type ToolsListResult = { tools: ToolInfo[] };
+export type WorkspaceRegisterParams = { workspace: string };
+export type WorkspaceListResult = { workspaces: unknown[] };
+
+export type McpAddParams = Record<string, unknown>;
+export type McpRemoveParams = { name: string; workspace?: string };
+export type McpStartParams = { name: string; workspace?: string };
+export type McpStopParams = { name: string; workspace?: string };
+export type McpListParams = { workspace?: string };
+export type McpEntry = Record<string, unknown>;
+export type McpListResult = { servers: McpEntry[] };
+
+export type ConfigGetParams = Record<string, unknown>;
+export type ConfigSetParams = Record<string, unknown>;
+export type ConfigListParams = Record<string, unknown>;
+export type ConfigEntry = Record<string, unknown>;
+export type ConfigListResult = { entries: ConfigEntry[] };
+
+export type HookEvent = "pre_tool_use" | "post_tool_use" | "notification" | "stop" | "subagent_stop";
+export type HooksAddParams = Record<string, unknown>;
+export type HooksRemoveParams = { hookId?: string; id?: string };
+export type HooksListParams = Record<string, unknown>;
+export type HookEntry = Record<string, unknown>;
+export type HooksListResult = { hooks: HookEntry[] };
+
+export type ContextReadParams = Record<string, unknown>;
+export type ContextWriteParams = Record<string, unknown>;
+export type ContextListParams = Record<string, unknown>;
+export type ContextListResult = { files: unknown[] };
+
+export type SessionEventType = string;
+export type SessionEventNotification = JsonRpcNotification;
+export type SubagentEventNotification = JsonRpcNotification;
+export type ProgressNotification = JsonRpcNotification;
+export type ToolApprovalNotification = JsonRpcNotification;
+export type FileChangedNotification = JsonRpcNotification;

@@ -3,6 +3,9 @@ schema_version: 1
 artifact_type: spec_index
 schema_file: templates/strict-spec-driven/schemas/spec-index.yaml
 specs:
+  - id: bridge-public-contract
+    title: Bridge Public Contract
+    path: .strict-spec-driven/specs/bridge-public-contract.yaml
   - id: bridge-websocket-transport
     title: websocket-transport
     path: .strict-spec-driven/specs/bridge/websocket-transport.yaml

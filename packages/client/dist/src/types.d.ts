@@ -1,12 +1,12 @@
 export interface JsonRpcRequest {
     jsonrpc: "2.0";
-    id: number;
+    id: string | number | null;
     method: string;
     params?: Record<string, unknown>;
 }
 export interface JsonRpcResponse {
     jsonrpc: "2.0";
-    id: number | null;
+    id: string | number | null;
     result?: unknown;
     error?: {
         code: number;
@@ -19,110 +19,70 @@ export interface JsonRpcNotification {
     method: string;
     params: Record<string, unknown>;
 }
-export interface CapabilitiesResult {
+export interface BridgeCapabilitiesResult {
     protocol: string;
-    transport: string;
+    transport: "stdio" | "http" | "ws";
     bridgeVersion: string;
     apiVersion: string;
+    streaming: boolean;
     notifications: {
         progress: boolean;
         sessionEvent: boolean;
     };
     workflows: string[];
-    skills: SkillInfo[];
-    workflowSkillMap: Record<string, string>;
+    skills: unknown[];
+    workflowSkillMap: Record<string, unknown>;
     methods: string[];
     agentControlParams: string[];
-    models: ModelInfo[];
-    tools: ToolInfo[];
+    models: Array<Record<string, unknown>>;
+    tools: Array<Record<string, unknown>>;
     hookEvents: string[];
     ui: {
         enabled: boolean;
         path: string;
     };
 }
-export interface SkillInfo {
-    name: string;
-    description: string;
-    hasScript: boolean;
-    parameters: string[];
+export interface BridgeNegotiateVersionParams {
+    supportedVersions: unknown[];
 }
-export interface ModelInfo {
-    id: string;
-    displayName: string;
-}
-export interface ToolInfo {
-    name: string;
-    description: string;
-}
-export interface PingResult {
-    pong: boolean;
-    ts: string;
-}
-export interface NegotiateVersionParams {
-    supportedVersions: string[];
-}
-export interface NegotiateVersionResult {
+export interface BridgeNegotiateVersionResult {
     negotiatedVersion: string;
-    capabilities: CapabilitiesResult;
+    capabilities: Record<string, unknown>;
 }
-export type LogLevel = "debug" | "info" | "warn" | "error" | "silent";
-export interface SetLogLevelParams {
-    level: LogLevel;
+export interface SkillsListResult {
+    skills: unknown[];
 }
-export interface SetLogLevelResult {
-    level: string;
+export interface WorkflowRunParams {
+    workspace: string;
+    workflow: "init" | "propose" | "modify" | "apply" | "verify" | "archive" | "cancel" | "list";
+    args?: unknown[];
 }
-export interface RuntimeInfo {
-    bridgeVersion: string;
-    apiVersion: string;
-    transport: string;
-    authMode: string;
-    logLevel: string;
-    sessionsPath: string;
-    keysPath: string;
-    specDrivenScriptPath: string;
-    http: {
-        port: number;
-        corsOrigins: string;
-    } | null;
-    nodeVersion: string;
-}
-export type PermissionMode = "default" | "acceptEdits" | "bypassPermissions" | "approve";
-export interface ProxyParams {
-    http?: string;
-    https?: string;
-    noProxy?: string;
+export interface WorkflowRunResult {
+    workflow: string;
+    workspace: string;
+    stdout: string;
+    stderr: string;
+    parsed: unknown;
 }
 export interface SessionStartParams {
     workspace: string;
     prompt: string;
-    model?: string;
-    allowedTools?: string[];
-    disallowedTools?: string[];
-    permissionMode?: PermissionMode;
-    maxTurns?: number;
-    systemPrompt?: string;
-    proxy?: ProxyParams;
     options?: Record<string, unknown>;
 }
-export interface SessionResult {
+export interface SessionStartResult {
     sessionId: string;
-    status: "completed" | "stopped";
-    result: unknown;
-    usage: unknown | null;
+    status: "completed" | "stopped" | "interrupted";
+    result: unknown | null;
 }
 export interface SessionResumeParams {
     sessionId: string;
     prompt: string;
-    model?: string;
-    allowedTools?: string[];
-    disallowedTools?: string[];
-    permissionMode?: PermissionMode;
-    maxTurns?: number;
-    systemPrompt?: string;
-    proxy?: ProxyParams;
     options?: Record<string, unknown>;
+}
+export interface SessionResumeResult {
+    sessionId: string;
+    status: "completed" | "stopped" | "interrupted";
+    result: unknown | null;
 }
 export interface SessionStopParams {
     sessionId: string;
@@ -142,259 +102,216 @@ export interface SessionStatusResult {
     historyLength: number;
     result: unknown | null;
 }
-export interface SessionListParams {
-    status?: "active" | "all";
+export interface JsonRpcError {
+    code: number;
+    message: string;
+    data?: unknown;
 }
-export interface SessionListItem {
-    sessionId: string;
-    status: string;
+export interface InternalErrorErrorData {
+    message: string;
+}
+export interface WorkspaceNotFoundErrorData {
     workspace: string;
-    createdAt: string;
-    updatedAt: string;
-    prompt: string | null;
 }
-export interface SessionListResult {
+export interface ScriptNotFoundErrorData {
+    scriptPath: string;
+}
+export interface WorkflowFailedErrorData {
+    workflow: string;
+    workspace: string;
+    message: string;
+    stdout: string;
+    stderr: string;
+    code: unknown;
+}
+export interface SessionNotFoundErrorData {
+    sessionId: string;
+}
+export interface SDKUnavailableErrorData {
+    hint: string;
+}
+export interface VersionMismatchErrorData {
+    supportedVersions: unknown[];
+}
+export type NotificationMethod = "bridge/progress" | "bridge/session_event" | "bridge/subagent_event" | "bridge/hook_triggered" | "bridge/file_changed" | "bridge/tool_approval_requested";
+export type CapabilitiesResult = BridgeCapabilitiesResult;
+export type PingResult = {
+    pong: boolean;
+    ts: string;
+};
+export type NegotiateVersionParams = BridgeNegotiateVersionParams;
+export type NegotiateVersionResult = BridgeNegotiateVersionResult;
+export type LogLevel = "trace" | "debug" | "info" | "warn" | "error" | "silent";
+export type SetLogLevelParams = {
+    level: LogLevel;
+};
+export type SetLogLevelResult = {
+    level: LogLevel;
+};
+export interface RuntimeInfo {
+    bridgeVersion: string;
+    apiVersion: string;
+    transport: string;
+    authMode: string;
+    logLevel: string;
+    sessionsPath: string;
+    keysPath: string;
+    specDrivenScriptPath: string;
+    http: Record<string, unknown> | null;
+    nodeVersion: string;
+}
+export interface SkillInfo {
+    name: string;
+    description: string;
+    hasScript: boolean;
+    parameters: string[];
+}
+export interface ModelInfo {
+    id: string;
+    displayName: string;
+}
+export interface ToolInfo {
+    name: string;
+    description: string;
+}
+export type PermissionMode = "default" | "acceptEdits" | "bypassPermissions" | "approve";
+export type ProxyParams = {
+    http?: string;
+    https?: string;
+    noProxy?: string;
+};
+export type SessionResult = SessionStartResult;
+export interface SessionSpawnParams extends SessionStartParams {
+    parentSessionId?: string;
+}
+export type SessionListParams = Record<string, unknown>;
+export type SessionListItem = Record<string, unknown>;
+export type SessionListResult = {
     sessions: SessionListItem[];
-}
-export interface SessionHistoryParams {
+};
+export type SessionHistoryParams = {
     sessionId: string;
     offset?: number;
     limit?: number;
-}
-export interface SessionHistoryResult {
+};
+export type SessionHistoryEntry = Record<string, unknown>;
+export type SessionHistoryResult = {
     sessionId: string;
     total: number;
     entries: SessionHistoryEntry[];
-}
-export interface SessionHistoryEntry {
-    type: string;
-    prompt?: string;
-    message?: unknown;
-}
-export interface SessionEventsParams {
+};
+export type BufferedEvent = Record<string, unknown>;
+export type SessionEventsParams = {
     sessionId: string;
     since?: number;
     limit?: number;
-}
-export interface BufferedEvent {
-    seq: number;
-    payload: Record<string, unknown>;
-}
-export interface SessionEventsResult {
-    sessionId: string;
+};
+export type SessionEventsResult = {
     events: BufferedEvent[];
-    total: number;
-}
-export interface SessionExportParams {
+    nextSeq: number;
+};
+export type SessionExportParams = {
     sessionId: string;
-}
-export interface SessionExportResult {
-    id: string;
-    workspace: string;
-    sdkSessionId: string | null;
-    status: string;
-    createdAt: string;
-    updatedAt: string;
-    history: SessionHistoryEntry[];
-    result: unknown | null;
-}
-export interface SessionDeleteParams {
+};
+export type SessionExportResult = Record<string, unknown>;
+export type SessionDeleteParams = {
     sessionId: string;
-}
-export interface SessionDeleteResult {
+};
+export type SessionDeleteResult = {
+    sessionId: string;
     deleted: boolean;
-    sessionId: string;
-}
-export interface SessionCleanupParams {
+};
+export type SessionCleanupParams = {
     olderThanDays?: number;
-}
-export interface SessionCleanupResult {
-    removedCount: number;
-}
-export interface SessionApproveToolParams {
-    sessionId: string;
+};
+export type SessionCleanupResult = {
+    deleted: number;
+};
+export type SessionApproveToolParams = {
+    sessionId?: string;
     requestId: string;
-}
-export interface SessionRejectToolParams {
-    sessionId: string;
+};
+export type SessionRejectToolParams = {
+    sessionId?: string;
     requestId: string;
     message?: string;
-}
-export interface ApprovalResult {
-    requestId: string;
-    behavior: "allow" | "deny";
-}
-export interface SessionBranchParams {
+};
+export type ApprovalResult = Record<string, unknown>;
+export type SessionBranchParams = {
     sessionId: string;
-    fromIndex?: number;
     prompt?: string;
-}
-export interface SessionSearchParams {
+    fromIndex?: number;
+};
+export type SessionSearchParams = {
     query: string;
     workspace?: string;
-    status?: string;
     limit?: number;
-}
-export interface SearchResult {
-    sessionId: string;
-    workspace: string;
-    status: string;
-    matches: Array<{
-        historyIndex: number;
-        snippet: string;
-    }>;
-}
-export interface SessionSearchResult {
-    results: SearchResult[];
-}
+};
+export type SearchResult = Record<string, unknown>;
+export type SessionSearchResult = {
+    sessions: SearchResult[];
+};
 export type WorkflowName = "init" | "propose" | "modify" | "apply" | "verify" | "archive" | "cancel" | "list" | "maintenance" | "migrate";
-export interface WorkflowRunParams {
-    workspace: string;
-    workflow: WorkflowName;
-    args?: string[];
-}
-export interface WorkflowRunResult {
-    workflow: string;
-    workspace: string;
-    stdout: string;
-    stderr: string;
-    parsed: unknown | null;
-}
-export interface ModelsListResult {
+export type ModelsListResult = {
     models: ModelInfo[];
-}
-export interface ToolsListResult {
+};
+export type ToolsListResult = {
     tools: ToolInfo[];
-}
-export interface WorkspaceRegisterParams {
+};
+export type WorkspaceRegisterParams = {
     workspace: string;
-}
-export interface WorkspaceListResult {
+};
+export type WorkspaceListResult = {
     workspaces: unknown[];
-}
-export interface McpAddParams {
-    workspace: string;
+};
+export type McpAddParams = Record<string, unknown>;
+export type McpRemoveParams = {
     name: string;
-    command: string;
-    args?: string[];
-    env?: Record<string, string>;
-}
-export interface McpRemoveParams {
-    workspace: string;
+    workspace?: string;
+};
+export type McpStartParams = {
     name: string;
-}
-export interface McpStartParams {
-    workspace: string;
+    workspace?: string;
+};
+export type McpStopParams = {
     name: string;
-}
-export interface McpStopParams {
-    workspace: string;
-    name: string;
-}
-export interface McpListParams {
-    workspace: string;
-}
-export interface McpEntry {
-    name: string;
-    status: string;
-    pid: number | null;
-}
-export interface McpListResult {
+    workspace?: string;
+};
+export type McpListParams = {
+    workspace?: string;
+};
+export type McpEntry = Record<string, unknown>;
+export type McpListResult = {
     servers: McpEntry[];
-}
-export interface ConfigGetParams {
-    key: string;
-    workspace?: string;
-}
-export interface ConfigSetParams {
-    key: string;
-    value: unknown;
-    scope: "project" | "user";
-    workspace?: string;
-}
-export interface ConfigListParams {
-    workspace?: string;
-}
-export interface ConfigEntry {
-    key: string;
-    value: unknown;
-    scope: string;
-}
-export interface ConfigListResult {
-    settings: ConfigEntry[];
-}
+};
+export type ConfigGetParams = Record<string, unknown>;
+export type ConfigSetParams = Record<string, unknown>;
+export type ConfigListParams = Record<string, unknown>;
+export type ConfigEntry = Record<string, unknown>;
+export type ConfigListResult = {
+    entries: ConfigEntry[];
+};
 export type HookEvent = "pre_tool_use" | "post_tool_use" | "notification" | "stop" | "subagent_stop";
-export interface HooksAddParams {
-    event: HookEvent;
-    command: string;
-    matcher?: string;
-    scope: "project" | "user";
-    workspace?: string;
-}
-export interface HooksRemoveParams {
-    hookId: string;
-}
-export interface HooksListParams {
-    workspace?: string;
-}
-export interface HookEntry {
-    hookId: string;
-    event: string;
-    command: string;
-    matcher?: string;
-    scope: string;
-    workspace?: string;
-}
-export interface HooksListResult {
+export type HooksAddParams = Record<string, unknown>;
+export type HooksRemoveParams = {
+    hookId?: string;
+    id?: string;
+};
+export type HooksListParams = Record<string, unknown>;
+export type HookEntry = Record<string, unknown>;
+export type HooksListResult = {
     hooks: HookEntry[];
-}
-export interface ContextReadParams {
-    scope: "project" | "user";
-    path: string;
-    workspace?: string;
-}
-export interface ContextWriteParams {
-    scope: "project" | "user";
-    path: string;
-    content: string;
-    workspace?: string;
-}
-export interface ContextListParams {
-    workspace?: string;
-}
-export interface ContextListResult {
+};
+export type ContextReadParams = Record<string, unknown>;
+export type ContextWriteParams = Record<string, unknown>;
+export type ContextListParams = Record<string, unknown>;
+export type ContextListResult = {
     files: unknown[];
-}
-export type NotificationMethod = "bridge/progress" | "bridge/session_event" | "bridge/hook_triggered" | "bridge/file_changed" | "bridge/tool_approval_requested";
-export type SessionEventType = "session_started" | "session_resumed" | "session_completed" | "session_stopped" | "agent_message";
-export interface SessionEventNotification {
-    sessionId: string;
-    type: SessionEventType;
-    requestId?: string | number | null;
-    messageType?: string;
-    message?: unknown;
-    result?: unknown;
-    usage?: unknown;
-    status?: string;
-}
-export interface ProgressNotification {
-    phase: "workflow_started" | "workflow_completed" | "workflow_failed";
-    workflow?: string;
-    workspace?: string;
-    requestId?: string | number | null;
-}
-export interface ToolApprovalNotification {
-    sessionId: string;
-    requestId: string;
-    toolName: string;
-    input: Record<string, unknown>;
-    title?: string;
-    displayName?: string;
-    description?: string;
-}
-export interface FileChangedNotification {
-    sessionId: string;
-    path: string;
-    action: "created" | "modified";
-}
+};
+export type SessionEventType = string;
+export type SessionEventNotification = JsonRpcNotification;
+export type SubagentEventNotification = JsonRpcNotification;
+export type ProgressNotification = JsonRpcNotification;
+export type ToolApprovalNotification = JsonRpcNotification;
+export type FileChangedNotification = JsonRpcNotification;
 //# sourceMappingURL=types.d.ts.map

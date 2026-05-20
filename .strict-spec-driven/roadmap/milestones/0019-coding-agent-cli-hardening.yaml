@@ -15,8 +15,8 @@ scope:
       Preserve Agent SDK options on Anthropic provider-routed sessions, including cwd, env, tools,
       permissionMode, allowedTools, disallowedTools, resume, maxTurns, systemPrompt, and streaming.
     - >-
-      Support Anthropic-compatible third-party API endpoints by forwarding provider/CLI
-      base-url, API-key, auth-token, and SDK env settings to Claude Agent SDK process env.
+      Support Anthropic-compatible third-party API endpoints by forwarding provider/CLI base-url,
+      API-key, auth-token, and SDK env settings to Claude Agent SDK process env.
     - >-
       Add an `ai-spec-bridge agent` command with `run` alias for one-shot coding tasks in a
       workspace.

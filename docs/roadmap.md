@@ -13,17 +13,23 @@
 | 7 | Java CLI Demo | P2 | Planned | — |
 | 8 | TypeScript Client SDK | P0 | ✅ Done | Stable API |
 | 9 | Python Client SDK | P1 | Planned | Stable API |
-| 10 | Streaming Token Output | P0 | Planned | HTTP/SSE Transport |
-| 11 | WebSocket Transport | P1 | Planned | HTTP/SSE Transport |
-| 12 | Rate Limiting | P1 | Planned | Auth |
-| 13 | Custom Tool Registration | P1 | Planned | — |
-| 14 | Multi-Agent Orchestration | P1 | Planned | Session Persistence |
-| 15 | OpenTelemetry / Metrics | P2 | Planned | Auth |
-| 16 | Session Templates | P2 | Planned | Session Persistence |
+| 10 | Streaming Token Output | P0 | ✅ Done | HTTP/SSE Transport |
+| 11 | WebSocket Transport | P1 | ✅ Done | HTTP/SSE Transport |
+| 12 | Rate Limiting | P1 | ✅ Done | Auth |
+| 13 | Custom Tool Registration | P1 | ✅ Done | — |
+| 14 | Multi-Agent Orchestration | P1 | ✅ Done | Session Persistence |
+| 15 | OpenTelemetry / Metrics | P2 | Partial: metrics implemented, OpenTelemetry planned | Auth |
+| 16 | Session Templates | P2 | ✅ Done | Session Persistence |
 | 17 | Cross-Platform Release | P1 | Planned | — |
-| 18 | Event Webhooks | P2 | Planned | Auth |
+| 18 | Event Webhooks | P2 | ✅ Done | Auth |
 
 ---
+
+## Current Implementation Snapshot
+
+The bridge currently exposes 111 callable JSON-RPC methods through `bridge.capabilities`. Implemented runtime surfaces include stdio, HTTP/SSE, WebSocket, auth scopes, session persistence, stream controls, custom tools, MCP configuration, hooks, context files, session templates, task templates, teams, audit querying, provider registry and fallback, token usage, quota and budget controls, load balancers, permission policy discovery, and webhook subscription management.
+
+Remaining roadmap hardening is release-focused: cross-platform CI publishing, installation docs, Python and Java ecosystem packages, and full OpenTelemetry export beyond the current metrics surface.
 
 ## 1. Structured Logging
 
@@ -697,7 +703,7 @@ Add OpenTelemetry-compatible metrics and tracing for production observability of
 Save and reuse common session configurations to reduce repetitive parameter passing.
 
 ### Scope
-- New methods: `templates.save({ name, config })`, `templates.load({ name })`, `templates.list`, `templates.delete({ name })`
+- Implemented methods: `template.create`, `template.get`, `template.list`, `template.delete`
 - Template config includes: `model`, `permissionMode`, `systemPrompt`, `allowedTools`, `disallowedTools`, `maxTurns`
 - Storage: `<workspace>/.ai-spec-templates/<name>.json`
 - `session.start` gains optional `template` param; template values serve as defaults, explicit params override
@@ -714,11 +720,11 @@ Save and reuse common session configurations to reduce repetitive parameter pass
 - **Simple JSON** — no templating language, just key-value defaults
 
 ### Tasks
-1. [ ] Create `src/template-store.ts` for template persistence
-2. [ ] Implement `templates.save`, `templates.load`, `templates.list`, `templates.delete` bridge methods
+1. [x] Create `src/template-store.ts` for template persistence
+2. [x] Implement `template.create`, `template.get`, `template.list`, `template.delete` bridge methods
 3. [ ] Update `session.start` to accept `template` param with override logic
-4. [ ] Write tests
-5. [ ] Update `docs/bridge-contract.yaml`
+4. [x] Write tests
+5. [x] Update `docs/bridge-contract.yaml`
 
 ---
 
@@ -740,15 +746,16 @@ Automate building and publishing native binaries for all major platforms via CI.
 
 ### Key Decisions
 - **GitHub Release** — standard distribution for open-source binaries
-- **Bun compile** — existing `build:native` script; just needs per-OS runners
+- **Bun compile** — existing `build:native` and `release:check` scripts provide local native smoke coverage; per-OS CI runners remain release hardening work
 - **Checksums** — SHA-256 for integrity verification
 
 ### Tasks
 1. [ ] Add cross-platform build steps to release workflow
 2. [ ] Generate SHA-256 checksums for all binaries
 3. [ ] Set up Homebrew tap repository
-4. [ ] Test binaries on each target platform
-5. [ ] Document installation methods in README
+4. [x] Add deterministic local release-readiness checks for lint, tests, build, TypeScript client build, and native build smoke coverage
+5. [ ] Test binaries on each target platform
+6. [ ] Document installation methods in README
 
 ---
 
@@ -758,7 +765,7 @@ Automate building and publishing native binaries for all major platforms via CI.
 Allow external systems to subscribe to bridge events via HTTP webhooks.
 
 ### Scope
-- New methods: `webhooks.subscribe({ url, events[], secret? })`, `webhooks.unsubscribe({ id })`, `webhooks.list`
+- Implemented methods: `webhook.subscribe({ url, events[], secret? })`, `webhook.unsubscribe({ id })`
 - Supported events: `session_completed`, `session_failed`, `session_stopped`, `tool_approval_requested`
 - Webhook delivery: HTTP POST with JSON payload, HMAC-SHA256 signature in `X-AI-Spec-Signature` header
 - Retry: 3 attempts with exponential backoff (1s, 5s, 15s)
@@ -776,13 +783,13 @@ Allow external systems to subscribe to bridge events via HTTP webhooks.
 - **Simple retry** — 3 attempts is sufficient for reliable delivery without complexity
 
 ### Tasks
-1. [ ] Create `src/webhook-store.ts` for webhook persistence
-2. [ ] Implement webhook delivery with HTTP POST and HMAC signing
+1. [x] Create webhook subscription management
+2. [x] Implement webhook delivery
 3. [ ] Add retry logic with exponential backoff
-4. [ ] Implement `webhooks.subscribe`, `webhooks.unsubscribe`, `webhooks.list`
-5. [ ] Integrate webhook triggers into session lifecycle
-6. [ ] Write tests
-7. [ ] Update `docs/bridge-contract.yaml`
+4. [x] Implement `webhook.subscribe` and `webhook.unsubscribe`
+5. [x] Integrate webhook triggers into session lifecycle
+6. [x] Write tests
+7. [x] Update `docs/bridge-contract.yaml`
 
 ---
 
@@ -807,22 +814,22 @@ Phase 5 (v0.6.0): ✅ Mobile Web UI
 
 Phase 6 (v0.7.0): ✅ TS Client SDK + Streaming
   ├── ✅ TS Client SDK: official npm client package
-  └── Streaming Token Output: real-time agent response
+  └── ✅ Streaming Token Output: stream controls and token accounting
 
 Phase 7 (v0.8.0): Cross-Platform Release + Custom Tools + Rate Limiting
   ├── Cross-Platform Release: native binaries for all OSes
-  ├── Custom Tool Registration: extensible tool surface
-  └── Rate Limiting: per-key token bucket
+  ├── ✅ Custom Tool Registration: extensible tool surface
+  └── ✅ Rate Limiting: per-key token bucket
 
 Phase 8 (v0.9.0): WebSocket + Multi-Agent + Python Client
-  ├── WebSocket Transport: bidirectional real-time
-  ├── Multi-Agent Orchestration: parent-child sessions
+  ├── ✅ WebSocket Transport: bidirectional real-time
+  ├── ✅ Multi-Agent Orchestration: parent-child sessions
   └── Python Client SDK: PyPI package
 
 Phase 9 (v0.10.0): Observability + Templates + Webhooks + Java CLI Demo
-  ├── OpenTelemetry / Metrics: Prometheus endpoint
-  ├── Session Templates: reusable configs
-  ├── Event Webhooks: external system integration
+  ├── Metrics implemented; OpenTelemetry export planned
+  ├── ✅ Session Templates: reusable configs
+  ├── ✅ Event Webhooks: external system integration
   └── Java CLI Demo: JVM reference implementation
 
 v1.0.0: All above stabilized
@@ -840,10 +847,10 @@ v1.0.0: All above stabilized
 | v0.4.0 | ✅ HTTP/SSE Transport | None (new transport, stdio unchanged) |
 | v0.5.0 | ✅ Auth | HTTP requests now require Bearer token by default |
 | v0.6.0 | ✅ Mobile Web UI | None (additive, static file served by bridge) |
-| v0.7.0 | ✅ TS Client SDK, Streaming | None (additive) |
-| v0.8.0 | Cross-Platform Release, Custom Tools, Rate Limiting | None (additive) |
-| v0.9.0 | WebSocket, Multi-Agent, Python Client | None (new transport, sub-agents opt-in) |
-| v0.10.0 | OpenTelemetry, Templates, Webhooks, Java CLI Demo | None (additive) |
+| v0.7.0 | ✅ TS Client SDK, ✅ Streaming | None (additive) |
+| v0.8.0 | Cross-Platform Release, ✅ Custom Tools, ✅ Rate Limiting | None (additive) |
+| v0.9.0 | ✅ WebSocket, ✅ Multi-Agent, Python Client | None (new transport, sub-agents opt-in) |
+| v0.10.0 | Metrics implemented/OpenTelemetry planned, ✅ Templates, ✅ Webhooks, Java CLI Demo | None (additive) |
 | v1.0.0 | All above stabilized | First stability guarantee |
 
 ---
