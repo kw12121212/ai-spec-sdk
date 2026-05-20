@@ -10,6 +10,7 @@ import { loadKeys, addKey, revokeKey, DEFAULT_KEYS_FILE, type StoredKey } from "
 import { generateKey } from "./auth.js";
 import { buildDoctorInfo } from "./runtime-info.js";
 import { BRIDGE_VERSION } from "./capabilities.js";
+import { agentCliHelp, runAgentCli } from "./agent-cli.js";
 
 function writeMessage(message: unknown): void {
   process.stdout.write(`${JSON.stringify(message)}\n`);
@@ -39,6 +40,8 @@ JSON-RPC 2.0 bridge for Claude Agent SDK and spec-driven workflows.
 
 Usage:
   ai-spec-bridge [options]            Start in stdio transport mode (default)
+  ai-spec-bridge agent <prompt>       Run a coding-agent task in the current workspace
+  ai-spec-bridge run <prompt>         Alias for agent
   ai-spec-bridge --transport http     Start in HTTP/SSE transport mode
   ai-spec-bridge doctor [--json]      Show runtime diagnostics and exit
   ai-spec-bridge keygen               Generate a new API key
@@ -72,8 +75,21 @@ Environment variables:
 RPC discovery:
   Send {"jsonrpc":"2.0","id":1,"method":"bridge.capabilities"} to list all methods.
   Send {"jsonrpc":"2.0","id":2,"method":"bridge.info"} (requires admin scope) for runtime info.
+
+Agent command:
+${agentCliHelp()}
 `);
   process.exit(0);
+}
+
+// ── Coding agent subcommand ──────────────────────────────────────────────────
+
+if (subcommand === "agent" || subcommand === "run") {
+  const exitCode = await runAgentCli(process.argv.slice(3), {
+    stdout: process.stdout,
+    stderr: process.stderr,
+  }, { sessionsDir });
+  process.exit(exitCode);
 }
 
 // ── doctor subcommand ─────────────────────────────────────────────────────────

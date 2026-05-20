@@ -50,6 +50,18 @@ describe("ProviderRegistry", () => {
       }
     });
 
+    it("should register an Anthropic-compatible provider with auth token and base URL", () => {
+      const config = createConfig({
+        apiKey: undefined,
+        authToken: "third-party-token-1234567890",
+        baseUrl: "https://anthropic-compatible.example/v1",
+      });
+
+      const result = registry.register(config);
+
+      expect(result).toEqual({ success: true, providerId: config.id });
+    });
+
     it("should reject duplicate provider ID", () => {
       const config = createConfig();
       registry.register(config);

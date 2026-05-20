@@ -1,0 +1,55 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: align-public-contract-and-release-readiness
+sections:
+  Implementation:
+    audit-public-surfaces:
+      text: Audit bridge dispatch methods, capabilities methods, auth scope mappings, docs/bridge-contract.yaml, README.md, docs/roadmap.md, and release scripts for drift.
+      status: pending
+    align-capabilities:
+      text: Update runtime capability discovery so bridge.capabilities advertises every callable JSON-RPC method handled by bridge dispatch.
+      status: pending
+    repair-bridge-contract:
+      text: Update docs/bridge-contract.yaml so the public contract covers the current method set, transports, auth scopes, notifications, errors, and environment variables without stale duplicate sections.
+      status: pending
+    add-drift-checks:
+      text: Add automated checks that fail when dispatch methods, capabilities methods, auth scope mappings, or bridge contract method coverage drift apart.
+      status: pending
+    refresh-docs:
+      text: Update README.md and docs/roadmap.md to describe the implemented SDK surface and separate completed capabilities from remaining future hardening.
+      status: pending
+    add-release-readiness:
+      text: Add or document deterministic release-readiness commands covering lint, tests, build, TypeScript client build, and native build smoke coverage where practical.
+      status: pending
+  Testing:
+    run-lint:
+      text: Run TypeScript validation.
+      status: pending
+      command: bun run lint
+    run-build:
+      text: Run build validation.
+      status: pending
+      command: bun run build
+    run-tests:
+      text: Run the full Bun test suite.
+      status: pending
+      command: bun run test
+    run-client-build:
+      text: Build the TypeScript client package.
+      status: pending
+      command: bun --cwd packages/client run build
+  Verification:
+    verify-scope:
+      text: Verify implementation matches proposal scope.
+      status: pending
+    verify-contract-drift:
+      text: Confirm the new drift checks fail on intentional metadata omissions and pass on the final method set.
+      status: pending
+    verify-release-readiness:
+      text: Confirm release-readiness documentation and commands do not require live LLM credentials or Python packaging tools by default.
+      status: pending
+testing_gates:
+  validation_task: run-lint
+  unit_test_task: run-tests

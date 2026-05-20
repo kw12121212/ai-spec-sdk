@@ -1,5 +1,6 @@
 import { ConfigStore } from "../config-store.js";
 import type { LLMProvider, ProviderConfig, StorageBackend } from "./types.js";
+import { hasAnthropicCredential } from "./anthropic-env.js";
 import { AnthropicAdapter } from "./adapters/anthropic.js";
 import { OpenAIAdapter } from "./adapters/openai.js";
 import { DeepSeekAdapter } from "./adapters/deepseek.js";
@@ -94,9 +95,17 @@ export class ProviderRegistry {
       }
     }
 
-    if (cfg.type === "anthropic" || cfg.type === "openai" || cfg.type === "deepseek") {
+    if (cfg.type === "anthropic") {
+      if (!hasAnthropicCredential(cfg as ProviderConfig)) {
+        errors.push({
+          field: "apiKey",
+          message:
+            "required for type 'anthropic' (set config.apiKey, config.authToken, env.ANTHROPIC_API_KEY, env.ANTHROPIC_AUTH_TOKEN, ANTHROPIC_API_KEY, or ANTHROPIC_AUTH_TOKEN)",
+        });
+      }
+    } else if (cfg.type === "openai" || cfg.type === "deepseek") {
       const hasApiKey = cfg.apiKey && typeof cfg.apiKey === "string" && cfg.apiKey.trim() !== "";
-      const envVarName = cfg.type === "anthropic" ? "ANTHROPIC_API_KEY" : cfg.type === "openai" ? "OPENAI_API_KEY" : "DEEPSEEK_API_KEY";
+      const envVarName = cfg.type === "openai" ? "OPENAI_API_KEY" : "DEEPSEEK_API_KEY";
       const hasEnvKey = typeof process.env[envVarName] === "string" && process.env[envVarName]!.trim() !== "";
 
       if (!hasApiKey && !hasEnvKey) {
@@ -301,6 +310,9 @@ export class ProviderRegistry {
 
     if (masked.apiKey && typeof masked.apiKey === "string" && masked.apiKey.length > 8) {
       masked.apiKey = `${masked.apiKey.substring(0, 7)}...`;
+    }
+    if (masked.authToken && typeof masked.authToken === "string" && masked.authToken.length > 8) {
+      masked.authToken = `${masked.authToken.substring(0, 7)}...`;
     }
 
     return masked;

@@ -75,3 +75,7 @@ milestones:
     title: CLI UX and Developer Ecosystem Completion
     path: roadmap/milestones/0018-cli-ux-and-ecosystem.yaml
     status: complete
+  0019-coding-agent-cli-hardening:
+    title: Coding Agent CLI Hardening
+    path: roadmap/milestones/0019-coding-agent-cli-hardening.yaml
+    status: proposed

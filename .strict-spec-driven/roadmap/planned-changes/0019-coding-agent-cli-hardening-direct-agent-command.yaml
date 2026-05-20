@@ -1,0 +1,18 @@
+schema: strict-spec-driven/planned-change/v1
+schema_version: 1
+artifact_type: planned_change
+schema_file: ../../templates/strict-spec-driven/schemas/planned-change.yaml
+planned_change:
+  id: direct-agent-command
+  milestone: 0019-coding-agent-cli-hardening
+status: planned
+summary: Add a direct `ai-spec-bridge agent` coding task command with a `run` alias
+details: >-
+  Add a terminal-facing coding-agent command on the existing binary so users can run one-shot coding
+  tasks without manually sending JSON-RPC. The command accepts workspace, model, permission, tool
+  allow/deny, max-turn, system prompt, template, timeout, streaming, and JSON-output flags, and
+  renders session notifications into readable terminal output by default. It also exposes
+  Anthropic-compatible third-party endpoint flags for base URL, API key, auth token, and repeatable
+  SDK env variables.
+depends_on:
+  - terminal-ux

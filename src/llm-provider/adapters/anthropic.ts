@@ -1,5 +1,6 @@
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import { defaultLogger as logger } from "../../logger.js";
+import { buildAnthropicSdkEnv, hasAnthropicCredential } from "../anthropic-env.js";
 import type {
   LLMProvider,
   ProviderConfig,
@@ -35,8 +36,10 @@ export class AnthropicAdapter implements LLMProvider {
   async initialize(): Promise<void> {
     if (this.initialized) return;
 
-    if (!this.config.apiKey && !process.env.ANTHROPIC_API_KEY) {
-      throw new Error("Anthropic API key is required. Set config.apiKey or ANTHROPIC_API_KEY environment variable.");
+    if (!hasAnthropicCredential(this.config)) {
+      throw new Error(
+        "Anthropic API credential is required. Set config.apiKey, config.authToken, ANTHROPIC_API_KEY, or ANTHROPIC_AUTH_TOKEN.",
+      );
     }
 
     this.initialized = true;
@@ -45,8 +48,7 @@ export class AnthropicAdapter implements LLMProvider {
 
   async healthCheck(): Promise<boolean> {
     try {
-      const hasApiKey = !!this.config.apiKey || !!process.env.ANTHROPIC_API_KEY;
-      return hasApiKey && this.initialized;
+      return hasAnthropicCredential(this.config) && this.initialized;
     } catch {
       return false;
     }
@@ -76,6 +78,8 @@ export class AnthropicAdapter implements LLMProvider {
     if (options.temperature !== undefined) sdkOptions["temperature"] = options.temperature;
     if (options.maxTokens !== undefined) sdkOptions["max_tokens"] = options.maxTokens;
     if (this.config.model) sdkOptions["model"] = this.config.model;
+    const env = buildAnthropicSdkEnv(this.config);
+    if (Object.keys(env).length > 0) sdkOptions["env"] = env;
 
     let terminalResult: unknown = null;
     let terminalUsage: TokenUsage | null = null;
@@ -119,6 +123,8 @@ export class AnthropicAdapter implements LLMProvider {
     if (options.temperature !== undefined) sdkOptions["temperature"] = options.temperature;
     if (options.maxTokens !== undefined) sdkOptions["max_tokens"] = options.maxTokens;
     if (this.config.model) sdkOptions["model"] = this.config.model;
+    const env = buildAnthropicSdkEnv(this.config);
+    if (Object.keys(env).length > 0) sdkOptions["env"] = env;
 
     const abortController = signal ? new AbortController() : undefined;
     if (signal) {

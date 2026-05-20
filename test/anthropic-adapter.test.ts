@@ -39,9 +39,37 @@ describe("AnthropicAdapter", () => {
 
     it("should throw error when API key is missing", async () => {
       const noKeyAdapter = new AnthropicAdapter({ id: "no-key", type: "anthropic" });
-      delete process.env.ANTHROPIC_API_KEY;
+      const originalApiKey = process.env.ANTHROPIC_API_KEY;
+      const originalAuthToken = process.env.ANTHROPIC_AUTH_TOKEN;
 
-      await expect(noKeyAdapter.initialize()).rejects.toThrow("API key is required");
+      try {
+        delete process.env.ANTHROPIC_API_KEY;
+        delete process.env.ANTHROPIC_AUTH_TOKEN;
+
+        await expect(noKeyAdapter.initialize()).rejects.toThrow("API credential is required");
+      } finally {
+        if (originalApiKey === undefined) {
+          delete process.env.ANTHROPIC_API_KEY;
+        } else {
+          process.env.ANTHROPIC_API_KEY = originalApiKey;
+        }
+        if (originalAuthToken === undefined) {
+          delete process.env.ANTHROPIC_AUTH_TOKEN;
+        } else {
+          process.env.ANTHROPIC_AUTH_TOKEN = originalAuthToken;
+        }
+      }
+    });
+
+    it("should initialize with auth token for Anthropic-compatible APIs", async () => {
+      const tokenAdapter = new AnthropicAdapter({
+        id: "token-provider",
+        type: "anthropic",
+        authToken: "proxy-token",
+        baseUrl: "https://anthropic-compatible.example/v1",
+      });
+
+      await expect(tokenAdapter.initialize()).resolves.toBeUndefined();
     });
   });
 
@@ -73,8 +101,13 @@ describe("AnthropicAdapter", () => {
 
   describe("Query", () => {
     it("should execute query and return result", async () => {
-      (globalThis as Record<string, unknown>).__AI_SPEC_SDK_QUERY__ =
-        createMockQueryGenerator as unknown as QueryFunction;
+      let capturedOptions: Record<string, unknown> | null = null;
+      (globalThis as Record<string, unknown>).__AI_SPEC_SDK_QUERY__ = (async function* (params: {
+        options: Record<string, unknown>;
+      }) {
+        capturedOptions = params.options;
+        yield* createMockQueryGenerator();
+      }) as unknown as QueryFunction;
 
       await adapter.initialize();
 
@@ -85,6 +118,7 @@ describe("AnthropicAdapter", () => {
       expect(result.status).toBe("completed");
       expect(result.result).toBeDefined();
       expect(result.usage).toBeDefined();
+      expect((capturedOptions?.["env"] as Record<string, unknown>)["ANTHROPIC_API_KEY"]).toBe("test-api-key");
     });
 
     it("should throw error if not initialized", async () => {

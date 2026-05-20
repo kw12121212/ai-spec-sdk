@@ -2,6 +2,12 @@ export interface ProviderConfig {
   id: string;
   type: "anthropic" | "openai" | "deepseek" | "local";
   apiKey?: string;
+  authToken?: string;
+  baseUrl?: string;
+  baseURL?: string;
+  apiBaseUrl?: string;
+  apiBaseURL?: string;
+  env?: Record<string, string | undefined>;
   model?: string;
   temperature?: number;
   maxTokens?: number;

@@ -1,0 +1,65 @@
+schema: strict-spec-driven/roadmap-milestone/v2
+schema_version: 2
+artifact_type: roadmap_milestone
+schema_file: templates/strict-spec-driven/schemas/roadmap-milestone.yaml
+milestone:
+  0019-coding-agent-cli-hardening:
+    title: Coding Agent CLI Hardening
+goal: >-
+  Close the gap between the existing bridge/runtime and a practical coding-agent CLI by ensuring
+  production Anthropic sessions retain workspace-scoped Agent SDK controls, and by adding a direct
+  terminal command for running coding tasks without requiring callers to hand-write JSON-RPC.
+scope:
+  in:
+    - >-
+      Preserve Agent SDK options on Anthropic provider-routed sessions, including cwd, env, tools,
+      permissionMode, allowedTools, disallowedTools, resume, maxTurns, systemPrompt, and streaming.
+    - >-
+      Support Anthropic-compatible third-party API endpoints by forwarding provider/CLI
+      base-url, API-key, auth-token, and SDK env settings to Claude Agent SDK process env.
+    - >-
+      Add an `ai-spec-bridge agent` command with `run` alias for one-shot coding tasks in a
+      workspace.
+    - >-
+      Provide CLI flags for workspace, model, permission mode, tool allow/deny lists, turn limits,
+      system prompt, template, timeout, Anthropic-compatible API env, streaming, and JSON output.
+    - >-
+      Add deterministic tests for CLI parsing/run behavior and provider-routed Agent SDK option
+      forwarding.
+  out:
+    - Replacing the bridge JSON-RPC transport.
+    - Re-implementing OpenAI or DeepSeek as tool-using coding agents.
+    - Building a full-screen TUI, IDE extension, or long-lived REPL.
+done_criteria:
+  - >-
+    A user can run `ai-spec-bridge agent --workspace <repo> <prompt>` and receive terminal output
+    from a bridge-backed session.
+  - >-
+    A user can add `--json` to receive machine-readable notifications and the final JSON-RPC
+    response.
+  - >-
+    Anthropic provider-routed sessions pass workspace, environment, tools, and permission controls
+    through to the Claude Agent SDK instead of collapsing into a plain chat completion path.
+  - >-
+    Anthropic-compatible third-party endpoints can be configured with base URL plus either API key,
+    bearer auth token, or provider/CLI supplied SDK environment variables.
+  - Lint and focused tests cover the new CLI command and the provider option-forwarding regression.
+planned_changes: {}
+dependencies:
+  - 0001-bridge-foundation
+  - 0008-llm-provider
+  - 0017-lightweight-cli
+  - 0018-cli-ux-and-ecosystem
+risks:
+  - >-
+    Provider abstraction can blur the line between coding-agent providers and plain chat providers;
+    this milestone limits tool-using coding-agent behavior to the Anthropic/Claude Agent SDK path.
+  - >-
+    Human-readable terminal output can duplicate streamed and final text unless notification
+    rendering tracks stream state.
+status: proposed
+notes:
+  - >-
+    This milestone was created after code review found that src/cli.ts was a bridge launcher rather
+    than a direct coding-agent CLI, and that the production Anthropic provider path dropped Agent
+    SDK runtime options.

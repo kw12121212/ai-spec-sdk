@@ -1,0 +1,52 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: align-public-contract-and-release-readiness
+  status: proposed
+summary:
+  what:
+    - >-
+      Align public documentation, bridge contract, runtime capability discovery, and
+      release-readiness checks with the implemented ai-spec-sdk surface.
+  why:
+    - >-
+      The implemented bridge now exposes substantially more behavior than the public README,
+      roadmap, bridge contract, and capabilities metadata describe; downstream clients need a
+      trustworthy contract and release checklist before relying on the SDK.
+scope:
+  in:
+    - >-
+      Update README and roadmap status so completed SDK, transport, provider, tooling, and
+      observability capabilities are represented accurately.
+    - >-
+      Regenerate or repair docs/bridge-contract.yaml so it covers the current JSON-RPC methods,
+      transport behavior, auth scopes, notifications, errors, and environment variables without
+      stale duplicate sections.
+    - >-
+      Make bridge.capabilities advertise every callable JSON-RPC method handled by the bridge
+      dispatch path, including stream, audit, balancer, and policy discovery methods.
+    - >-
+      Add automated drift checks that compare dispatch methods, capabilities methods, auth scope
+      coverage, and bridge contract method coverage.
+    - >-
+      Add release-readiness verification for build, lint, test, TypeScript client build, and native
+      build smoke coverage where practical.
+  out:
+    - >-
+      Do not add new transports, new JSON-RPC methods, or new LLM provider behavior except metadata
+      and contract alignment needed for existing behavior.
+    - >-
+      Do not change existing runtime semantics for sessions, workflows, provider routing, auth,
+      quota, budget, or storage.
+    - >-
+      Do not include Python client, Python wheel, or Python platform publishing checks in the
+      release-readiness scope for this change.
+unchanged_behavior:
+  - >-
+    Existing JSON-RPC request and response behavior remains unchanged unless a bug is found in
+    method discovery or documentation generation.
+  - >-
+    Existing tests that exercise runtime behavior continue to pass without requiring real network
+    LLM credentials.

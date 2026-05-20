@@ -1,6 +1,7 @@
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import { defaultLogger as logger } from "./logger.js";
 import { AnthropicAdapter } from "./llm-provider/adapters/anthropic.js";
+import { buildAnthropicSdkEnv } from "./llm-provider/anthropic-env.js";
 import type { LLMProvider, ProviderConfig } from "./llm-provider/types.js";
 import { getTokenStore } from "./token-tracking/store.js";
 import { counterRegistry } from "./token-tracking/counters/index.js";
@@ -140,6 +141,78 @@ export async function runClaudeQuery({
       signal.addEventListener("abort", () => {
         abortController?.abort();
       });
+    }
+
+    if (provider && provider.config.type === "anthropic") {
+      const anthropicOptions: Record<string, unknown> = {
+        ...sdkOptions,
+        ...(provider.config.model !== undefined && sdkOptions["model"] === undefined
+          ? { model: provider.config.model }
+          : {}),
+        ...(provider.config.temperature !== undefined && sdkOptions["temperature"] === undefined
+          ? { temperature: provider.config.temperature }
+          : {}),
+        ...(provider.config.maxTokens !== undefined && sdkOptions["maxTokens"] === undefined && sdkOptions["max_tokens"] === undefined
+          ? { maxTokens: provider.config.maxTokens }
+          : {}),
+      };
+
+      const providerEnv: Record<string, string | undefined> = {
+        ...(env ?? {}),
+        ...buildAnthropicSdkEnv(provider.config),
+      };
+      if (Object.keys(providerEnv).length > 0) {
+        anthropicOptions["env"] = providerEnv;
+      }
+
+      for await (const message of queryFn({ prompt, options: anthropicOptions } as Parameters<QueryFunction>[0])) {
+        if (waitForResume) await waitForResume();
+        if (shouldStop() || signal?.aborted) {
+          logger.debug("query stopped by caller or aborted");
+          return {
+            status: "stopped",
+            result: null,
+            usage: null,
+          };
+        }
+
+        onEvent(message);
+
+        if (
+          message !== null &&
+          typeof message === "object" &&
+          Object.prototype.hasOwnProperty.call(message, "result")
+        ) {
+          terminalResult = (message as Record<string, unknown>)["result"];
+
+          const rawUsage = (message as Record<string, unknown>)["usage"];
+          if (rawUsage !== null && typeof rawUsage === "object") {
+            const u = rawUsage as Record<string, unknown>;
+            if (typeof u["input_tokens"] === "number" && typeof u["output_tokens"] === "number") {
+              const inT = u["input_tokens"] as number;
+              const outT = u["output_tokens"] as number;
+              terminalUsage = { inputTokens: inT, outputTokens: outT, totalTokens: computeTotalTokens(inT, outT) };
+            }
+          }
+        }
+      }
+
+      recordTokenUsage(
+        (options["sessionId"] as string) ?? "unknown",
+        provider.id,
+        provider.config.type,
+        terminalUsage,
+        options["messageId"] as string | undefined,
+      );
+
+      postQueryCheck(sessionId, effectiveProviderId, { onWarning: onQuotaWarning });
+      postQueryBudgetCheck(sessionId, effectiveProviderId, { onAlert: onBudgetAlert });
+
+      return {
+        status: "completed",
+        result: terminalResult,
+        usage: terminalUsage,
+      };
     }
 
     if (provider) {

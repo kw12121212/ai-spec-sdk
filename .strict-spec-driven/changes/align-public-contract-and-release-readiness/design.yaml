@@ -1,0 +1,55 @@
+schema: strict-spec-driven/change-design/v1
+schema_version: 1
+artifact_type: change_design
+schema_file: templates/strict-spec-driven/schemas/change-design.yaml
+change: align-public-contract-and-release-readiness
+approach:
+  - >-
+    Treat source-level dispatch as the authoritative set of callable bridge methods, then align
+    every public surface around that source of truth. Add or update tests so capabilities, auth
+    scopes, and bridge contract coverage cannot silently drift. Keep runtime behavior unchanged
+    unless metadata is currently incomplete or inconsistent.
+  - >-
+    Refresh user-facing documentation after the machine-checkable contract is corrected, so README
+    and roadmap describe the same implemented surface exposed by bridge.capabilities and
+    docs/bridge-contract.yaml.
+  - >-
+    Use release-readiness checks as runnable project scripts or tests rather than prose-only
+    instructions, prioritizing deterministic checks that do not require real LLM credentials.
+decisions:
+  source-dispatch-is-authoritative:
+    decision: >-
+      The bridge dispatch table is the authoritative source for currently callable JSON-RPC methods
+      during this cleanup.
+    rationale: >-
+      The immediate problem is drift between implementation and public metadata. Using dispatch as
+      the source prevents under-advertising implemented methods and makes gaps visible to clients
+      and contract generation.
+  contract-coverage-is-tested:
+    decision: >-
+      The bridge contract must be covered by automated drift checks against capabilities and
+      dispatch.
+    rationale: >-
+      A hand-maintained YAML contract has already fallen behind. Tests provide a low-cost guardrail
+      even if the contract remains YAML rather than fully generated in this change.
+  release-checks-avoid-real-credentials:
+    decision: >-
+      Release-readiness validation must not require live LLM credentials or Python packaging tools
+      by default.
+    rationale: >-
+      The normal project test suite uses SDK stubs for determinism, and Python publication is out of
+      scope for this release cleanup. Real-provider checks can remain optional smoke tests, but
+      default release checks should be reliable in local and CI environments.
+alternatives: []
+risks:
+  - >-
+    Contract regeneration may reveal callable methods that lack complete parameter/result
+    documentation. Mitigation: mark the coverage gap explicitly in docs and add drift tests first,
+    then fill method details in the same change without changing behavior.
+  - >-
+    Packaging checks can be slow or environment-sensitive, especially native build validation.
+    Mitigation: keep default checks deterministic and make any live-provider or cross-platform
+    release smoke checks opt-in.
+  - >-
+    Updating roadmap status could obscure future work if completed and planned items are mixed.
+    Mitigation: separate implemented capabilities from remaining hardening/future release tasks.

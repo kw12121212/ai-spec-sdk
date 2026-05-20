@@ -1,0 +1,27 @@
+schema: strict-spec-driven/question-list/v1
+schema_version: 1
+artifact_type: question_list
+schema_file: templates/strict-spec-driven/schemas/question-list.yaml
+change: align-public-contract-and-release-readiness
+open: []
+resolved:
+  - id: scope-derived-from-current-audit
+    question: >-
+      Should this change alter runtime behavior or only align public contract, metadata, docs, and
+      verification?
+    context: >-
+      The prior project scan found documentation and capability metadata drift, but tests for
+      runtime behavior already pass.
+    answer: >-
+      Limit the change to metadata, contract, documentation, and release-readiness checks unless an
+      implementation bug is directly required to make existing callable behavior discoverable.
+    status: resolved
+  - id: python-release-out-of-scope
+    question: Should release-readiness checks include Python client or Python wheel publishing?
+    context: >-
+      The change originally included Python wheel build validation in the release-readiness scope.
+      The requested release cleanup now explicitly excludes Python platform considerations.
+    answer: >-
+      No. Python client tests, Python wheel builds, and Python platform publishing checks are out of
+      scope for this change's release-readiness work.
+    status: resolved
