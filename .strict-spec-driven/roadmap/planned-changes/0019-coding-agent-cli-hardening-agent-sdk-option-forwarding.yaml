@@ -5,7 +5,7 @@ schema_file: ../../templates/strict-spec-driven/schemas/planned-change.yaml
 planned_change:
   id: agent-sdk-option-forwarding
   milestone: 0019-coding-agent-cli-hardening
-status: planned
+status: complete
 summary: Preserve workspace-scoped Claude Agent SDK controls on Anthropic provider-routed sessions
 details: >-
   Ensure the production Anthropic provider path keeps using the Claude Agent SDK as a coding-agent

@@ -57,7 +57,7 @@ risks:
   - >-
     Human-readable terminal output can duplicate streamed and final text unless notification
     rendering tracks stream state.
-status: active
+status: complete
 notes:
   - >-
     This milestone was created after code review found that src/cli.ts was a bridge launcher rather

@@ -89,3 +89,18 @@ requirements:
         - GIVEN: 'session start with stream: true'
         - WHEN: the LLM provider streams a response
         - THEN: a stream_chunk notification is emitted
+  anthropic-provider-sdk-option-forwarding:
+    strength: MUST
+    statement: >-
+      Anthropic provider-routed sessions MUST preserve Claude Agent SDK runtime options for
+      workspace, environment, tools, permission mode, allow and deny tool lists, resume, max turns,
+      system prompt, model, and streaming.
+    scenarios:
+      provider-routed-session-preserves-sdk-options:
+        - GIVEN: >-
+            a session is routed through a configured Anthropic provider with workspace, environment,
+            tool, permission, resume, turn, system prompt, model, and streaming controls
+        - WHEN: the session starts a Claude Agent SDK query
+        - THEN: >-
+            the SDK query options include those controls instead of using a plain chat completion
+            path

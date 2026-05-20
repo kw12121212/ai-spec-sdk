@@ -47,3 +47,18 @@ requirements:
         - THEN: >-
             ANTHROPIC_BASE_URL and ANTHROPIC_API_KEY are set in the Agent SDK environment and passed
             to the session dispatch
+  anthropic-compatible-sdk-env:
+    strength: MUST
+    statement: >-
+      Anthropic provider configuration MUST map API key, auth token, base URL aliases, and provider
+      SDK environment entries into Claude Agent SDK environment options for Anthropic-compatible
+      endpoints.
+    scenarios:
+      provider-config-maps-sdk-env:
+        - GIVEN: >-
+            an Anthropic-compatible provider is configured with base URL, API key or auth token, and
+            SDK environment values
+        - WHEN: a provider-routed Claude Agent SDK query is started
+        - THEN: >-
+            the SDK query environment contains ANTHROPIC_BASE_URL, ANTHROPIC_API_KEY or
+            ANTHROPIC_AUTH_TOKEN, and the configured SDK environment values
