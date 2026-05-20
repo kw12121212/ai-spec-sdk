@@ -1,0 +1,30 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: cli-provider-config
+mapping:
+  implementation:
+    - src/cli.ts
+    - src/agent-cli.ts
+  tests:
+    - test/agent-cli.test.ts
+operations:
+  ADDED:
+    agent-command-provider-flags:
+      strength: MUST
+      statement: >-
+        The agent command MUST accept --base-url, --api-key, --auth-token, and repeatable --sdk-env
+        KEY=VALUE flags and forward them to the session dispatch path through the existing
+        anthropic-env mapping.
+      scenarios:
+        provider-flags-forwarding:
+          - GIVEN: >-
+              A user runs ai-spec-bridge agent --base-url https://api.example.com --api-key sk-123
+              --workspace /repo 'task'
+          - WHEN: The CLI builds the session options
+          - THEN: >-
+              ANTHROPIC_BASE_URL and ANTHROPIC_API_KEY are set in the Agent SDK environment and
+              passed to the session dispatch
+  MODIFIED: {}
+  REMOVED: {}

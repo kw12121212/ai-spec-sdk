@@ -32,3 +32,18 @@ requirements:
         - THEN: >-
             The adapter MUST correctly map internal tool calling format to OpenAI's function calling
             API.
+  agent-command-provider-flags:
+    strength: MUST
+    statement: >-
+      The agent command MUST accept --base-url, --api-key, --auth-token, and repeatable --sdk-env
+      KEY=VALUE flags and forward them to the session dispatch path through the existing
+      anthropic-env mapping.
+    scenarios:
+      provider-flags-forwarding:
+        - GIVEN: >-
+            A user runs ai-spec-bridge agent --base-url https://api.example.com --api-key sk-123
+            --workspace /repo 'task'
+        - WHEN: The CLI builds the session options
+        - THEN: >-
+            ANTHROPIC_BASE_URL and ANTHROPIC_API_KEY are set in the Agent SDK environment and passed
+            to the session dispatch

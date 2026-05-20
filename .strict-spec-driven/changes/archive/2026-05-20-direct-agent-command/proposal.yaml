@@ -1,0 +1,33 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: direct-agent-command
+  status: proposed
+summary:
+  what:
+    - >-
+      Add an ai-spec-bridge agent command (with run alias) for one-shot coding tasks from the
+      terminal
+  why:
+    - >-
+      Users need a direct coding-agent CLI that avoids hand-crafting JSON-RPC; workspace, model,
+      permissions, tools, prompts, and provider flags must all be expressible on the command line
+scope:
+  in:
+    - >-
+      agent subcommand with run alias; CLI flags for workspace, model, permission mode, allow/deny
+      tool lists, max-turns, system prompt, template, timeout, streaming, and --json output;
+      Anthropic-compatible endpoint flags for base-url, api-key, auth-token, and repeatable sdk-env
+      vars; terminal notification rendering for human-readable output; deterministic CLI-parsing and
+      session-dispatch tests
+  out:
+    - >-
+      Replacing the bridge JSON-RPC transport; re-implementing OpenAI or DeepSeek as tool-using
+      coding agents; a TUI, IDE extension, or long-lived REPL
+unchanged_behavior:
+  - Existing bridge transport, session management, and provider registry behavior
+roadmap:
+  milestone: 0019-coding-agent-cli-hardening
+  planned_change: direct-agent-command

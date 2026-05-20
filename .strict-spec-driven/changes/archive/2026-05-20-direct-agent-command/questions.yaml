@@ -1,0 +1,19 @@
+schema: strict-spec-driven/question-list/v1
+schema_version: 1
+artifact_type: question_list
+schema_file: templates/strict-spec-driven/schemas/question-list.yaml
+change: direct-agent-command
+open: []
+resolved:
+  - id: Q1
+    question: >-
+      Should the 'run' alias be a top-level command alias or a subcommand of 'agent' (i.e. 'agent
+      run <args>'  vs 'agent <args>' with 'run' as a top-level alias)?
+    context: >-
+      The planned-change summary says 'agent command with run alias'; the milestone scope says
+      'agent run alias'. Clarifying avoids an ambiguous CLI UX.
+    answer: >-
+      run is a top-level alias (ai-spec-bridge run <prompt>) — the existing src/cli.ts routes both
+      'agent' and 'run' at process.argv[2] to the same runAgentCli handler. Not a subcommand of
+      agent.
+    status: resolved

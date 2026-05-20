@@ -6,8 +6,10 @@ spec:
   id: workflow-built-in-tools
   title: Built-in Tools
 mapping:
-  implementation: []
-  tests: []
+  implementation:
+    - src/built-in-tools.ts
+  tests:
+    - test/built-in-tools.test.ts
 requirements:
   built-in-tools:
     strength: MUST

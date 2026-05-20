@@ -1,0 +1,56 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: direct-agent-command
+sections:
+  Implementation:
+    read-existing-cli:
+      text: Read src/cli.ts and related source files to understand the current CLI structure.
+      status: complete
+    add-agent-command:
+      text: >-
+        Register an 'agent' command (with 'run' alias) in src/cli.ts; accept workspace, model,
+        permission-mode, allow-tool, deny-tool, max-turns, system-prompt, template, timeout, stream,
+        and --json flags.
+      status: complete
+    add-provider-flags:
+      text: >-
+        Add Anthropic-compatible provider flags: --base-url, --api-key, --auth-token, and repeatable
+        --sdk-env (KEY=VALUE) flags; forward them to the session dispatch path via anthropic-env.ts.
+      status: complete
+    add-notification-renderer:
+      text: >-
+        Render bridge/stream_chunk and bridge/notification events as human-readable terminal output
+        by default; emit JSON-lines when --json is passed.
+      status: complete
+  Testing:
+    add-cli-parsing-tests:
+      text: >-
+        Add deterministic tests for agent command CLI flag parsing and session-dispatch option
+        construction covering all new flags.
+      status: complete
+    add-notification-render-tests:
+      text: >-
+        Add tests verifying human-readable terminal rendering and --json output mode for bridge
+        notifications.
+      status: complete
+    run-lint:
+      text: Run lint checks.
+      status: complete
+      command: bun run lint
+    run-tests:
+      text: Run unit tests.
+      status: complete
+      command: bun run test
+    run-build:
+      text: Run build validation.
+      status: complete
+      command: bun run build
+  Verification:
+    verify-scope:
+      text: Verify implementation matches proposal scope.
+      status: complete
+testing_gates:
+  validation_task: run-build
+  unit_test_task: run-tests

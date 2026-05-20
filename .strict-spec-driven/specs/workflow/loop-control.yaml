@@ -6,8 +6,10 @@ spec:
   id: workflow-loop-control
   title: Loop Control API
 mapping:
-  implementation: []
-  tests: []
+  implementation:
+    - src/workflow/loop-controller.ts
+  tests:
+    - test/workflow/loop-controller.test.ts
 requirements:
   '1':
     strength: MUST

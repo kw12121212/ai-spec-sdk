@@ -6,8 +6,10 @@ spec:
   id: session-resumption
   title: Session Resumption
 mapping:
-  implementation: []
-  tests: []
+  implementation:
+    - src/bridge.ts
+  tests:
+    - test/session-resumption.test.ts
 requirements:
   req-pause-session:
     strength: MUST

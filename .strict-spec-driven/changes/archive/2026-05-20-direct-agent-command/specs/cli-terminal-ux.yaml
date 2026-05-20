@@ -1,0 +1,40 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: cli-terminal-ux
+mapping:
+  implementation:
+    - src/cli.ts
+    - src/agent-cli.ts
+  tests:
+    - test/agent-cli.test.ts
+operations:
+  ADDED:
+    agent-command-registration:
+      strength: MUST
+      statement: >-
+        The CLI MUST expose an 'agent' command that accepts a prompt argument and workspace, model,
+        permission-mode, allow-tool, deny-tool, max-turns, system-prompt, template, timeout, stream,
+        and --json output flags.
+      scenarios:
+        agent-command-invocation:
+          - GIVEN: A user runs ai-spec-bridge agent --workspace /repo 'fix the bug'
+          - WHEN: The CLI parses the command
+          - THEN: >-
+              It dispatches a coding-agent session with the parsed workspace and prompt and renders
+              session notifications to the terminal
+    agent-json-output:
+      strength: MUST
+      statement: >-
+        When invoked with --json, the CLI MUST emit machine-readable JSON-lines for each bridge
+        notification and the final session result instead of human-readable terminal output.
+      scenarios:
+        json-output-mode:
+          - GIVEN: A user runs ai-spec-bridge agent --json --workspace /repo 'fix the bug'
+          - WHEN: The CLI dispatches the session and receives notifications
+          - THEN: >-
+              Each notification is emitted as a JSON-lines object and the final result is a
+              JSON-lines object with the session outcome
+  MODIFIED: {}
+  REMOVED: {}

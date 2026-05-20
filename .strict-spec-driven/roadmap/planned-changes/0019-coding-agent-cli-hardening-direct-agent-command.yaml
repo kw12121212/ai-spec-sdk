@@ -5,7 +5,7 @@ schema_file: ../../templates/strict-spec-driven/schemas/planned-change.yaml
 planned_change:
   id: direct-agent-command
   milestone: 0019-coding-agent-cli-hardening
-status: planned
+status: complete
 summary: Add a direct `ai-spec-bridge agent` coding task command with a `run` alias
 details: >-
   Add a terminal-facing coding-agent command on the existing binary so users can run one-shot coding
