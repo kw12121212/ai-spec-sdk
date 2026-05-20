@@ -1,0 +1,33 @@
+schema: strict-spec-driven/delta-spec/v1
+schema_version: 1
+artifact_type: delta_spec
+schema_file: templates/strict-spec-driven/schemas/delta-spec.yaml
+target_spec: cli-real-e2e-validation
+mapping:
+  implementation:
+    - README.md
+  tests:
+    - test/e2e/cli-real-process.e2e.test.ts
+operations:
+  ADDED:
+    compiled-cli-command-matrix:
+      strength: MUST
+      statement: >-
+        The project MUST provide deterministic real-process E2E coverage for the compiled non-LLM
+        CLI command matrix, including help aliases, doctor text and JSON modes, key management
+        flows, stdio JSON-RPC bridge requests, accepted transport startup paths, invalid argument
+        failures, and clean shutdown behavior under isolated HOME and workspace roots.
+      scenarios:
+        compiled-command-matrix-coverage:
+          - GIVEN: >-
+              A deterministic release or developer validation run exercises the compiled
+              ai-spec-bridge entrypoint without live provider credentials.
+          - WHEN: >-
+              The real-process CLI E2E suite runs the non-LLM command matrix through pipe-backed and
+              PTY-backed executions.
+          - THEN: >-
+              It verifies observable stdout or JSON output, exit status, generated key-store state
+              under the temporary HOME, transport health or capability responses, expected failure
+              paths, and clean process termination without requiring exact prose matches.
+  MODIFIED: {}
+  REMOVED: {}

@@ -5,7 +5,7 @@ schema_file: ../../templates/strict-spec-driven/schemas/planned-change.yaml
 planned_change:
   id: cli-command-matrix-e2e
   milestone: 0020-cli-real-e2e-validation
-status: planned
+status: complete
 summary: Cover the non-LLM CLI command matrix with real compiled processes
 details: >-
   Add deterministic real-process E2E coverage for every non-LLM command surface in `src/cli.ts`. The

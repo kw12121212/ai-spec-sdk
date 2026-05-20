@@ -1,0 +1,35 @@
+schema: strict-spec-driven/change-proposal/v1
+schema_version: 1
+artifact_type: change_proposal
+schema_file: templates/strict-spec-driven/schemas/change-proposal.yaml
+change:
+  id: cli-command-matrix-e2e
+  status: proposed
+summary:
+  what:
+    - >-
+      Add deterministic compiled-process E2E coverage for the non-LLM CLI command matrix, including
+      help aliases, doctor text and JSON, key management, stdio JSON-RPC bridge mode, HTTP and
+      WebSocket transport startup, invalid argument paths, and clean SIGTERM shutdown.
+  why:
+    - >-
+      The roadmap's real CLI validation milestone still lacks end-to-end confidence for the shipped
+      non-LLM command surface exposed by src/cli.ts, and the live agent E2E work depends on this
+      baseline command-matrix coverage.
+scope:
+  in:
+    - >-
+      Extend the compiled CLI E2E suite and README guidance for deterministic real-process coverage
+      of non-LLM CLI flows under an isolated HOME and workspace while reusing the existing shared
+      harness.
+  out:
+    - >-
+      Live provider agent scenarios, changes to the user-facing CLI contract beyond existing
+      accepted flags and subcommands, and exact natural-language output matching.
+unchanged_behavior:
+  - >-
+    Existing unit and integration coverage for bridge, auth, and live-provider agent behavior stays
+    in place; default bun run test remains deterministic and does not require local credentials.
+roadmap:
+  milestone: 0020-cli-real-e2e-validation
+  planned_change: cli-command-matrix-e2e

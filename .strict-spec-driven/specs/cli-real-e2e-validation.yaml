@@ -28,3 +28,22 @@ requirements:
         - THEN: >-
             It captures output, exit status, and cleanup results from real child processes and can
             choose pipe-backed or PTY-backed execution according to the assertion surface.
+  compiled-cli-command-matrix:
+    strength: MUST
+    statement: >-
+      The project MUST provide deterministic real-process E2E coverage for the compiled non-LLM CLI
+      command matrix, including help aliases, doctor text and JSON modes, key management flows,
+      stdio JSON-RPC bridge requests, accepted transport startup paths, invalid argument failures,
+      and clean shutdown behavior under isolated HOME and workspace roots.
+    scenarios:
+      compiled-command-matrix-coverage:
+        - GIVEN: >-
+            A deterministic release or developer validation run exercises the compiled
+            ai-spec-bridge entrypoint without live provider credentials.
+        - WHEN: >-
+            The real-process CLI E2E suite runs the non-LLM command matrix through pipe-backed and
+            PTY-backed executions.
+        - THEN: >-
+            It verifies observable stdout or JSON output, exit status, generated key-store state
+            under the temporary HOME, transport health or capability responses, expected failure
+            paths, and clean process termination without requiring exact prose matches.

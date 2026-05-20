@@ -127,7 +127,7 @@ Run the compiled CLI E2E harness with:
 bun run test:e2e:cli
 ```
 
-The harness locates or builds `dist/src/cli.js`, launches the compiled CLI entrypoint as a child process under Bun, provisions a temporary `HOME` plus disposable workspace roots, and validates pipe-backed and PTY-backed CLI flows without requiring live provider credentials.
+The harness locates or builds `dist/src/cli.js`, launches the compiled CLI entrypoint as a child process under Bun, provisions a temporary `HOME` plus disposable workspace roots, and validates the deterministic non-LLM command matrix without requiring live provider credentials. Coverage includes `-h`/`--help`, `doctor` text and JSON output plus invalid-port failures, `keygen`, `keys list`, successful and failed `keys revoke`, stdio JSON-RPC discovery and parse-error handling, and HTTP/WebSocket transport startup and shutdown under the isolated test roots.
 
 ### Opt-in live provider E2E
 

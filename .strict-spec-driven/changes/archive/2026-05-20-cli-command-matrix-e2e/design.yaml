@@ -1,0 +1,23 @@
+schema: strict-spec-driven/change-design/v1
+schema_version: 1
+artifact_type: change_design
+schema_file: templates/strict-spec-driven/schemas/change-design.yaml
+change: cli-command-matrix-e2e
+approach:
+  - >-
+    Build on the existing real-process CLI harness and extend the deterministic E2E suite to
+    exercise each non-LLM command surface through the compiled entrypoint under isolated
+    HOME/workspace roots, using pipe-backed execution for JSON/protocol assertions and the existing
+    PTY-backed path where human terminal rendering matters.
+decisions:
+  command-matrix-scope:
+    decision: >-
+      Keep the change focused on deterministic compiled-process coverage for non-LLM CLI surfaces
+      and reuse the existing harness instead of introducing a second E2E runner.
+    rationale: >-
+      The archived harness change already established compiled child-process execution, temp
+      HOME/workspace isolation, and PTY support. Reusing that path keeps the roadmap dependency
+      order intact and creates the stable baseline that the later live-agent CLI E2E change depends
+      on.
+alternatives: []
+risks: []

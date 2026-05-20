@@ -1,0 +1,49 @@
+schema: strict-spec-driven/task-list/v2
+schema_version: 2
+artifact_type: task_list
+schema_file: templates/strict-spec-driven/schemas/task-list.yaml
+change: cli-command-matrix-e2e
+sections:
+  Implementation:
+    read-cli-and-harness-surfaces:
+      text: >-
+        Read src/cli.ts, test/e2e/cli-harness.ts, and test/e2e/cli-real-process.e2e.test.ts to
+        confirm the currently shipped non-LLM command surfaces and the harness helpers available for
+        compiled-process assertions.
+      status: complete
+    extend-cli-command-matrix-tests:
+      text: >-
+        Extend the deterministic compiled CLI E2E suite to cover help aliases, doctor text and JSON,
+        invalid port failures, keygen/list/revoke flows, unknown keys subcommands, stdio
+        bridge.capabilities plus parse-error handling, accepted HTTP and WebSocket transport
+        startup, and clean SIGTERM shutdown under an isolated HOME/workspace root.
+      status: complete
+    update-command-matrix-docs:
+      text: >-
+        Update README guidance for the deterministic CLI E2E command so it describes the covered
+        non-LLM command matrix and the isolated temporary HOME/workspace expectations.
+      status: complete
+  Testing:
+    run-cli-e2e:
+      text: Run the deterministic compiled CLI E2E command-matrix suite.
+      status: complete
+      command: bun run test:e2e:cli
+    run-tests:
+      text: Run repository tests.
+      status: complete
+      command: bun run test
+    run-lint:
+      text: Run lint checks.
+      status: complete
+      command: bun run lint
+    run-build:
+      text: Run build validation.
+      status: complete
+      command: bun run build
+  Verification:
+    verify-scope:
+      text: Verify implementation matches proposal scope.
+      status: complete
+testing_gates:
+  validation_task: run-build
+  unit_test_task: run-tests
